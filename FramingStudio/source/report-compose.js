@@ -99,7 +99,7 @@ window.ReportCompose=(()=>{
  }
  async function compose(files,section){
   const {bytes,geometry}=await template(),paperDoc=await PDFLib.PDFDocument.load(bytes),doc=await PDFLib.PDFDocument.create(),font=await doc.embedFont(PDFLib.StandardFonts.Helvetica),papers=await doc.embedPages(paperDoc.getPages()),W=geometry.width,H=geometry.height,frame=geometry.frame,left=frame.left+6,right=frame.right-6,top=H-frame.top-7,bottom=H-frame.bottom+7,availableW=right-left,availableH=top-bottom,grid=geometry.rules.map(r=>H-(r.top+r.bottom)/2).filter(y=>y<top&&y>bottom).sort((a,b)=>b-a);
-  const layouts=[],stats={sourcePages:0,pages:0,alignedRows:0,tables:[],figures:[],placements:[],headers:[],fallbacks:0};let current=null,cursor=top,previousNotes='';
+  const layouts=[],stats={sourcePages:0,pages:0,alignedRows:0,centeredRows:0,tables:[],figures:[],placements:[],headers:[],fallbacks:0};let current=null,cursor=top,previousNotes='';
   const fresh=()=>{const page=doc.addPage([W,H]);page.drawPage(papers[layouts.length?Math.min(1,papers.length-1):0],{x:0,y:0,width:W,height:H});current={page,framing:[]};layouts.push(current);cursor=top;};
   const lineIndex=(at,above=0)=>grid.findIndex(y=>y+above<=at+.01);
   for(const file of files){const src=await PDFLib.PDFDocument.load(file.base64,{parseSpeed:PDFLib.ParseSpeeds.Fastest}),pages=src.getPages().slice(),eligible=(section==='A'&&/^Overall-[BD][.]pdf$/.test(file.file||''))||pages.length===1&&new RegExp('^Section-'+section+'-RC-\\d+\\.pdf$').test(file.file||''),inspected=await inspect(file.base64,eligible),pending=[];let introHeader111=null;stats.sourcePages+=pages.length;
@@ -127,8 +127,12 @@ window.ReportCompose=(()=>{
       const xs=block.xs.map(x=>left+(x-c.left)*scale),header=block.parts[0],hasFloorHeader111=introFlow&&header.cells.some(c=>c.items.some(t=>t.str.trim()==='Floor')),carry111=introFlow&&!hasFloorHeader111&&introHeader111?.columns===block.xs.length?introHeader111:null;let first=true;
       const slotsIn=part=>block.slots.slice(part.start,part.end).reduce((a,b)=>a+b,0);
       const drawPart=(part,repeated=false)=>{const needed=slotsIn(part);let idx=lineIndex(cursor);if(idx<0||idx+needed>=grid.length)return false;const offsets=[0];for(let r=part.start;r<part.end;r++)offsets.push(offsets.at(-1)+block.slots[r]);const ys=offsets.map(i=>grid[idx+i]);
-       for(const cell of part.cells){const a=cell.r0-part.start,b=cell.r1-part.start,x=xs[cell.col],w=xs[cell.col+1]-x,yt=ys[a],yb=ys[b];if(cell.fill)current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,color:PDFLib.rgb(...cell.fill)});current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,borderColor:PDFLib.rgb(.15,.15,.15),borderWidth:.9});
-        for(const [j,row]of cell.rows.entries()){const baseline=grid[idx+offsets[a]+j+1];textRow(row,baseline,false,repeated);}
+       for(const cell of part.cells){const a=cell.r0-part.start,b=cell.r1-part.start,x=xs[cell.col],w=xs[cell.col+1]-x,yt=ys[a],yb=ys[b];
+        // Keep paper rules out of cells so they cannot run through centered glyphs.
+        current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,color:PDFLib.rgb(...(cell.fill||[1,1,1])),borderColor:PDFLib.rgb(.15,.15,.15),borderWidth:.9});
+        if(!cell.rows.length)continue;
+        const pitch=grid[idx]-grid[idx+1],rows=cell.rows,s=Math.min(scale,(w-6)/Math.max(...rows.map(r=>r.crop.right-r.crop.left))),above=(rows[0].crop.top-rows[0].base)*s,below=(rows.at(-1).base-rows.at(-1).crop.bottom)*s,firstBase=(yt+yb+(rows.length-1)*pitch+below-above)/2;
+        for(const [j,row]of rows.entries()){const crop=row.crop,baseline=firstBase-j*pitch,record=place(row.items,crop,x+(w-(crop.right-crop.left)*s)/2,baseline-(row.base-crop.bottom)*s,s,true,repeated);record.baseline=baseline;record.sourceBaseline=row.base;record.cell={left:x,right:x+w,top:yt,bottom:yb};stats.centeredRows++;}
        }stats.tables.push({file:file.file,sourcePage:pageIndex+1,outputPage:layouts.length,xs,ys,repeated,rows:part.end-part.start,borderWidth:.9});cursor=ys.at(-1);return true;};
       if(hasFloorHeader111)introHeader111={columns:block.xs.length,slots:slotsIn(header),repeat:()=>drawPart(header,true)};
       for(const [partIndex,part]of block.parts.entries()){

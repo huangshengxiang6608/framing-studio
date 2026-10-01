@@ -10,6 +10,7 @@ const ReportPaper=(function createReportPaper(){
  .answer-paper-content>h1{font-size:16pt;margin:0!important;padding:${pitch}pt 0 0!important;line-height:${pitch}pt;break-after:avoid}
  .answer-paper-content table{background:#fff;max-width:100%;min-width:0!important}
  .answer-paper-content th{position:static!important}
+ .answer-paper-content th,.answer-paper-content td{text-align:center!important;vertical-align:middle!important;padding:3pt!important;background-color:#fff}
  .answer-paper-content tr{break-inside:avoid}
  .answer-paper-content .copy-figure{margin:0!important;padding:0!important;break-inside:avoid;background:#fff}
  .answer-paper-content .copy-figure img{display:block;width:100%;max-height:160mm;object-fit:contain}
@@ -17,7 +18,7 @@ const ReportPaper=(function createReportPaper(){
  .answer-paper-content .overall-copy{margin:0!important;background:transparent!important}
  .answer-paper-content .native-copy-scroll,.answer-paper-content .copy-table-wrap{overflow:visible!important;margin:0!important}
  .answer-paper-content .native-excel-copy{min-width:0!important;background:transparent!important}
- .answer-paper-content .native-excel-copy td{vertical-align:top!important;line-height:${pitch}pt!important;padding-top:0!important;padding-bottom:0!important}
+ .answer-paper-content .native-excel-copy td{line-height:1.35!important}
  #ex-report-content:has(.answer-ruled){overflow:auto;background:#eef2f4;padding:18px}
  @media print{
   #printpage:has(.answer-ruled),.answer-ruled{page:answer-sheet}

@@ -1533,6 +1533,7 @@ if(typeof module!=='undefined')module.exports=Loading;
  .answer-paper-content>h1{font-size:16pt;margin:0!important;padding:${pitch}pt 0 0!important;line-height:${pitch}pt;break-after:avoid}
  .answer-paper-content table{background:#fff;max-width:100%;min-width:0!important}
  .answer-paper-content th{position:static!important}
+ .answer-paper-content th,.answer-paper-content td{text-align:center!important;vertical-align:middle!important;padding:3pt!important;background-color:#fff}
  .answer-paper-content tr{break-inside:avoid}
  .answer-paper-content .copy-figure{margin:0!important;padding:0!important;break-inside:avoid;background:#fff}
  .answer-paper-content .copy-figure img{display:block;width:100%;max-height:160mm;object-fit:contain}
@@ -1540,7 +1541,7 @@ if(typeof module!=='undefined')module.exports=Loading;
  .answer-paper-content .overall-copy{margin:0!important;background:transparent!important}
  .answer-paper-content .native-copy-scroll,.answer-paper-content .copy-table-wrap{overflow:visible!important;margin:0!important}
  .answer-paper-content .native-excel-copy{min-width:0!important;background:transparent!important}
- .answer-paper-content .native-excel-copy td{vertical-align:top!important;line-height:${pitch}pt!important;padding-top:0!important;padding-bottom:0!important}
+ .answer-paper-content .native-excel-copy td{line-height:1.35!important}
  #ex-report-content:has(.answer-ruled){overflow:auto;background:#eef2f4;padding:18px}
  @media print{
   #printpage:has(.answer-ruled),.answer-ruled{page:answer-sheet}
@@ -2721,8 +2722,9 @@ window.Deflection=(()=>{
   const axis=buildingAxis(result,s.floor);
   return {v:{windAverage:average,method:'BUILDING_AXIS',axis,columns,columnGrade:'C'+Loading.settings(p).columnFcu,sourceLayers,readFloor:s.floor,readFloorName:FloorLevels.name(p,s.floor),readFraming:result.floors[s.floor-1]?.type,q,breadth,height,base,roof,grade:s.grade,limit:s.limit,direction:face==='B'?'X':'Y',walls,mode,layers,sourceMode:overall?.mode,windStart:overall?.leftEL},s:{...s,mode,direction:face==='B'?'X':'Y'},errors,available:model,availableColumns:cols};
  }
- function assess(p,result,key,face){try{const v=input(p,result,key,face);if(v.s.checkSignature94!==JSON.stringify(v.v))return {ok:false,pending:true,errors:[...v.errors,'墙柱或输入尚未 Check，请完成选择后点击 Check'],input:v.v,settings:v.s,available:v.available,availableColumns:v.availableColumns};const r=calculate(v.v);return {...r,errors:[...v.errors,...r.errors],ok:r.ok&&!v.errors.length,settings:v.s,available:v.available,availableColumns:v.availableColumns};}catch(e){return {ok:false,errors:[e.message],input:{},settings:saved(p,key,face),available:[]};}}
- function runCheck(p,result,key,face){const v=input(p,result,key,face);edit(p,key,face).checkSignature94=JSON.stringify(v.v);return assess(p,result,key,face);}
+ function assess(p,result,key,face){try{const v=input(p,result,key,face),r=calculate(v.v);return {...r,errors:[...v.errors,...r.errors],ok:r.ok&&!v.errors.length,settings:v.s,available:v.available,availableColumns:v.availableColumns};}catch(e){return {ok:false,errors:[e.message],input:{},settings:saved(p,key,face),available:[]};}}
+ // Compatibility entry point: assessment always uses current inputs without changing the project.
+ function runCheck(p,result,key,face){return assess(p,result,key,face);}
  function compare(B,D){if(!B.ok||!D.ok)return {governing:null,status:'待 B、D 两面资料完整'};return {governing:Math.abs(B.ratio-D.ratio)<1e-7?'B / D':B.ratio>D.ratio?'B':'D',status:B.status==='OK'&&D.status==='OK'?'OK':'NOT OK'};}
  function job(p,result,key){const faces={};for(const f of ['B','D']){const r=assess(p,result,key,f);if(!r.ok)throw Error(f+' 面：'+r.errors.join('；'));if(r.input.mode==='LAYERED'){const cols=f==='B'?['F','G','H','I','B']:['R','S','T','U','N'],cells={};r.bands.forEach((l,i)=>{['w','F','M','mm'].forEach((k,j)=>cells[cols[j]+(i+13)]=l[k]);});cells[cols[4]+'6']=r.bands.reduce((a,l)=>a+l.F,0);cells[cols[4]+'7']=r.bands.reduce((a,l)=>a+l.M,0);cells[cols[4]+'8']=r.delta*1000;cells[cols[4]+'9']=r.bands.length;cells[cols[4]+'10']='Inputs complete';r.expected['Layered Wind']=cells;}faces[f]={input:r.input,geometry:r.geometry,expected:r.expected};}
   return {type:'Deflection',method:'BUILDING_AXIS',section:'A',label:label(key)+' · Deflection B / D',scheme:label(key),project:p.name,faces};
@@ -2730,6 +2732,7 @@ window.Deflection=(()=>{
  function jobs(p,result,forReport=false){const batches=[],issues=[];if(forReport&&p.deflection?.include===false)return {batches,issues};for(const key of planKeys(p))try{batches.push(job(p,result,key));}catch(e){issues.push({id:label(key)+' · Deflection',reason:e.message});}return {batches,issues};}
  return {grades,defaults,init,planKeys,label,saved,edit,modelWalls,modelColumns,buildingAxis,buildingSection,section,calculate,input,assess,runCheck,compare,job,jobs};
 })();
+
 </script><script>window.DeflectionUI=(()=>{
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const n=(x,d=3)=>typeof x==='number'&&Number.isFinite(x)?x.toLocaleString('en-US',{maximumFractionDigits:d}):'—';
@@ -2751,7 +2754,7 @@ window.Deflection=(()=>{
   <p class="wp-sub">Column 等级：${esc(v.columnGrade||'—')}；E = ${n(Deflection.grades[v.columnGrade])} GPa。均跟随共同材料。</p>
 </div></details>
   <details class="wp-card df-fold" data-df-fold="inputs" ${folds.inputs?'open':''}><summary>风、标高与墙柱</summary><div class="df-fold-body"><div class="df-layout"><div><h2>${face} 面 · 风与高度</h2><p class="wp-sub">风荷载与 Wind Load Check 共用，自动更新。</p><div class="wp-grid"><label>当前风模式<output>${v.sourceMode==='LAYERED'?'逐层风':'均布风'}</output></label><label>受风起点<output>${n(v.windStart)} mPD</output></label><label>平均风压 · Wind Load Check<output data-df-output="wind-q">${n(v.q)} kPa</output></label><label>等效迎风宽度 · 自动读取<output data-df-output="wind-breadth">${n(v.breadth)} m</output></label></div><div class="wp-row"><button data-df-action="wind">到 Wind Load Check 修改</button><button data-df-action="materials">到共同材料设置 Wall 等级</button></div><div class="wp-grid"><label>固定端标高 · 跟随受风面底<output data-df-output="base">${n(v.base)} mPD</output></label><label>楼顶标高 · 自动读取<output>${n(levels.at(-1)?.z)} mPD</output></label></div><div class="df-result">悬臂高度 H <strong>${n(v.height)} m</strong><div class="wp-sub">H = 楼顶 mPD − 固定端 mPD</div></div><div class="wp-grid"><label>Wall 混凝土等级 · 共同材料<output data-df-output="grade">${esc(s.grade||'待设置 Wall 等级')}</output></label><label>弹性模量 E · 原表对应<output data-df-output="E">${n(Deflection.grades[s.grade])} GPa</output></label><label>允许挠度 · 固定 H / 500<output data-df-output="limit">500</output></label><label>风向 · 跟随 ${face} 面<output>${s.direction} 向</output></label></div></div></div>
-  <div class="df-foot"><div class="wp-row"><button class="primary" data-df-action="check">Check ${face} 面</button><span data-df-check-status>${r.pending?'待 Check':r.ok?'已 Check · '+r.status:'请补齐资料后重新 Check'}</span></div></div></div></details>
+  <div class="df-foot"><div class="wp-row"><span data-df-check-status role="status">${r.ok?'自动计算 · '+r.status:'待补齐资料，填写后自动计算'}</span></div></div></div></details>
 
   <section class="wp-card"><div class="wp-row wp-spread"><h2>B / D 挠度比较</h2><span class="df-status">${c.governing?'控制面：'+c.governing+' · '+c.status:c.status}</span></div><table class="wp-table"><tr><th>方向</th><th>顶端 Δ · mm</th><th>允许 H/n · mm</th><th>利用率</th><th>结果</th></tr>${[['B',B],['D',D]].map(([f,q])=>`<tr><td>${f} · ${q.settings.direction} 向</td><td>${q.ok?n(q.delta*1000,2):esc((q.errors||q.missing||['资料未完成']).join('；'))}</td><td>${q.ok?n(q.allow*1000,2):'—'}</td><td>${q.ok?n(q.ratio,3):'—'}</td><td class="${q.status==='OK'&&q.ok?'wp-ok':''}">${q.ok?q.status:`<button data-df-action="trace" data-face="${f}">查看待补输入</button>`}</td></tr>`).join('')}</table><p class="wp-sub">两面均完成后，按挠度利用率比较；Section A 保留比较表，并列出 B、D 的计算过程。</p></section>
   <section class="wp-card"><h2>Wind Load Check · 平均风压与等效均布荷载</h2><p class="wp-sub">自动读取 ${face} 面共用结果；修改 Wind Load Check 后同步更新。</p><div class="wp-grid"><label>受风面积<output data-df-output="wind-area">${n(v.windAverage?.area)} m²</output></label><label>总风力<output data-df-output="wind-force">${n(v.windAverage?.force)} kN</output></label></div><p class="wp-sub">q̄ = Σ(qᵢ Bᵢ hᵢ) / Σ(Bᵢ hᵢ)，B̄ = Σ(Bᵢ hᵢ) / H，w̄ = q̄B̄ = ΣFᵢ / H。保持总风力；不等同逐层挠度积分，也不保证更保守。</p>${v.sourceLayers?.length?`<div class="df-table-wrap"><table class="wp-table"><tr><th>层段</th><th>a–b m</th><th>q kPa</th><th>B m</th><th>F kN</th></tr>${v.sourceLayers.map(l=>`<tr><td>${esc(l.id)}</td><td>${n(l.a)}–${n(l.b)}</td><td>${n(l.q)}</td><td>${n(l.breadth)}</td><td>${n(l.q*l.breadth*(l.b-l.a))}</td></tr>`).join('')}</table></div>`:''}<p>q̄ = ${n(v.q)} kPa；B̄ = ${n(v.breadth)} m；w̄ = ${n(v.q*v.breadth)} kN/m</p></section>
@@ -2766,7 +2769,7 @@ window.Deflection=(()=>{
   if(action==='add-layer')host.transact(()=>{const s=Deflection.edit(p,key,face);let i=1;while(s.layers.some(l=>l.id==='L'+i))i++;s.layers.push({id:'L'+i,a:s.layers.at(-1)?.b??0,b:null,q:null,breadth:null});delete s.checkSignature94;});
   if(action==='remove-layer')host.transact(()=>{const s=Deflection.edit(p,key,face);s.layers.splice(+a.dataset.index,1);delete s.checkSignature94;});
   if(action==='wind'){host.navigate('elevation');}if(action==='materials'){host.navigate('checks');requestAnimationFrame(()=>{const control=document.getElementById('ex-wallFcu');if(control){for(let parent=control.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;control.scrollIntoView({block:'center'});control.focus({preventScroll:true});}});}
-  if(action==='face'){face=a.dataset.face;enter(host);WorkspacePages.refresh();}if(action==='check'){host.transact(()=>Deflection.runCheck(p,host.get().result,key,face));}
+  if(action==='face'){face=a.dataset.face;enter(host);WorkspacePages.refresh();}
   if(action==='trace'){folds.inputs=true;face=a.dataset.face;enter(host);WorkspacePages.refresh();requestAnimationFrame(()=>{const input=document.querySelector('[data-df-output=base]');input?.closest('.wp-card')?.scrollIntoView({behavior:'smooth',block:'start'});input?.focus({preventScroll:true});});}
   if(action==='excel'){host.navigate('excel');ExcelSync.generate('Deflection');}
   if(action==='copy-core')host.transact(()=>{const s=Deflection.saved(p,key,face),target=Deflection.edit(p,key,face==='B'?'D':'B');for(const k of ['selected','selectedColumns','selection92','floor94'])target[k]=s[k]===undefined?undefined:JSON.parse(JSON.stringify(s[k]));delete target.checkSignature94;});
@@ -2786,6 +2789,7 @@ window.Deflection=(()=>{
 
  return {render,click,change,enter,setFloor,pick,overlay};
 })();
+
 </script><script>
 // Foundation v8 source methods; one shared area-load input for both copies.
 window.Foundation=(()=>{
@@ -4300,7 +4304,7 @@ window.ReportCompose=(()=>{
  }
  async function compose(files,section){
   const {bytes,geometry}=await template(),paperDoc=await PDFLib.PDFDocument.load(bytes),doc=await PDFLib.PDFDocument.create(),font=await doc.embedFont(PDFLib.StandardFonts.Helvetica),papers=await doc.embedPages(paperDoc.getPages()),W=geometry.width,H=geometry.height,frame=geometry.frame,left=frame.left+6,right=frame.right-6,top=H-frame.top-7,bottom=H-frame.bottom+7,availableW=right-left,availableH=top-bottom,grid=geometry.rules.map(r=>H-(r.top+r.bottom)/2).filter(y=>y<top&&y>bottom).sort((a,b)=>b-a);
-  const layouts=[],stats={sourcePages:0,pages:0,alignedRows:0,tables:[],figures:[],placements:[],headers:[],fallbacks:0};let current=null,cursor=top,previousNotes='';
+  const layouts=[],stats={sourcePages:0,pages:0,alignedRows:0,centeredRows:0,tables:[],figures:[],placements:[],headers:[],fallbacks:0};let current=null,cursor=top,previousNotes='';
   const fresh=()=>{const page=doc.addPage([W,H]);page.drawPage(papers[layouts.length?Math.min(1,papers.length-1):0],{x:0,y:0,width:W,height:H});current={page,framing:[]};layouts.push(current);cursor=top;};
   const lineIndex=(at,above=0)=>grid.findIndex(y=>y+above<=at+.01);
   for(const file of files){const src=await PDFLib.PDFDocument.load(file.base64,{parseSpeed:PDFLib.ParseSpeeds.Fastest}),pages=src.getPages().slice(),eligible=(section==='A'&&/^Overall-[BD][.]pdf$/.test(file.file||''))||pages.length===1&&new RegExp('^Section-'+section+'-RC-\\d+\\.pdf$').test(file.file||''),inspected=await inspect(file.base64,eligible),pending=[];let introHeader111=null;stats.sourcePages+=pages.length;
@@ -4328,8 +4332,12 @@ window.ReportCompose=(()=>{
       const xs=block.xs.map(x=>left+(x-c.left)*scale),header=block.parts[0],hasFloorHeader111=introFlow&&header.cells.some(c=>c.items.some(t=>t.str.trim()==='Floor')),carry111=introFlow&&!hasFloorHeader111&&introHeader111?.columns===block.xs.length?introHeader111:null;let first=true;
       const slotsIn=part=>block.slots.slice(part.start,part.end).reduce((a,b)=>a+b,0);
       const drawPart=(part,repeated=false)=>{const needed=slotsIn(part);let idx=lineIndex(cursor);if(idx<0||idx+needed>=grid.length)return false;const offsets=[0];for(let r=part.start;r<part.end;r++)offsets.push(offsets.at(-1)+block.slots[r]);const ys=offsets.map(i=>grid[idx+i]);
-       for(const cell of part.cells){const a=cell.r0-part.start,b=cell.r1-part.start,x=xs[cell.col],w=xs[cell.col+1]-x,yt=ys[a],yb=ys[b];if(cell.fill)current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,color:PDFLib.rgb(...cell.fill)});current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,borderColor:PDFLib.rgb(.15,.15,.15),borderWidth:.9});
-        for(const [j,row]of cell.rows.entries()){const baseline=grid[idx+offsets[a]+j+1];textRow(row,baseline,false,repeated);}
+       for(const cell of part.cells){const a=cell.r0-part.start,b=cell.r1-part.start,x=xs[cell.col],w=xs[cell.col+1]-x,yt=ys[a],yb=ys[b];
+        // Keep paper rules out of cells so they cannot run through centered glyphs.
+        current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,color:PDFLib.rgb(...(cell.fill||[1,1,1])),borderColor:PDFLib.rgb(.15,.15,.15),borderWidth:.9});
+        if(!cell.rows.length)continue;
+        const pitch=grid[idx]-grid[idx+1],rows=cell.rows,s=Math.min(scale,(w-6)/Math.max(...rows.map(r=>r.crop.right-r.crop.left))),above=(rows[0].crop.top-rows[0].base)*s,below=(rows.at(-1).base-rows.at(-1).crop.bottom)*s,firstBase=(yt+yb+(rows.length-1)*pitch+below-above)/2;
+        for(const [j,row]of rows.entries()){const crop=row.crop,baseline=firstBase-j*pitch,record=place(row.items,crop,x+(w-(crop.right-crop.left)*s)/2,baseline-(row.base-crop.bottom)*s,s,true,repeated);record.baseline=baseline;record.sourceBaseline=row.base;record.cell={left:x,right:x+w,top:yt,bottom:yb};stats.centeredRows++;}
        }stats.tables.push({file:file.file,sourcePage:pageIndex+1,outputPage:layouts.length,xs,ys,repeated,rows:part.end-part.start,borderWidth:.9});cursor=ys.at(-1);return true;};
       if(hasFloorHeader111)introHeader111={columns:block.xs.length,slots:slotsIn(header),repeat:()=>drawPart(header,true)};
       for(const [partIndex,part]of block.parts.entries()){

@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.111**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.112**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -44,6 +44,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 ## 版本与依赖
 
-E2.111 按 PDF 批注调整 Section A 抄：合并短章节、首页连续排版、增加 SDL 列、删除圈选内容并改善墙编号。空间不足时自动续页，楼层表续页重复表头。Section B、Excel 模板/VBA、模型输入及计算逻辑保持不变。原生计算核对 6,199 项无差异。
+E2.112 按参考照片调整 Floor Summary 居中、表格线宽、Load Path 颜色及基础框、Wind/Overall 排版，隐藏不适用和确定为零的荷载项，精简 Deflection，并将 Foundation Recommendation 排在验算后。适用但缺失输入的项目仍显示。当前样例 A 14 页 / B 6 页；原生计算核对 6,199 项无差异，Excel 模板/VBA 与模型数据保持不变。
 
 第三方组件保留其随附许可文件。本仓库未另行授予开源许可。

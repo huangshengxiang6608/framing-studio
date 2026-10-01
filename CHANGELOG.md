@@ -1,5 +1,16 @@
 # 版本记录
 
+## E2.112 — 2026-10-01
+
+- Floor Summary 所有文字水平居中；Section A/B 表格边框加粗至 0.9 pt。
+- Vertical / Horizontal Load Path 用蓝色结构及 Foundation 框，红色传力箭头，保留绿色水平推拉箭头；增加图下标题并按照片更新默认 Horizontal Stability 文字。
+- Wind Load 示意图移到右上，H/B/D 和参数在左，后续计算连续排版。保留当前项目数值和风压算法。
+- 无地下室时隐藏不适用的 Soil/Uplift 内容；Sliding / Overturning 隐藏确定为零的荷载及无用自重分区，适用但缺失输入的项目仍显示。
+- Deflection 保留关键假定、截面图、惯性矩与挠度公式/代入值/结果，删去重复长说明。
+- Foundation Recommendation 移到 Foundation 验算抄后。
+- 6,199 项原生计算核对无差异，Excel 模板/VBA 和模型输入未改。Section B 正文/数值与 E2.111 一致。
+- 当前样例 A 14 页 / B 6 页；13,000 个正文字符与 501 行横线检查通过，40 行楼层表续页无漏行。
+
 ## E2.111 — 2026-10-01
 
 - Floor Summary / Design Assumptions 接在首页正文后；不足时续页，跨页楼层表重复正确表头。

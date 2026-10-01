@@ -164,7 +164,7 @@ static class ExcelBridge {
     var picked=governing=="B"||equalFaces?new[]{"B"}:governing=="D"?new[]{"D"}:governing=="Equal"||governing=="Both: no resistance"?new[]{"B","D"}:new string[0];
     if(picked.Length==0)throw new Exception("原 Excel 尚未确定控制面："+governing);
     // Generate the native copy for every governing face; preserve the editable workbook.
-    foreach(string face in picked){Run(x,b,"View"+face);Run(x,b,"GenerateEricCopy");OverallCopy98(b,job,face);RemovePaperNumbers111(b.Worksheets["抄"]);string label=Convert.ToString(Val(b.Worksheets["抄"].Range["D3"]));if(label.Contains("--")||!label.StartsWith(face))throw new Exception("原 Excel 抄未生成");if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"]))files.Add(ExportCopy(b.Worksheets["抄"],dir,"Overall-"+face+".pdf"));}
+    foreach(string face in picked){Run(x,b,"View"+face);Run(x,b,"GenerateEricCopy");OverallCopy98(b,job,face);RemovePaperNumbers111(b.Worksheets["抄"]);OverallPresentation112(b,job,face);string label=Convert.ToString(Val(b.Worksheets["抄"].Range["D3"]));if(label.Contains("--")||!label.StartsWith(face))throw new Exception("原 Excel 抄未生成");if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"]))files.Add(ExportCopy(b.Worksheets["抄"],dir,"Overall-"+face+".pdf"));}
     compare.Activate();
     ReportPages75(b,job,files,dir);ReportInks84(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,governing=governing,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }else if(kind=="Foundation"){
@@ -572,8 +572,37 @@ static class ExcelBridge {
   dynamic table=sheet.Range["A"+start+":H"+end];table.UnMerge();table.ClearContents();table.Borders.LineStyle=-4142;
   string[] first={"A","B","D","E","F","G"},final={"A","C","D","E","F","H"};
   object[] headings={"Floor","Usage","D.L. (kPa)","S.D.L. (kPa)","L.L. (kPa)","Structural Zone (m)"};
-  for(int i=0;i<=rows.Length;i++){int row=start+i;object[] values=i==0?headings:rows[i-1];for(int c=0;c<6;c++){dynamic cell=sheet.Range[first[c]+row+":"+final[c]+row];cell.Merge();cell.Value2=values[c] is string?"'"+Convert.ToString(values[c]):values[c];cell.WrapText=true;cell.Font.Bold=i==0;cell.Borders.LineStyle=1;cell.VerticalAlignment=-4160;if(i>0&&c>=2)cell.NumberFormat="0.0";}sheet.Rows[row].Hidden=false;sheet.Rows[row].RowHeight=i==0?40:26;}
+  for(int i=0;i<=rows.Length;i++){int row=start+i;object[] values=i==0?headings:rows[i-1];for(int c=0;c<6;c++){dynamic cell=sheet.Range[first[c]+row+":"+final[c]+row];cell.Merge();cell.Value2=values[c] is string?"'"+Convert.ToString(values[c]):values[c];cell.WrapText=true;cell.Font.Bold=i==0;cell.Borders.LineStyle=1;cell.HorizontalAlignment=-4108;cell.VerticalAlignment=-4160;if(i>0&&c>=2)cell.NumberFormat="0.0";}sheet.Rows[row].Hidden=false;sheet.Rows[row].RowHeight=i==0?40:26;}
   if(start+rows.Length<end)sheet.Rows[(start+rows.Length+1)+":"+end].Hidden=true;
+ }
+ // Presentation of generated Overall copies only. Missing applicable input stays visible.
+ static bool ReportZero112(dynamic sheet,int row,string force="B",string moment="F"){
+  object a=Val(sheet.Range[force+row]),b=Val(sheet.Range[moment+row]);return Number(a)&&Number(b)&&Math.Abs(Convert.ToDouble(a))<1e-9&&Math.Abs(Convert.ToDouble(b))<1e-9;
+ }
+ static bool ReportKnown112(Dictionary<string,object> input,string label){
+  string[] keys=label=="Hydrostatic"||label=="Uplift"?new[]{"leftGWL","rightGWL","baseRL"}:label=="Soil"?new[]{"leftEL","rightEL","baseRL","gammaLeft","gammaRight","submergedLeft","submergedRight"}:label=="Surcharge"?new[]{"leftQ","rightQ","leftEL","rightEL","baseRL"}:new string[0];
+  return keys.All(key=>input.ContainsKey(key)&&Number(input[key]));
+ }
+ static bool GroupZero112(dynamic sheet,int first,int last){
+  var text=new List<string>();for(int r=first;r<=last;r++)foreach(string c in new[]{"C","E"})text.Add(Convert.ToString(Val(sheet.Range[c+r])));
+  string combined=String.Join(" ",text);return System.Text.RegularExpressions.Regex.Matches(combined,@"=\s*0(?:[.]0+)?\s*k(?:N|Pa)\b").Count>=4&&!combined.Contains("= —");
+ }
+ static void ReportColumn112(dynamic sheet,int row,string value,int lastCol=3){
+  dynamic area=sheet.Cells[row,1].MergeArea;int final=Convert.ToInt32(area.Row)+Convert.ToInt32(area.Rows.Count)-1;area.UnMerge();dynamic target=sheet.Range["A"+row+":"+Column84(lastCol)+final];target.Merge();target.Value2="'"+value;target.WrapText=true;target.VerticalAlignment=-4160;
+ }
+ static void OverallPresentation112(dynamic b,Dictionary<string,object> job,string face){
+  dynamic s=b.Worksheets["抄"];var v=Obj(Obj(Obj(job["faces"])[face])["input"]);bool noBasement=Convert.ToString(v["basement"])=="No";
+  var names=new List<string>();foreach(dynamic shape in s.Shapes)if(Convert.ToString(shape.Name).StartsWith("eric_"))names.Add(Convert.ToString(shape.Name));
+  if(names.Count>0){double baseY=0;foreach(dynamic shape in s.Shapes)if(Convert.ToString(shape.Name).StartsWith("eric_")&&Convert.ToInt32(shape.Type)==9)baseY=Math.Max(baseY,Convert.ToDouble(shape.Top)+Convert.ToDouble(shape.Height));foreach(dynamic shape in s.Shapes)if(Convert.ToString(shape.Name).StartsWith("eric_")&&Convert.ToInt32(shape.Type)==17&&Convert.ToString(shape.TextFrame.Characters().Text)=="SECTION A-A")shape.Top=baseY+12;dynamic picture=s.Shapes.Range(names.ToArray()).Group();picture.Name="Overall-Wind-112";picture.Placement=3;picture.LockAspectRatio=-1;picture.Width=Convert.ToDouble(s.Range["D:F"].Width)-16;picture.Left=Convert.ToDouble(s.Range["D7"].Left)+8;picture.Top=Convert.ToDouble(s.Range["D7"].Top);}
+  string dimensions=Convert.ToString(Val(s.Range["A7"]));ReportColumn112(s,7,dimensions.Replace(",   ","\n").Replace(",  ","\n"));dynamic dimensionsBox=s.Range["A7:C8"];dimensionsBox.UnMerge();dimensionsBox.Merge();dimensionsBox.Value2="'"+dimensions.Replace(",   ","\n").Replace(",  ","\n");dimensionsBox.WrapText=true;dimensionsBox.VerticalAlignment=-4160;s.Rows["7:8"].RowHeight=24;
+  ReportColumn112(s,9,Convert.ToString(Val(s.Range["A9"])));ReportColumn112(s,12,Convert.ToString(Val(s.Range["A12"])));
+  // Tables of single parameters are written as short lines, as in the supplied handwriting.
+  foreach(int row in new[]{18,19,23,27}){string a=Convert.ToString(Val(s.Range["A"+row])),note=Convert.ToString(Val(s.Range["D"+row]));dynamic range=s.Range["A"+row+":F"+row];range.UnMerge();range.ClearContents();range.Merge();range.Value2="'"+a+"  "+note;range.WrapText=true;range.Borders.LineStyle=-4142;s.Rows[row].RowHeight=22;}
+  bool hydro=noBasement||ReportKnown112(v,"Hydrostatic")&&GroupZero112(s,90,95),soil=noBasement||ReportKnown112(v,"Soil")&&GroupZero112(s,96,101),surcharge=noBasement||ReportKnown112(v,"Surcharge")&&GroupZero112(s,102,107);
+  if(hydro)s.Rows["90:95"].Hidden=true;if(soil)s.Rows["96:101"].Hidden=true;if(surcharge)s.Rows["102:107"].Hidden=true;if(hydro&&soil&&surcharge)s.Rows["88:108"].Hidden=true;
+  for(int row=130;row<=145;row++){string label=Convert.ToString(Val(s.Range["A"+row]));if(String.IsNullOrWhiteSpace(label))continue;bool inactive=noBasement&&(label=="Hydrostatic"||label=="Soil"||label=="Uplift"||label=="Surcharge");if(inactive||ReportKnown112(v,label)&&ReportZero112(s,row))s.Rows[row].Hidden=true;}
+  if(noBasement){s.Rows["45:67"].Hidden=true;s.Range["A68"].Value2="Self-weight";s.Range["A86"].Value2="Assume φ = "+N98(D(v,"phi"))+"°";s.Rows[87].Hidden=true;}
+  for(int row=69;row<=72;row++){string value=Convert.ToString(Val(s.Range["A"+row]))??"";if(System.Text.RegularExpressions.Regex.IsMatch(value,@"=\s*0[.]000 kN$"))s.Rows[row].Hidden=true;}
  }
  static void RemovePaperNumbers111(dynamic sheet){
   dynamic range=sheet.UsedRange;var values=(object[,])range.Value2;int r0=Convert.ToInt32(range.Row),c0=Convert.ToInt32(range.Column);
@@ -592,7 +621,7 @@ static class ExcelBridge {
  }
 
  static void Plan98(dynamic s,Dictionary<string,object> v,Dictionary<string,object> g){
-  var a=Obj(v["axis"]);double x0=D(a,"x0"),y0=D(a,"y0"),width=D(a,"x1")-x0,height=D(a,"y1")-y0,total=Convert.ToDouble(s.Range["A:L"].Width),left=total*.68,top=67,scale=Math.Min((total-left-24)/Math.Max(width,.001),164/Math.Max(height,.001)),ww=width*scale,hh=height*scale;
+  var a=Obj(v["axis"]);double x0=D(a,"x0"),y0=D(a,"y0"),width=D(a,"x1")-x0,height=D(a,"y1")-y0,total=Convert.ToDouble(s.Range["A:L"].Width),left=total*.68,top=67,scale=Math.Min((total-left-24)/Math.Max(width,.001),125/Math.Max(height,.001)),ww=width*scale,hh=height*scale;
   dynamic box=s.Shapes.AddShape(1,left,top,ww,hh);box.Fill.Visible=0;box.Line.Weight=.7;box.Line.ForeColor.RGB=Color75("#000000");box.Placement=2;
   foreach(var raw in Arr(g["parts"])){var r=Obj(raw);double px=left+(D(r,"x")-D(r,"w")/2-x0)*scale,py=top+(D(r,"y")-D(r,"h")/2-y0)*scale;
    dynamic q=s.Shapes.AddShape(1,px,py,Math.Max(.9,D(r,"w")*scale),Math.Max(.9,D(r,"h")*scale));q.Placement=2;q.Fill.ForeColor.RGB=Color75("#0057b8");q.Line.Visible=0;
@@ -604,7 +633,7 @@ static class ExcelBridge {
   Line98(s,left,top-12,left+ww,top-12);Line98(s,ax,top-15,ax,top-9);
   Text98(s,N98(D(a,"x")-x0)+" m",left+ww*.15,top-27,60,13,8);Text98(s,N98(D(a,"x1")-D(a,"x"))+" m",left+ww*.63,top-27,60,13,8);
   Text98(s,N98(height)+" m",left+ww+2,top+hh*.72,22,13,7);
-  Text98(s,"Selected walls / columns;\ndashed = bending axis",left-5,top+hh+27,total-left+4,30,8);
+  Text98(s,"Details: functional Framing.",left-5,top+hh+27,total-left+4,14,8);
   PlanLabels111(s,g,left,top,scale,x0,y0,ww,hh);
  }
  static void DeflectionCopy98(dynamic x,dynamic b,Dictionary<string,object> job,List<object> files,string dir,dynamic summary){
@@ -615,13 +644,13 @@ static class ExcelBridge {
    Band98(s,1,"Deflection Checking of Building",30,false,"A:L",17,true);
    Band98(s,3,"Wind along "+v["direction"]+" - face "+face+(equal?" (B / D equal utilisation)":face==governing?" CONTROLS":" (other direction checked)"),29,false,"A:G",11,true);
    var parts=Arr(g["parts"]).Select(Obj).ToArray();int walls=parts.Count(p=>Convert.ToString(p["kind"])=="Wall"),columns=parts.Length-walls;
-   Band98(s,4,"Resisting section: "+walls+" walls, "+columns+" columns.\nFloor "+Convert.ToString(v["readFloorName"])+" / "+Convert.ToString(v["readFraming"]),34,false,"A:G",10);
-   Band98(s,5,"Constant section and common bending action assumed above the wind-face base.",33,false,"A:G",10);
+   Band98(s,4,"Assume "+walls+" walls, "+columns+" columns resist wind; constant EI.",34,false,"A:G",10);
+
    Band98(s,6,"=\"Average wind pressure = \"&TEXT("+refSheet+"B6,\"0.000\")&\" kPa\"",22,true,"A:G",10);
    Band98(s,7,"=\"H = \"&TEXT("+refSheet+"B16,\"0.###\")&\" - \"&TEXT("+refSheet+"B15,\"0.###\")&\" = \"&TEXT("+refSheet+"B5,\"0.###\")&\" m\"",22,true,"A:G",10);
    double eref=D(g,"referenceE"),erefKN=eref*1000000;bool mixed=parts.Any(p=>Math.Abs(D(p,"E")-eref)>1e-8);
    Band98(s,8,(mixed?"Reference E = ":"E = ")+N98(eref)+" GPa = "+N98(erefKN,"#,##0")+" kN/m²",22,false,"A:G",10);
-   Band98(s,9,"Specified building centre axis "+bend+".\nSee functional Framing for the selected section.",32,false,"A:G",10);
+   Band98(s,9,"Section: "+Convert.ToString(v["readFloorName"])+" / "+Convert.ToString(v["readFraming"])+"; bending axis "+bend+".",25,false,"A:G",10);
    Plan98(s,v,g);
    int row=12;Band98(s,row++,"Moment of inertia about "+bend,25,false,"A:L",12,true);
    Band98(s,row++,mixed?"I_eq = Σ (E_i / E_ref) [I_local,i + A_i d_i²]":"I_"+bend+" = Σ [I_local,i + A_i d_i²] = Σ [b_i t_i³ / 12 + (b_i t_i) d_i²]",23,false,"A:L",11);
@@ -634,15 +663,15 @@ static class ExcelBridge {
    }
    if(groups.Length>8)Band98(s,row++,"+ "+(groups.Length-8)+" further terms (all included; see "+face+" Axis worksheet).",20,false,"A:L",10);
    Band98(s,row++,"=\""+(mixed?"I_eq":"I_"+bend)+" = \"&TEXT("+refSheet+"B9/"+N98(erefKN)+",\"#,##0.000\")&\" m⁴\"",26,true,"A:L",12,true);
-   Band98(s,row++,"Dimensions in m; intersecting wall / column areas are counted once (union cells).",20,false,"A:L",9);
+
    Band98(s,row++,"Deflection of building",26,false,"A:L",12,true);
    Band98(s,row++,"δ = p_avg B_eq H⁴ / (8 E_ref I_eq)",24,false,"A:L",12);
    Band98(s,row++,"=\"= (\"&TEXT("+refSheet+"B6,\"0.000\")&\" × \"&TEXT("+refSheet+"B7,\"0.000\")&\" × \"&TEXT("+refSheet+"B5,\"0.###\")&\"⁴) / (8 × "+N98(erefKN,"#,##0")+" × \"&TEXT("+refSheet+"B9/"+N98(erefKN)+",\"0.000\")&\")\"",29,true,"A:L",11);
    Band98(s,row++,"=\"= \"&TEXT("+refSheet+"B10/1000,\"0.000000\")&\" m = \"&TEXT("+refSheet+"B10,\"0.000\")&\" mm\"",26,true,"A:L",12,true);
    Band98(s,row++,"=\"δ / H = \"&TEXT("+refSheet+"B10/1000,\"0.000000\")&\" / \"&TEXT("+refSheet+"B5,\"0.###\")&\" = \"&TEXT("+refSheet+"B10/1000/"+refSheet+"B5,\"0.000000\")&IF("+refSheet+"B10>0,\" = 1 / \"&TEXT("+refSheet+"B5*1000/"+refSheet+"B10,\"0.0\"),\"\")",26,true,"A:L",11);
    Band98(s,row++,"=IF("+refSheet+"B12<=1,\"≤\",\">\")&\" 1 / \"&TEXT("+refSheet+"B8,\"0\")&\"   ∴ \"&IF("+refSheet+"B12<=1,\"OKAY\",\"NOT OKAY\")&\"     (Governing face: "+governing+")\"",27,true,"A:L",13,true);
-   Band98(s,row++,"p_avg = Σ(p_i B_i h_i) / Σ(B_i h_i); B_eq = Σ(B_i h_i) / H.\nEquivalent uniform load preserves force; it is not necessarily conservative for deflection.",30,false,"A:L",9);
-   Band98(s,row++,"Specified-axis, constant-EI estimate. Coupling, cracked stiffness, shear, torsion, dynamics and foundation rotation are outside this check.",28,false,"A:L",9);
+
+
    s.Range["P1"].Value2="CURRENT";s.PageSetup.PaperSize=9;s.PageSetup.Orientation=1;s.PageSetup.LeftMargin=30;s.PageSetup.RightMargin=30;s.PageSetup.TopMargin=27;s.PageSetup.BottomMargin=27;s.PageSetup.Zoom=false;s.PageSetup.FitToPagesWide=1;s.PageSetup.FitToPagesTall=1;s.PageSetup.PrintArea="A1:L"+(row-1);
    x.CalculateFullRebuild();if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"]))files.Add(ExportCopy(s,dir,index==0?"Section-A-Deflection.pdf":"Section-A-Deflection-"+face+".pdf"));index++;
   }

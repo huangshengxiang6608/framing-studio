@@ -6,7 +6,7 @@ window.ReportExtras82=(()=>{
   const width=524.4,scale=width/540,rows=[],overlays=[];let row=1;
   const top=r=>{let t=0;for(let i=1;i<r;i++)t+=rows[i]?.height??21;return t;};
   const write=(text,level=0,editable=false)=>{text=String(text??'');const lines=text.split('\n').reduce((n,p)=>n+Math.max(1,Math.ceil(p.length/88)),0),height=Math.max(level===2?32:22,lines*16+8);rows[row++]={height,markup:`<div class="line level${level}${editable?' reference':''}">${esc(text).replace(/\n/g,'<br>')}</div>`};};
-  write(page.title,2);for(const l of page.lines||[])write(l.text,num(l.level),!!page.reference);
+  if(page.title)write(page.title,2);for(const l of page.lines||[])write(l.text,num(l.level),!!page.reference);
   if(page.image&&!page.referenceImageAfter){const vertical=page.image==='vertical-load-path.png';if(!["vertical-load-path.png","horizontal-load-path.png"].includes(page.image)||!images[page.image])throw Error('Missing report reference image');
    const [iw,ih,left,y,cw,ch]=vertical?[660,622,65,101,549,363]:[687,607,66,130,535,312],h=ch*width/cw,pt=top(row)+8;
    overlays.push(`<svg class="drawing" style="top:${pt}pt;width:${width}pt;height:${h}pt;overflow:hidden" viewBox="${left} ${y} ${cw} ${ch}" xmlns="http://www.w3.org/2000/svg"><image width="${iw}" height="${ih}" href="data:image/png;base64,${images[page.image]}"/></svg>`);

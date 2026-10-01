@@ -64,7 +64,7 @@ window.ReportCompose=(()=>{
   }return tables;
  }
  function plan(info,all,file){
-  info.text.forEach((t,i)=>t.id=i);const valid=info.text.filter(t=>t.y>=info.crop.bottom&&t.y<=info.crop.top),framing=valid.some(t=>/^(?:[AB]\.[\d.]+\s*)?Functional Framing\b/i.test(t.str));if(framing)return [{kind:'framing',...info.crop,items:valid}];
+  info.text.forEach((t,i)=>t.id=i);const valid=info.text.filter(t=>!t.omit111&&t.y>=info.crop.bottom&&t.y<=info.crop.top),framing=valid.some(t=>/^(?:(?:[AB]\.[\d.]+\s*)?Functional Framing\b|Framing .+\s\|)/i.test(t.str));if(framing)return [{kind:'framing',...info.crop,items:valid}];
   const loadPath=valid.find(t=>/Vertical Load Path|Horizontal Load Path/i.test(t.str));
   if(loadPath){
    const banner=all.find(s=>s.filled&&s.right-s.left>(info.crop.right-info.crop.left)*.75&&s.top>loadPath.y&&s.bottom<loadPath.y);
@@ -99,12 +99,12 @@ window.ReportCompose=(()=>{
  }
  async function compose(files,section){
   const {bytes,geometry}=await template(),paperDoc=await PDFLib.PDFDocument.load(bytes),doc=await PDFLib.PDFDocument.create(),font=await doc.embedFont(PDFLib.StandardFonts.Helvetica),papers=await doc.embedPages(paperDoc.getPages()),W=geometry.width,H=geometry.height,frame=geometry.frame,left=frame.left+6,right=frame.right-6,top=H-frame.top-7,bottom=H-frame.bottom+7,availableW=right-left,availableH=top-bottom,grid=geometry.rules.map(r=>H-(r.top+r.bottom)/2).filter(y=>y<top&&y>bottom).sort((a,b)=>b-a);
-  const layouts=[],stats={sourcePages:0,pages:0,alignedRows:0,tables:[],figures:[],placements:[],headers:[],fallbacks:0};let current=null,cursor=top;
+  const layouts=[],stats={sourcePages:0,pages:0,alignedRows:0,tables:[],figures:[],placements:[],headers:[],fallbacks:0};let current=null,cursor=top,previousNotes='';
   const fresh=()=>{const page=doc.addPage([W,H]);page.drawPage(papers[layouts.length?Math.min(1,papers.length-1):0],{x:0,y:0,width:W,height:H});current={page,framing:[]};layouts.push(current);cursor=top;};
   const lineIndex=(at,above=0)=>grid.findIndex(y=>y+above<=at+.01);
-  for(const file of files){const src=await PDFLib.PDFDocument.load(file.base64,{parseSpeed:PDFLib.ParseSpeeds.Fastest}),pages=src.getPages().slice(),eligible=pages.length===1&&new RegExp('^Section-'+section+'-RC-\\d+\\.pdf$').test(file.file||''),inspected=await inspect(file.base64,eligible),pending=[];stats.sourcePages+=pages.length;
+  for(const file of files){const src=await PDFLib.PDFDocument.load(file.base64,{parseSpeed:PDFLib.ParseSpeeds.Fastest}),pages=src.getPages().slice(),eligible=pages.length===1&&new RegExp('^Section-'+section+'-RC-\\d+\\.pdf$').test(file.file||''),inspected=await inspect(file.base64,eligible),pending=[];let introHeader111=null;stats.sourcePages+=pages.length;
    for(const [pageIndex,page]of pages.entries()){
-    const info=inspected[pageIndex],source=contents(page),ops=operations(source),all=shapes(source,ops),blocks=plan(info,all,file.file||''),c=info.crop,scale=Math.min(1,availableW/(c.right-c.left)),foundation=/Foundation/i.test(file.file||'');if(!eligible)current=null;
+    const info=inspected[pageIndex];if(section==='A'&&file.file==='Section-A-Intro.pdf')info.text.forEach(t=>{if(t.str.trim()==='Section A')t.omit111=true;});const source=contents(page),ops=operations(source),all=shapes(source,ops),blocks=plan(info,all,file.file||''),c=info.crop,scale=Math.min(1,availableW/(c.right-c.left)),foundation=/Foundation/i.test(file.file||''),noteTitle=section==='A'&&pages.length===1?info.text.map(t=>t.str).join(' '):'',notes=/Robustness\s*&\s*Progressive Collapse/i.test(noteTitle)?'robustness':/Other Considerations/i.test(noteTitle)?'other':'',continueNotes=notes==='other'&&previousNotes==='robustness',introFlow=section==='A'&&file.file==='Section-A-Intro.pdf';if(!eligible&&!continueNotes&&!(introFlow&&pageIndex>0))current=null;
     // Fit a native diagram page as a unit when a modest diagram reduction prevents an orphan caption.
     const figureScale=(block,factor)=>{const b=bounds(block.figs);return Math.min(scale,availableH/(b.top-b.bottom))*(block.figs.every(f=>f.header)?1:factor);};
     const fitsPage=(factor,start=top)=>{let at=start;const rowEnd=(row,at)=>{const i=lineIndex(at,(row.crop.top-row.base)*scale);return i<0?-Infinity:grid[i]-(row.base-row.crop.bottom)*scale-2;};for(const block of blocks){if(block.kind==='text')at=rowEnd(block.row,at);else if(block.kind==='zone'){const b=bounds(block.figs),start=at;for(const row of block.rows)at=rowEnd(row,at);at=Math.min(at,start-(b.top-b.bottom)*figureScale(block,factor)-3);}else if(block.kind==='table'){for(const part of block.parts){const count=block.slots.slice(part.start,part.end).reduce((a,b)=>a+b,0),i=lineIndex(at);if(i<0||i+count>=grid.length)return false;at=grid[i+count];}at-=2;}else return false;if(at<bottom)return false;}return true;};
@@ -124,16 +124,26 @@ window.ReportCompose=(()=>{
       for(const row of block.rows){const i=lineIndex(cursor,(row.crop.top-row.base)*scale);const record=textRow(row,grid[i]);cursor=record.y-2;}cursor=Math.min(cursor,start-figureHeight-3);continue;
      }
      if(block.kind==='table'){
-      const xs=block.xs.map(x=>left+(x-c.left)*scale),header=block.parts[0];let first=true;
+      const xs=block.xs.map(x=>left+(x-c.left)*scale),header=block.parts[0],hasFloorHeader111=introFlow&&header.cells.some(c=>c.items.some(t=>t.str.trim()==='Floor')),carry111=introFlow&&!hasFloorHeader111&&introHeader111?.columns===block.xs.length?introHeader111:null;let first=true;
       const slotsIn=part=>block.slots.slice(part.start,part.end).reduce((a,b)=>a+b,0);
       const drawPart=(part,repeated=false)=>{const needed=slotsIn(part);let idx=lineIndex(cursor);if(idx<0||idx+needed>=grid.length)return false;const offsets=[0];for(let r=part.start;r<part.end;r++)offsets.push(offsets.at(-1)+block.slots[r]);const ys=offsets.map(i=>grid[idx+i]);
        for(const cell of part.cells){const a=cell.r0-part.start,b=cell.r1-part.start,x=xs[cell.col],w=xs[cell.col+1]-x,yt=ys[a],yb=ys[b];if(cell.fill)current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,color:PDFLib.rgb(...cell.fill)});current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,borderColor:PDFLib.rgb(.15,.15,.15),borderWidth:.5});
         for(const [j,row]of cell.rows.entries()){const baseline=grid[idx+offsets[a]+j+1];textRow(row,baseline,false,repeated);}
        }stats.tables.push({file:file.file,sourcePage:pageIndex+1,outputPage:layouts.length,xs,ys,repeated,rows:part.end-part.start});cursor=ys.at(-1);return true;};
-      for(const part of block.parts){if(!current)begin();if(!drawPart(part)){begin();if(!first&&header!==part&&slotsIn(header)+slotsIn(part)<grid.length-1)drawPart(header,true);if(!drawPart(part))throw Error('表格单元格超过一页，请缩短该单元格内容');}first=false;}
-      cursor-=2;
+      if(hasFloorHeader111)introHeader111={columns:block.xs.length,slots:slotsIn(header),repeat:()=>drawPart(header,true)};
+      for(const [partIndex,part]of block.parts.entries()){
+       if(!current){begin();if(carry111)carry111.repeat();}
+       // Keep the heading row with at least the first data row when flowing an introduction.
+       const idx=lineIndex(cursor),need=slotsIn(part)+(introFlow&&first&&!carry111&&block.parts[partIndex+1]?slotsIn(block.parts[partIndex+1]):0);
+       if(idx<0||idx+need>=grid.length||!drawPart(part)){
+        begin();const repeat=carry111||(!first&&header!==part?{slots:slotsIn(header),repeat:()=>drawPart(header,true)}:null);
+        if(repeat&&repeat.slots+slotsIn(part)<grid.length-1)repeat.repeat();
+        if(!drawPart(part))throw Error('表格单元格超过一页，请缩短该单元格内容');
+       }first=false;
+      }
+      if(!(introFlow&&(hasFloorHeader111||carry111)&&pageIndex<pages.length-1&&block===blocks.at(-1)))cursor-=2;
      }
-    }if(!eligible)current=null;
+    }if(!eligible&&notes!=='robustness'&&!(introFlow&&pageIndex<pages.length-1))current=null;previousNotes=notes;
    }
    const embedded=await doc.embedPages(pending.map(p=>p.page),pending.map(p=>p.crop));for(const [i,p]of pending.entries())p.out.drawPage(embedded[i],{x:p.record.x,y:p.record.y,width:p.record.w,height:p.record.h});
   }

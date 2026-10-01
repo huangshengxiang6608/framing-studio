@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。此仓库以已验证的 **E2.110** 为初始版本，包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.111**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -27,7 +27,7 @@ Windows 结构建模与工程检查工具。此仓库以已验证的 **E2.110** 
 | `FramingStudio/assets/pdfjs/` | 随附的离线 PDF.js 资源 |
 | `FramingStudio/Excel/` | Excel 模板、模板映射及 ExcelBridge.exe |
 | `FramingStudio/desktop-bridge.js` | 网页界面与 Windows 宿主的通信 |
-| `CHANGELOG.md` | 本仓库初始版本说明 |
+| `CHANGELOG.md` | 版本与改动说明 |
 
 ## 构建
 
@@ -44,6 +44,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 ## 版本与依赖
 
-E2.110 的改动限于 Section A/B 线纸排版。公式、Excel 模板/VBA、模型数据及计算逻辑保持上一版本。工程结果仍取决于输入和模型假设。
+E2.111 按 PDF 批注调整 Section A 抄：合并短章节、首页连续排版、增加 SDL 列、删除圈选内容并改善墙编号。空间不足时自动续页，楼层表续页重复表头。Section B、Excel 模板/VBA、模型输入及计算逻辑保持不变。原生计算核对 6,199 项无差异。
 
 第三方组件保留其随附许可文件。本仓库未另行授予开源许可。

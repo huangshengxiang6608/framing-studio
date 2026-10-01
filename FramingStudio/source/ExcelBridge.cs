@@ -164,7 +164,7 @@ static class ExcelBridge {
     var picked=governing=="B"||equalFaces?new[]{"B"}:governing=="D"?new[]{"D"}:governing=="Equal"||governing=="Both: no resistance"?new[]{"B","D"}:new string[0];
     if(picked.Length==0)throw new Exception("原 Excel 尚未确定控制面："+governing);
     // Generate the native copy for every governing face; preserve the editable workbook.
-    foreach(string face in picked){Run(x,b,"View"+face);Run(x,b,"GenerateEricCopy");OverallCopy98(b,job,face);string label=Convert.ToString(Val(b.Worksheets["抄"].Range["D3"]));if(label.Contains("--")||!label.StartsWith(face))throw new Exception("原 Excel 抄未生成");if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"]))files.Add(ExportCopy(b.Worksheets["抄"],dir,"Overall-"+face+".pdf"));}
+    foreach(string face in picked){Run(x,b,"View"+face);Run(x,b,"GenerateEricCopy");OverallCopy98(b,job,face);RemovePaperNumbers111(b.Worksheets["抄"]);string label=Convert.ToString(Val(b.Worksheets["抄"].Range["D3"]));if(label.Contains("--")||!label.StartsWith(face))throw new Exception("原 Excel 抄未生成");if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"]))files.Add(ExportCopy(b.Worksheets["抄"],dir,"Overall-"+face+".pdf"));}
     compare.Activate();
     ReportPages75(b,job,files,dir);ReportInks84(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,governing=governing,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }else if(kind=="Foundation"){
@@ -224,7 +224,7 @@ static class ExcelBridge {
     CompareFullLoads(b,job);
     Stage79("原抄生成完成，整理版式");int formatCalc82=Convert.ToInt32(x.Calculation);bool formatScreen82=Convert.ToBoolean(x.ScreenUpdating),formatEvents82=Convert.ToBoolean(x.EnableEvents);
     try{x.Calculation=-4135;x.ScreenUpdating=false;x.EnableEvents=false;
-    ReportNumbers79(b.Worksheets["Section A 抄"]);ReportNumbers79(b.Worksheets["Section B 抄"]);ReportHeader75(b.Worksheets["Section A 抄"],job);ReportHeader75(b.Worksheets["Section B 抄"],job);
+    Intro111(b.Worksheets["Section A 抄"],job);ReportNumbers79(b.Worksheets["Section A 抄"]);ReportNumbers79(b.Worksheets["Section B 抄"]);ReportHeader75(b.Worksheets["Section A 抄"],job);ReportHeader75(b.Worksheets["Section B 抄"],job);
     if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"])) { if(section=="A"||section=="Check")ExportRC76(b.Worksheets["Section A 抄"],job,files,dir,"A");if(section=="B"||section=="Check")ExportRC76(b.Worksheets["Section B 抄"],job,files,dir,"B"); }
     }finally{x.Calculation=formatCalc82;x.ScreenUpdating=formatScreen82;x.EnableEvents=formatEvents82;}
     Run(x,b,"PersistManualSteel78");Run(x,b,"PersistTransfer79");input.Activate();ReportPages75(b,job,files,dir);ReportInks84(b);
@@ -323,7 +323,7 @@ static class ExcelBridge {
    dynamic printed=sheet.Range[sheet.PageSetup.PrintArea];int last=Convert.ToInt32(printed.Row)+Convert.ToInt32(printed.Rows.Count)-1;bool first=Convert.ToBoolean(n["first"]);object[,] labels82=(object[,])sheet.Range["A1:A"+Math.Max(2,last)].Value2;
    for(int r=1;r<=last;r++){
     string t=Convert.ToString(labels82[r,1]);if(string.IsNullOrEmpty(t))continue;
-    var headings=new Dictionary<string,string>{{"1 Introduction","A.1 Introduction"},{"2.3 Site Constraints and Client Requirements","A.1.1 Site Constraints and Client Requirements"},{"2 Design Appraisal","A.2 Design Appraisal"},{"2.1 Floor Summary","A.2.1 Floor Summary"},{"2.2 Design Assumptions","A.2.2 Design Assumptions"},{"Feasibility Checking",prefix+".2 RC Member Checks"}};
+    var headings=new Dictionary<string,string>{{"1 Introduction","Introduction"},{"2.3 Site Constraints and Client Requirements","Site Constraints and Client Requirements"},{"2 Design Appraisal",""},{"2.1 Floor Summary","Floor Summary"},{"2.2 Design Assumptions","Design Assumptions"},{"Feasibility Checking",prefix+".2 RC Member Checks"}};
     if(headings.ContainsKey(t))sheet.Cells[r,1].Value2=headings[t];
     if(t=="Feasibility Checking"&&!first){sheet.Rows["1:"+(r-1)].Hidden=true;sheet.PageSetup.PrintArea="$A$"+r+":$H$"+last;}
 
@@ -352,7 +352,7 @@ static class ExcelBridge {
    string pageFile="Section-A-Extra-"+index+".pdf";if(RestorePage79(b,page,job,name,Path.Combine(dir,pageFile))){files.Add(new {file=pageFile,reportOrder=D(page,"order"),chapter=D(page,"chapter")});continue;}Stage79("排版章节 "+index+"："+Convert.ToString(page["title"]));
    dynamic s=b.Worksheets.Add(Type.Missing,b.Worksheets[b.Worksheets.Count]);s.Name=name;s.DisplayPageBreaks=false;s.Columns["A:L"].ColumnWidth=6.5;
    s.Range["A1:L150"].Font.Name="Arial";s.Range["A1:L150"].Font.Size=11;s.Range["A1:L150"].Font.Color=Color75("#245b70");s.Rows["1:150"].RowHeight=21;
-   int row=1;ReportLine75(s,ref row,Convert.ToString(page["title"]),2,false);
+   int row=1;if(!string.IsNullOrEmpty(Convert.ToString(page["title"])))ReportLine75(s,ref row,Convert.ToString(page["title"]),2,false);
    bool reference=page.ContainsKey("reference")&&Convert.ToBoolean(page["reference"]);
    foreach(var l in Arr(page["lines"])){var a=Obj(l);ReportLine75(s,ref row,Convert.ToString(a["text"]),(int)D(a,"level"),reference);}
    if(page.ContainsKey("image")){
@@ -442,7 +442,7 @@ static class ExcelBridge {
  static void Palette84(dynamic sheet){
   dynamic range=sheet.UsedRange;range.Font.Color=Color75("#0057b8");range.Interior.Color=Color75("#ffffff");CleanBorders85(sheet,range);
   object raw=range.Value2;var values=raw as object[,];if(values!=null){int r0=Convert.ToInt32(range.Row),c0=Convert.ToInt32(range.Column);var red=new List<string>();var green=new List<string>();var black=new List<string>();
-   for(int r=1;r<=values.GetLength(0);r++)for(int c=1;c<=values.GetLength(1);c++){string t=Convert.ToString(values[r,c]);if(String.IsNullOrWhiteSpace(t))continue;string address=Column84(c0+c-1)+(r0+r-1);if(System.Text.RegularExpressions.Regex.IsMatch(t,@"\b(NOT\s*OK(?:AY)?|FAIL(?:ED)?|INPUT REQUIRED|NOT ASSESSED|NO RESISTANCE)\b",System.Text.RegularExpressions.RegexOptions.IgnoreCase))red.Add(address);else if(System.Text.RegularExpressions.Regex.IsMatch(t,@"\b(OK(?:AY)?|PASS(?:ED)?|SATISFIED)\b",System.Text.RegularExpressions.RegexOptions.IgnoreCase))green.Add(address);else if(System.Text.RegularExpressions.Regex.IsMatch(t,@"^(?:[AB]\.\d|[IVX]+[).]|Section [AB]|Scheme |.*(?:Load Path|Design Data|Design Codes|Foundation Recommendation))",System.Text.RegularExpressions.RegexOptions.IgnoreCase))black.Add(address);}
+   for(int r=1;r<=values.GetLength(0);r++)for(int c=1;c<=values.GetLength(1);c++){string t=Convert.ToString(values[r,c]);if(String.IsNullOrWhiteSpace(t))continue;string address=Column84(c0+c-1)+(r0+r-1);if(System.Text.RegularExpressions.Regex.IsMatch(t,@"\b(NOT\s*OK(?:AY)?|FAIL(?:ED)?|INPUT REQUIRED|NOT ASSESSED|NO RESISTANCE)\b",System.Text.RegularExpressions.RegexOptions.IgnoreCase))red.Add(address);else if(System.Text.RegularExpressions.Regex.IsMatch(t,@"\b(OK(?:AY)?|PASS(?:ED)?|SATISFIED)\b",System.Text.RegularExpressions.RegexOptions.IgnoreCase))green.Add(address);else if(System.Text.RegularExpressions.Regex.IsMatch(t,@"^(?:[AB]\.\d|[IVX]+[).]|Section [AB]|Introduction$|Site Constraints and Client Requirements$|Floor Summary$|Design Assumptions$|Scheme |.*(?:Load Path|Design Data|Design Codes|Foundation Recommendation))",System.Text.RegularExpressions.RegexOptions.IgnoreCase))black.Add(address);}
    foreach(var pair in new[]{Tuple.Create(red,"#c00000"),Tuple.Create(green,"#008000"),Tuple.Create(black,"#000000")})for(int i=0;i<pair.Item1.Count;i+=20)sheet.Range[String.Join(",",pair.Item1.Skip(i).Take(20))].Font.Color=Color75(pair.Item2);
   }
   foreach(dynamic shape in sheet.Shapes){ShapeInk84(shape);if(Convert.ToString(sheet.Name).Contains("抄"))ArrowInk84(shape);}
@@ -559,12 +559,44 @@ static class ExcelBridge {
  static dynamic Line98(dynamic s,double x,double y,double x2,double y2,bool dash=false,bool arrow=false){
   dynamic q=s.Shapes.AddLine(x,y,x2,y2);q.Placement=2;q.Line.ForeColor.RGB=Color75("#0057b8");q.Line.Weight=.9;if(dash)q.Line.DashStyle=4;if(arrow)q.Line.EndArrowheadStyle=3;return q;
  }
+
+ // Annotated Section A changes affect generated report sheets only.
+ static void Intro111(dynamic sheet,Dictionary<string,object> job){
+  if(!job.ContainsKey("reportFloors111"))return;
+  var rows=Arr(job["reportFloors111"]).Select(r=>Arr(r).ToArray()).ToArray();
+  int last=Convert.ToInt32(sheet.UsedRange.Row)+Convert.ToInt32(sheet.UsedRange.Rows.Count)-1,start=0,end=0;
+  object[,] labels=(object[,])sheet.Range["A1:A"+last].Value2;
+  for(int r=1;r<=last;r++){string t=Convert.ToString(labels[r,1]);if(t=="Preliminary Structural Design Appraisal Notes"||t=="Source: Design_Appraisal_Notes.docx")sheet.Cells[r,1].MergeArea.ClearContents();if(t=="Floor")start=r;if(start>0&&t=="2.2 Design Assumptions"){end=r-1;break;}}
+  if(start==0||end<start)throw new Exception("Section A floor summary could not be located");
+  if(rows.Length>end-start){int add=rows.Length-(end-start);sheet.Rows[(end+1)+":"+(end+add)].Insert();end+=add;}
+  dynamic table=sheet.Range["A"+start+":H"+end];table.UnMerge();table.ClearContents();table.Borders.LineStyle=-4142;
+  string[] first={"A","B","D","E","F","G"},final={"A","C","D","E","F","H"};
+  object[] headings={"Floor","Usage","D.L. (kPa)","S.D.L. (kPa)","L.L. (kPa)","Structural Zone (m)"};
+  for(int i=0;i<=rows.Length;i++){int row=start+i;object[] values=i==0?headings:rows[i-1];for(int c=0;c<6;c++){dynamic cell=sheet.Range[first[c]+row+":"+final[c]+row];cell.Merge();cell.Value2=values[c] is string?"'"+Convert.ToString(values[c]):values[c];cell.WrapText=true;cell.Font.Bold=i==0;cell.Borders.LineStyle=1;cell.VerticalAlignment=-4160;if(i>0&&c>=2)cell.NumberFormat="0.0";}sheet.Rows[row].Hidden=false;sheet.Rows[row].RowHeight=i==0?40:26;}
+  if(start+rows.Length<end)sheet.Rows[(start+rows.Length+1)+":"+end].Hidden=true;
+ }
+ static void RemovePaperNumbers111(dynamic sheet){
+  dynamic range=sheet.UsedRange;var values=(object[,])range.Value2;int r0=Convert.ToInt32(range.Row),c0=Convert.ToInt32(range.Column);
+  for(int r=1;r<=values.GetLength(0);r++)for(int c=1;c<=values.GetLength(1);c++)if(System.Text.RegularExpressions.Regex.IsMatch(Convert.ToString(values[r,c]),@"^Paper No[.]"))sheet.Cells[r0+r-1,c0+c-1].MergeArea.ClearContents();
+ }
+ static void PlanLabels111(dynamic s,Dictionary<string,object> g,double left,double top,double scale,double x0,double y0,double ww,double hh){
+  var occupied=new List<double[]>();
+  foreach(var group in Arr(g["parts"]).Select(Obj).GroupBy(r=>Convert.ToString(r["id"]))){
+   var r=group.OrderByDescending(q=>D(q,"w")*D(q,"h")).First();double cx=left+(D(r,"x")-x0)*scale,cy=top+(D(r,"y")-y0)*scale,lw=Math.Max(23,group.Key.Length*5+6),lh=13,lx,ly;
+   if(D(r,"w")>=D(r,"h")){lx=cx-lw/2;ly=cy+(cy<top+hh/2?-19:7);}else{lx=cx+(cx<left+ww/2?-lw-8:8);ly=cy-lh/2;}
+   lx=Math.Max(left+1,Math.Min(left+ww-lw-1,lx));ly=Math.Max(top+1,Math.Min(top+hh-lh-1,ly));
+   for(int attempt=0;attempt<10&&occupied.Any(q=>lx<q[0]+q[2]+2&&lx+lw>q[0]-2&&ly<q[1]+q[3]+2&&ly+lh>q[1]-2);attempt++)ly=Math.Min(top+hh-lh-1,ly+lh+3);
+   occupied.Add(new[]{lx,ly,lw,lh});double tx=Math.Max(lx,Math.Min(lx+lw,cx)),ty=Math.Max(ly,Math.Min(ly+lh,cy));dynamic leader=s.Shapes.AddLine(cx,cy,tx,ty);leader.Placement=2;leader.Line.Weight=.6;leader.Line.ForeColor.RGB=Color75("#000000");
+   dynamic label=Text98(s,group.Key,lx,ly,lw,lh,8.5);label.TextFrame.Characters().Font.Bold=true;label.TextFrame.HorizontalAlignment=-4108;label.Fill.Visible=-1;label.Fill.ForeColor.RGB=Color75("#ffffff");
+  }
+ }
+
  static void Plan98(dynamic s,Dictionary<string,object> v,Dictionary<string,object> g){
   var a=Obj(v["axis"]);double x0=D(a,"x0"),y0=D(a,"y0"),width=D(a,"x1")-x0,height=D(a,"y1")-y0,total=Convert.ToDouble(s.Range["A:L"].Width),left=total*.68,top=67,scale=Math.Min((total-left-24)/Math.Max(width,.001),164/Math.Max(height,.001)),ww=width*scale,hh=height*scale;
   dynamic box=s.Shapes.AddShape(1,left,top,ww,hh);box.Fill.Visible=0;box.Line.Weight=.7;box.Line.ForeColor.RGB=Color75("#000000");box.Placement=2;
   foreach(var raw in Arr(g["parts"])){var r=Obj(raw);double px=left+(D(r,"x")-D(r,"w")/2-x0)*scale,py=top+(D(r,"y")-D(r,"h")/2-y0)*scale;
    dynamic q=s.Shapes.AddShape(1,px,py,Math.Max(.9,D(r,"w")*scale),Math.Max(.9,D(r,"h")*scale));q.Placement=2;q.Fill.ForeColor.RGB=Color75("#0057b8");q.Line.Visible=0;
-   Text98(s,Convert.ToString(r["id"]),Math.Max(left,px-17),py+(D(r,"h")>D(r,"w")?D(r,"h")*scale*.5:2),30,11,7);
+
   }
   bool alongX=Convert.ToString(v["direction"])=="X";double ax=left+(D(a,"x")-x0)*scale,ay=top+(D(a,"y")-y0)*scale;
   if(alongX){Line98(s,ax,top-6,ax,top+hh+8,true);Text98(s,"y-y",ax+3,top+hh+8,36,14,8);Line98(s,left-32,top+hh*.45,left-4,top+hh*.45,false,true);Text98(s,"Wind X",left-43,top+hh*.45-16,42,14,8);}
@@ -573,6 +605,7 @@ static class ExcelBridge {
   Text98(s,N98(D(a,"x")-x0)+" m",left+ww*.15,top-27,60,13,8);Text98(s,N98(D(a,"x1")-D(a,"x"))+" m",left+ww*.63,top-27,60,13,8);
   Text98(s,N98(height)+" m",left+ww+2,top+hh*.72,22,13,7);
   Text98(s,"Selected walls / columns;\ndashed = bending axis",left-5,top+hh+27,total-left+4,30,8);
+  PlanLabels111(s,g,left,top,scale,x0,y0,ww,hh);
  }
  static void DeflectionCopy98(dynamic x,dynamic b,Dictionary<string,object> job,List<object> files,string dir,dynamic summary){
   var faces=Obj(job["faces"]);double rb=Convert.ToDouble(Val(b.Worksheets["B Axis"].Range["B12"])),rd=Convert.ToDouble(Val(b.Worksheets["D Axis"].Range["B12"]));bool equal=Math.Abs(rb-rd)<1e-7;string governing=equal?"B / D":rb>rd?"B":"D";

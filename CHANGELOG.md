@@ -1,5 +1,16 @@
 # 版本记录
 
+## E2.111 — 2026-10-01
+
+- Floor Summary / Design Assumptions 接在首页正文后；不足时续页，跨页楼层表重复正确表头。
+- Robustness 与 Other Considerations 合为一页；当前样例 Section A 从 18 页减为 16 页。
+- 按云线删除首页抬头、圈选编号、Design Appraisal 行、Framing 顶部说明和图例下方三行说明、Overall 正文重复页号。
+- Floor Summary 增加现有 Loading 中的 SDL，删除 Floor Height / Headroom / EM Zone 三列，保留 Structural Zone。
+- Load Path 删除轴号、轴圈和圈选楼层/层高标注，保留跨距尺寸；受力符号图例移到右上。
+- Deflection 墙编号加大、加粗，并用引线对应墙段，应用于 B、D 两方向。
+- 6,199 项原生计算核对无差异；Section B 六页逐页图像与 E2.110 一致。模板/VBA 与项目输入未改。
+- 40 行楼层表续页测试通过，每行恰好出现一次，各表格续页均有正确表头。
+
 ## E2.110 — 2026-10-01
 
 - Section A/B 正文、公式及表格文字按参考线纸的横线排版。

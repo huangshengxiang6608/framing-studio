@@ -63,12 +63,13 @@ const RCPlan=(()=>{
    return {type:'RC',section,fullLoads,projectFloors:floorSummary(p,model),label:'RC '+(section==='Check'?'Check':'Section '+section)+' · '+floors.map(floorName).join(', ')+' · 第 '+(i+1)+' 份',cells,sheetCells,members,copyNotes,dependencies:b.rows.filter(r=>!b.roots.includes(r)).map(id)};
   })};
  }
- function floorSummary(p,model){
+ function floorSummary(p,model,report111=false){
   const rows=[];
   for(const f of model.floors){
    const panels=Engine.floorModel(model,f).slabs,tokens=new Set(panels.map(c=>Loading.token('SLAB',c))),areas=LoadData.areas(p,f.n).filter(a=>a.rects?.length||a.panels.some(x=>tokens.has(x))),covered=new Set(areas.flatMap(a=>a.panels));
    const loads=[...([...tokens].some(t=>!covered.has(t))||!areas.length?[{...Loading.floorload(p,f.n),name:''}]:[]),...areas];
    for(const load of loads){const val=x=>Number.isFinite(x)?x:'INPUT REQUIRED',v=[load.usage||'INPUT REQUIRED',val(load.dl),val(LoadData.live(load)),f.h,val(f.headroom),val(f.em),Number.isFinite(f.sh)?f.sh/1000:'INPUT REQUIRED'];
+    if(report111)v.splice(0,v.length,load.usage||'INPUT REQUIRED',val(load.dl),val(load.sdl),val(LoadData.live(load)),Number.isFinite(f.sh)?f.sh/1000:'INPUT REQUIRED');
     const name=load.name||'',last=rows.at(-1),label=FloorLevels.name(p,f.n)+(name?' · '+name:'');
     if(loads.length===1&&last&&last.single&&last.hi===f.n-1&&last.area===name&&JSON.stringify(last.values)===JSON.stringify(v)){last.hi=f.n;last.label=FloorLevels.name(p,last.lo)+'–'+FloorLevels.name(p,f.n)+(name?' · '+name:'');}else rows.push({lo:f.n,hi:f.n,label,area:name,single:loads.length===1,values:v});
    }

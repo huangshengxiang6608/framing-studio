@@ -84,14 +84,11 @@ window.ReportContent=(()=>{
      if(columns===1)text(shapes,v.dim,x+51,y,cw-51,14,size);
      else text(shapes,v.dim,x+1,y+12,cw-2,10,5.8);
     });
-    const noteY=offset+Math.max(255,45+rows*pitch+7);
-    text(shapes,'S arrow: one-way span',374,noteY,160,14,7);
-    text(shapes,'?: support to confirm',374,noteY+13,160,14,7);
-    text(shapes,'C: cross; TC: circled cross',374,noteY+26,160,14,7);
+
     if(j===0)line(shapes,8,slot-4,534,slot-4,'#b8c2ca');
    });
-   pages.push({key:'framing',name:'Framing '+(pages.length+1),title:'Functional Framing - '+pair.map(q=>q.type).join(' / '),order:10,
-    lines:[{text:'A4 portrait | two plans per sheet | common fit scale; dimensions govern.'}],shapes,shapeTop:60,shapeHeight:slot*2,after:[],
+   pages.push({key:'framing',name:'Framing '+(pages.length+1),title:'',order:10,
+    lines:[],shapes,shapeTop:0,shapeHeight:slot*2,after:[],
     framingPanels107:pair.map((q,j)=>({type:q.type,floorCaption:q.floorCaption,offset:j*slot,height:slot,scale:q.scale,legends:q.legends,classification:q.classification})),
     classification:{floorNames:pair.flatMap(q=>q.classification.floorNames),transfer:pair.flatMap(q=>q.classification.transfer),landing:pair.flatMap(q=>q.classification.landing)}});
   }return pages;
@@ -123,13 +120,13 @@ window.ReportContent=(()=>{
  function decorate(p,jobs,section){if(section!=='A')return jobs;const model=Engine.generate(p),rc=jobs.filter(j=>j.type==='RC'),extra=[...framing(p,model),...references(p,model)];
   // Native introduction/design appraisal precede Scheme 1 framing and selected checks.
   let chapter=rc.length?2:0;const next=()=>++chapter,scheme=next();
-  rc.forEach((j,i)=>j.reportNumber={chapter:scheme,part:i+1,title:'Scheme 1 - RC',first:i===0});
-  let drawing=0;for(const q of extra.filter(x=>x.key==='framing')){q.chapter=scheme;q.title='A.'+scheme+'.1.'+(++drawing)+' '+q.title;q.order=10;}
-  for(const [i,key]of ['vertical','horizontal','robustness','other'].entries()){const q=extra.find(x=>x.key===key);q.chapter=scheme;q.title='A.'+scheme+'.'+(i+3)+' '+q.title;}
+  rc.forEach((j,i)=>{j.reportNumber={chapter:scheme,part:i+1,title:'Scheme 1 - RC',first:i===0};j.reportFloors111=RCPlan.floorSummary(p,model,true);});
+  let drawing=0;for(const q of extra.filter(x=>x.key==='framing')){q.chapter=scheme;q.order=10;}
+  for(const [i,key]of ['vertical','horizontal','robustness','other'].entries()){const q=extra.find(x=>x.key===key);q.chapter=scheme;}
   const steel=jobs.filter(j=>j.type==='Steel');if(steel.length){const c=next();steel.forEach((j,i)=>j.reportNumber={chapter:c,part:i+1,title:'Scheme 2 - Steel',first:i===0});}
-  const comparison=extra.find(x=>x.key==='recommendation');comparison.chapter=next();comparison.title='A.'+comparison.chapter+' '+comparison.title;
+  const comparison=extra.find(x=>x.key==='recommendation');comparison.chapter=next();
   for(const type of ['Overall','Deflection']){const batch=jobs.filter(j=>j.type===type);if(batch.length){const c=next();batch.forEach((j,i)=>j.reportNumber={chapter:c,part:i+1,title:type==='Overall'?'Overall Check':'Deflection Check',first:i===0});}}
-  const q=extra.find(x=>x.key==='foundation');q.chapter=next();q.title='A.'+q.chapter+' '+q.title;
+  const q=extra.find(x=>x.key==='foundation');q.chapter=next();
   for(const j of jobs.filter(j=>j.type==='Foundation'))j.reportNumber={chapter:q.chapter,part:1,title:'Foundation',first:true};
   const carrier=rc[0]||jobs[0];if(carrier)carrier.reportPages=extra;
   return jobs;

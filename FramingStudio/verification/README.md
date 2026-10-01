@@ -1,0 +1,43 @@
+# Transfer-truss verification
+
+Run from `FramingStudio/verification`. Node.js is required; the browser suites additionally require Playwright and installed Microsoft Edge (`channel: msedge`). Install Playwright in a separate tools directory or make an existing installation available through `NODE_PATH`.
+
+```powershell
+node truss-core-tests.cjs
+node truss-browser-tests.cjs
+node truss-integration-tests.cjs
+```
+
+Run the browser suite before the integration suite: it creates the synthetic fixture. Generated fixtures, screenshots, workbook jobs and PDFs are ignored by Git. These tests do not use a user's project or change their saved application profile.
+
+For an additional no-truss regression, set `FRAMING_BASELINE_HTML` to the absolute path of an unmodified baseline `assets/index.html` before running the browser suite. The test compares complete geometry and loading output using the baseline's embedded seed project.
+
+For the native Windows truss workflow, build the app with `source/compile.ps1`, then run this from `FramingStudio/verification` with desktop Excel and WebView2 installed:
+
+```powershell
+$trussTestDir = Join-Path (Get-Location) 'native-truss'
+New-Item -ItemType Directory -Path $trussTestDir -Force | Out-Null
+Copy-Item -LiteralPath 'fixture.framing.json' -Destination (Join-Path $trussTestDir 'fixture.framing.json')
+Set-Content -LiteralPath (Join-Path $trussTestDir 'truss-smoke.flag') -Value '1'
+$trussApp = (Resolve-Path '../FramingStudio.exe').Path
+$trussProcess = Start-Process -FilePath $trussApp -ArgumentList @('--self-test', ('"' + $trussTestDir + '"')) -WindowStyle Hidden -Wait -PassThru
+Get-Content (Join-Path $trussTestDir 'result.json')
+if ($trussProcess.ExitCode -ne 0) { throw 'Native truss check failed' }
+```
+
+Use a fresh output directory for each native run. The app uses an isolated profile beneath that directory. The fixture has no RC members selected for A/B export: the truss workbook is macro-free.
+
+## Results on the E2.112 integration branch — 2026-10-01
+
+- C# desktop and Excel bridge compilation: passed.
+- Core: 11 groups passed (section data, material boundaries, independent equilibrium/virtual work, buckling, load envelopes, selection and invalid inputs).
+- Browser: 8 groups passed, including complete no-truss geometry/loading comparison against repository E2.111, UI edits/undo, serialization and rejection of invalid transfer paths.
+- Integration: 7 groups passed, including actual floor heights, physical lower-column A/B inputs, all drawing views, report selection and export planning.
+- Windows native truss workflow: 10 checks passed, including A/B PDF preview/export, stale report invalidation, undo and project save.
+- Native A/B truss workbooks: 451 comparisons each, zero differences.
+
+## RC macro limitation
+
+The lower-column G/Q propagation and A/B input plans passed JavaScript checks. End-to-end RC macro export is **not verified**. With user-authorized retesting, the original E2.108 and E2.109 RC templates failed during macro-enabled `Workbooks.Open` with `0x800A03EC`, before calculation checks could run. Macro-disabled opening succeeded and a Steel template opened with macros enabled. The precise cause is unresolved; this is not evidence that the RC calculations passed.
+
+This PR preserves the repository's Excel templates and VBA. It does not change Office security settings or include diagnostic workbook modifications. The previously reported 6,199 native comparisons in the E2.111 changelog are historical baseline evidence, not a new RC validation result for this PR.

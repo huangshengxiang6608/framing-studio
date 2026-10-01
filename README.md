@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.111**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.112**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -17,6 +17,7 @@ Windows 结构建模与工程检查工具。当前版本为 **E2.111**（仓库�
 - Loading、RC Member Check、Overall、Deflection、Foundation。
 - Section A / B 抄、几何出图和原生 Excel 导出。
 - 原有独立 Steel 方案功能及对应模板。
+- S460 柱到柱转换桁架：跨一层／两层、杆件选型、反力传递、图形及 A/B 与无巨集 Excel 输出。详见 [使用与范围说明](FramingStudio/docs/transfer-truss.md)。
 
 ## 目录
 
@@ -42,7 +43,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 `compile.ps1` 不负责网页资源打包。修改 JavaScript/CSS 模块时，也需要同步 `assets/index.html` 中对应的打包内容；仅改 `source/` 下的模块不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
+## 验证
+
+[桁架测试与重跑步骤](FramingStudio/verification/README.md)。示例模型位于 `FramingStudio/示例模型/S460_两层转换桁架.framing.json`。
+
 ## 版本与依赖
+
+E2.112 将 S460 转换桁架整合到 E2.111，保留既有报告排版。桁架工作簿为无巨集 xlsx；原 RC 模板在本机启用巨集打开时仍出现 `0x800A03EC`，RC 巨集完整导出尚未验证，详见测试记录。Excel 模板及 VBA 未修改。
 
 E2.111 按 PDF 批注调整 Section A 抄：合并短章节、首页连续排版、增加 SDL 列、删除圈选内容并改善墙编号。空间不足时自动续页，楼层表续页重复表头。Section B、Excel 模板/VBA、模型输入及计算逻辑保持不变。原生计算核对 6,199 项无差异。
 

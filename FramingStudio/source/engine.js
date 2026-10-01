@@ -24,7 +24,7 @@ const Engine=(()=>{
 
  function validate(p){
   const fail=s=>{throw Error(s)},num=(n,lo,hi,s)=>{if(typeof n!=='number'||!Number.isFinite(n)||n<lo||n>hi)fail(s);};
-  if(p?.format!=='framing-app'||p.version!==1)fail('不是本 App 的项目文件');
+  if(p?.format!=='framing-app'||p.version!==1)fail('不是本 App 的项目文件');if(typeof TrussModel109!=='undefined')TrussModel109.validate(p);if(typeof TrussModel109!=='undefined')TrussModel109.validate(p);
   if(p.overall!==undefined){if(p.overall?.version!==1||!p.overall.faces||typeof p.overall.faces!=='object')fail('Overall Check 数据无效');for(const f of Object.keys(p.overall.faces)){if(!['B','D'].includes(f))fail('Overall Check 面无效');const q=p.overall.faces[f];if(!q||typeof q!=='object')fail('Overall Check 输入无效');for(const field of ['input','committed','attempt'])if(q[field]!==undefined)Overall.normalize(q[field],f);}}
   if(p.elevationLevels!==undefined){const v=p.elevationLevels;if(!v||typeof v!=='object')fail('楼层标高数据无效');if(v.base!==null)num(v.base,-10000,10000,'模型底 mPD 无效');if(v.basementFromNames!==undefined&&typeof v.basementFromNames!=='boolean')fail('地下室识别设置无效');if(v.names!==undefined&&(!v.names||typeof v.names!=='object'||Object.entries(v.names).some(([k,n])=>!/^\d+$/.test(k)||typeof n!=='string'||n.length>40)))fail('楼层名称无效');}
   if(typeof p.name!=='string'||p.name.length>150)fail('项目名称无效');

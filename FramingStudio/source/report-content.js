@@ -5,10 +5,10 @@ window.ReportContent=(()=>{
  function on(p,b){b={...b,a:b.rawA||b.a,z:b.rawZ||b.z};const dx=b.z[0]-b.a[0],dy=b.z[1]-b.a[1],l=dx*dx+dy*dy;if(!l)return false;const t=((p[0]-b.a[0])*dx+(p[1]-b.a[1])*dy)/l;return t>=-1e-6&&t<=1+1e-6&&Math.hypot(p[0]-b.a[0]-t*dx,p[1]-b.a[1]-t*dy)<.03;}
  function framing(p,model){
   const pages=[],groups=new Map();
-  for(const f of model.floors){const m=Engine.floorModel(model,f),upper=model.floors[f.n],um=upper&&Engine.floorModel(model,upper),lower=model.floors[f.n-2],lm=lower&&Engine.floorModel(model,lower);const beams=Loading.supportModel(p,m,f.n).beams,lowerBeams=lm?Loading.supportModel(p,lm,lower.n).beams:[];
+  for(const f of model.floors){const m=Engine.floorModel(model,f),upper=model.floors[f.n],um=upper&&Engine.floorModel(model,upper),lower=model.floors[f.n-2],lm=lower&&Engine.floorModel(model,lower);const beams=Loading.supportModel(p,m,f.n).beams.filter(b=>!TrussModel109.replacement(p,f.n,b)),lowerBeams=lm?Loading.supportModel(p,lm,lower.n).beams:[];
    const markers=TransferMarkers83.landing(p,model,f.n),landing=markers.map(x=>x.column);
    const transfer=m.columns.filter(c=>c.on!==false&&lm&&!lm.columns.some(x=>x.on!==false&&near([c.x,c.y],[x.x,x.y]))&&lowerBeams.filter(b=>b.kind==='TB'&&on([c.x,c.y],b)).length===1);
-   const key=JSON.stringify([f.type,m.localHeight96?.rects,landing.map(c=>[c.id,c.x,c.y]),transfer.map(c=>c.id),ColumnPlan87.items(model,f.n).map(c=>[c.column.id,c.status]),FramingSymbols98.wallItems(model,f.n).map(w=>[w.r,w.status]),m.slabs.map(s=>Loading.slabDirection(p,f.n,Loading.token('SLAB',s),s,m))]);
+   const key=JSON.stringify([f.type,TrussModel109.visuals(p,model,f.n,f.n).map(v=>[v.t.id,v.t.bottomFloor,v.t.topFloor]),m.localHeight96?.rects,landing.map(c=>[c.id,c.x,c.y]),transfer.map(c=>c.id),ColumnPlan87.items(model,f.n).map(c=>[c.column.id,c.status]),FramingSymbols98.wallItems(model,f.n).map(w=>[w.r,w.status]),m.slabs.map(s=>Loading.slabDirection(p,f.n,Loading.token('SLAB',s),s,m))]);
    if(groups.has(key)){groups.get(key).floors.push(f.n);continue;}groups.set(key,{f,m,beams,landing,transfer,floors:[f.n]});
   }
   // One common fit scale for all Section A framing panels on A4 portrait.
@@ -49,8 +49,9 @@ window.ReportContent=(()=>{
     }
    }
    for(const b of beams){const kind=b.kind||'MB',id=legend(kind,n(b.b*1000,0)+' x '+n(b.d*1000,0)+' mm',b.id);line(X(b.a[0]),Y(b.a[1]),X(b.z[0]),Y(b.z[1]),{MB:'#0057b8',SB:'#008000',CB:'#000000',TB:'#c00000'}[kind]||'#0057b8',kind==='TB'?4:2);if(kind==='TB')text(id+' / '+b.id,X((b.a[0]+b.z[0])/2)+5,Y((b.a[1]+b.z[1])/2)+3,Math.min(95,350-X((b.a[0]+b.z[0])/2)-5),8);}
+   for(const {t,g:tg}of TrussModel109.visuals(p,model,f.n,f.n)){legend('TT','L '+n(tg.span)+' / h '+n(tg.depth)+' m',t.name);line(X(tg.a[0]),Y(tg.a[1]),X(tg.z[0]),Y(tg.z[1]),'#0057b8',2);text(t.name+' · TT',X((tg.a[0]+tg.z[0])/2)+5,Y((tg.a[1]+tg.z[1])/2)-12,90,8);}
    for(const wall of m.walls||[])if(wall.on!==false){line(X(wall.a[0]),Y(wall.a[1]),X(wall.z[0]),Y(wall.z[1]),'#000000',3);legend('W',n(wall.b*1000,0)+' mm',wall.id);}
-   const col=(c,isTC,isUpper)=>{const id=legend(isTC?'TC':'C',n(c.b*1000,0)+' x '+n(c.d*1000,0)+' mm',c.id+(isUpper?' (above)':'')),r=Engine.columnRect(c),x=X(r.x),y=Y(r.y);line(x-3,y-3,x+3,y+3,'#0057b8',2);line(x-3,y+3,x+3,y-3,'#0057b8',2);if(isTC){shapes.push({type:'ellipse',x:x-7,y:y-7,w:14,h:14,color:'#0057b8',width:1.5});text(id+(isUpper?' (above) → '+(beams.find(b=>b.kind==='TB'&&TransferMarkers83.on(c,b))?.id||'TB'):''),x+9,y-8,Math.max(30,350-x-9),7);}else text(id,x+5,y-13,35,8);};
+   const col=(c,isTC,isUpper)=>{const id=legend(isTC?'TC':'C',n(c.b*1000,0)+' x '+n(c.d*1000,0)+' mm',c.id+(isUpper?' (above)':'')),r=Engine.columnRect(c),x=X(r.x),y=Y(r.y);line(x-3,y-3,x+3,y+3,'#0057b8',2);line(x-3,y+3,x+3,y-3,'#0057b8',2);if(isTC){shapes.push({type:'ellipse',x:x-7,y:y-7,w:14,h:14,color:'#0057b8',width:1.5});text(id+(isUpper?' (above) → '+(TransferMarkers83.landing(p,model,f.n).find(v=>v.column.id===c.id)?.beam.id||beams.find(b=>b.kind==='TB'&&TransferMarkers83.on(c,b))?.id||'TB'):''),x+9,y-8,Math.max(30,350-x-9),7);}else text(id,x+5,y-13,35,8);};
    m.columns.filter(c=>c.on!==false).forEach(c=>col(c,transfer.includes(c),false));landing.forEach(c=>col(c,true,true));
    const floorNames=g.floors.map(v=>FloorLevels.name(p,v));
    const runs=[];for(const v of g.floors){const last=runs[runs.length-1];if(last&&v===last[1]+1)last[1]=v;else runs.push([v,v]);}
@@ -128,7 +129,7 @@ window.ReportContent=(()=>{
   for(const type of ['Overall','Deflection']){const batch=jobs.filter(j=>j.type===type);if(batch.length){const c=next();batch.forEach((j,i)=>j.reportNumber={chapter:c,part:i+1,title:type==='Overall'?'Overall Check':'Deflection Check',first:i===0});}}
   const q=extra.find(x=>x.key==='foundation');q.chapter=next();
   for(const j of jobs.filter(j=>j.type==='Foundation'))j.reportNumber={chapter:q.chapter,part:1,title:'Foundation',first:true};
-  const carrier=rc[0]||jobs[0];if(carrier)carrier.reportPages=extra;
+  const carrier=rc[0]||jobs[0];if(carrier)carrier.reportPages=[...(carrier.reportPages||[]),...extra];
   return jobs;
  }
  return {framing,references,decorate};

@@ -99,12 +99,13 @@ static class ExcelBridge {
   try {
    var result=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(directory,"result.json"))));
    var job=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(directory,"job.json"))));ActiveJob75=job;
-   if(Path.GetFileName(path)!=Convert.ToString(result["workbook"])||(Path.GetExtension(path)!=".xlsm"&&!(Path.GetExtension(path)==".xlsx"&&job.ContainsKey("method")&&Convert.ToString(job["method"])=="BUILDING_AXIS")))throw new Exception("不是本次生成的 Excel 文件");
+   if(Path.GetFileName(path)!=Convert.ToString(result["workbook"])||(Path.GetExtension(path)!=".xlsm"&&!(Path.GetExtension(path)==".xlsx"&&((job.ContainsKey("method")&&Convert.ToString(job["method"])=="BUILDING_AXIS")||Convert.ToString(job["type"])=="Truss"))))throw new Exception("不是本次生成的 Excel 文件");
    // After manual edits, use the normal Excel trust/opening flow rather than forcing macros.
    if(!result.ContainsKey("workbookHash")||Hash(path)!=Convert.ToString(result["workbookHash"])) {
     if(!visible)throw new Exception("工作簿已改变，需按普通 Excel 流程打开");
     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=true});return 0;
    }
+   if(Convert.ToString(job["type"])=="Truss")return OpenTruss109(path,visible,job);
    var config=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(templateRoot,"templates.json"))));
    string kind=Convert.ToString(job["type"]);var template=Obj(config[kind]);
    string source=Path.Combine(templateRoot,Path.GetFileName(Convert.ToString(template["file"])));
@@ -136,11 +137,57 @@ static class ExcelBridge {
   finally{if(b!=null)try{b.Close(false);}catch{}if(x!=null)try{x.Quit();}catch{}}
  }
 
+ // A new, macro-free workbook; no RC/Steel template formulas are reused.
+ static int TrussJob109(Dictionary<string,object> job,string dir) {
+  dynamic app=null,book=null;RunDirectory79=dir;
+  try {
+   Stage79("建立桁架独立计算工作簿");string path=Path.Combine(dir,"Truss-filled.xlsx");
+   if(File.Exists(path))throw new Exception("输出已存在，请生成新任务");
+   app=Activator.CreateInstance(Type.GetTypeFromProgID("Excel.Application",true));app.Visible=false;app.DisplayAlerts=false;app.EnableEvents=false;app.ScreenUpdating=false;app.AutomationSecurity=3;
+   book=app.Workbooks.Add();app.Calculation=-4135;
+   var sheets=Obj(job["sheets"]);int index=0;
+   foreach(var item in sheets) {
+    if(!System.Text.RegularExpressions.Regex.IsMatch(item.Key,@"^(Read me|Members|Deflection|Summary|Case[0-9]{2})$"))throw new Exception("无效桁架工作表名称");
+    dynamic sheet;
+    if(index==0)sheet=book.Worksheets[1];else sheet=book.Worksheets.Add(Type.Missing,book.Worksheets[book.Worksheets.Count]);
+    sheet.Name=item.Key;index++;
+   }
+   foreach(var item in sheets) {
+    dynamic sheet=book.Worksheets[item.Key];var data=Obj(item.Value);var cells=Obj(data["cells"]);int maxRow=2,maxCol=1;
+    var positions=new Dictionary<string,int[]>();
+    foreach(var cell in cells) {
+     var match=System.Text.RegularExpressions.Regex.Match(cell.Key,@"^([A-Z]{1,2})([1-9][0-9]{0,3})$");if(!match.Success)throw new Exception("无效单元格");int col=0;foreach(char a in match.Groups[1].Value)col=col*26+a-'A'+1;int row=int.Parse(match.Groups[2].Value);positions[cell.Key]=new[]{row,col};maxRow=Math.Max(maxRow,row);maxCol=Math.Max(maxCol,col);
+    }
+    object[,] values=new object[maxRow,maxCol];foreach(var cell in cells){var q=positions[cell.Key];values[q[0]-1,q[1]-1]=cell.Value is string?"'"+(string)cell.Value:cell.Value;}
+    sheet.Range[sheet.Cells[1,1],sheet.Cells[maxRow,maxCol]].Value2=values;
+    foreach(var formula in Obj(data["formulas"]))sheet.Range[formula.Key].Formula=Convert.ToString(formula.Value);
+    sheet.UsedRange.Font.Name="Arial";sheet.UsedRange.Font.Size=10;sheet.UsedRange.NumberFormat="0.000";sheet.Rows[1].Font.Bold=true;sheet.Rows[1].Font.Size=14;sheet.Columns.ColumnWidth=15;
+    sheet.Range["A1:C1"].Font.Color=0x805500;
+    if(item.Key=="Read me"){sheet.Columns[1].ColumnWidth=115;sheet.UsedRange.WrapText=true;sheet.UsedRange.Rows.AutoFit();}
+    else if(item.Key=="Summary")sheet.Columns[1].ColumnWidth=42;
+    else if(item.Key=="Members"){sheet.Columns[3].ColumnWidth=23;sheet.Rows[5].WrapText=true;sheet.Rows[5].RowHeight=33;}
+    sheet.PageSetup.Orientation=item.Key=="Members"?2:1;sheet.PageSetup.Zoom=false;sheet.PageSetup.FitToPagesWide=1;sheet.PageSetup.FitToPagesTall=false;
+   }
+   Stage79("Excel 重算杆件轴力、节点平衡及两轴屈曲");app.Calculation=-4105;app.CalculateFullRebuild();Compare("Transfer truss",book,Obj(job["expected"]));
+   book.Worksheets["Summary"].Activate();book.SaveAs(path,51);book.Close(false);book=null;
+   Write(Path.Combine(dir,"result.json"),new {ok=true,type="Truss",workbook=Path.GetFileName(path),files=new object[0],compared=compared,differences=differences,sourceHash="PLANAR_AXIAL_109",fingerprint=job["fingerprint"],workbookHash=Hash(path),at=DateTime.Now.ToString("s")});
+   return 0;
+  }catch(Exception e){Write(Path.Combine(dir,"result.json"),new {ok=false,type="Truss",error=e.Message,compared=compared,differences=differences});return 1;}
+  finally {if(book!=null)try{book.Close(false);}catch{}if(app!=null)try{app.Quit();Marshal.FinalReleaseComObject(app);}catch{}}
+ }
+ static int OpenTruss109(string path,bool visible,Dictionary<string,object> job) {
+  dynamic app=null,book=null;string dir=Path.GetDirectoryName(path);
+  try {app=Activator.CreateInstance(Type.GetTypeFromProgID("Excel.Application",true));app.Visible=false;app.DisplayAlerts=false;app.EnableEvents=false;app.AutomationSecurity=3;book=app.Workbooks.Open(path,0,!visible);app.CalculateFullRebuild();Compare("Reopen truss",book,Obj(job["expected"]));Write(Path.Combine(dir,visible?"open-result.json":"reopen-check.json"),new {ok=differences.Count==0,compared=compared,differences=differences,macrosRun=0});app.DisplayAlerts=true;app.EnableEvents=true;if(visible){app.Visible=true;book=null;Marshal.FinalReleaseComObject(app);app=null;}return differences.Count==0?0:1;}
+  catch(Exception e){Write(Path.Combine(dir,"reopen-check.json"),new {ok=false,error=e.Message});return 1;}
+  finally{if(book!=null)try{book.Close(false);}catch{}if(app!=null)try{app.Quit();Marshal.FinalReleaseComObject(app);}catch{}}
+ }
+
  [STAThread] static int Main(string[] args){
   if(args.Length==3&&(args[0]=="--open"||args[0]=="--verify-open"))return OpenWorkbook(args[1],args[2],args[0]=="--open");
   if(args.Length!=2)return 2;string root=Path.GetFullPath(args[0]),jobPath=Path.GetFullPath(args[1]),dir=Path.GetDirectoryName(jobPath);dynamic x=null,b=null;
   try{
    var job=Obj(J.DeserializeObject(File.ReadAllText(jobPath)));ActiveJob75=job;var config=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(root,"templates.json"))));string kind=Convert.ToString(job["type"]);
+   if(kind=="Truss")return TrussJob109(job,dir);
    if(kind!="Overall"&&kind!="RC"&&kind!="Steel"&&kind!="Deflection"&&kind!="Foundation")throw new Exception("未知 Excel 类型");var template=Obj(config[kind]);string source=Path.Combine(root,Path.GetFileName(Convert.ToString(template["file"])));
    if(Hash(source)!=Convert.ToString(template["sha256"]))throw new Exception("Excel 模板已改变，请先更新 App；没有使用旧公式继续核对。");
    Start79(dir,source);if(RestoreJob79(job,dir))return 0;Stage79("打开原 Excel 模板");
@@ -302,6 +349,11 @@ static class ExcelBridge {
     string prefix=section=="A"?"A."+(job.ContainsKey("reportNumber")?Obj(job["reportNumber"])["chapter"]:3)+".2."+serial:"B."+(serial+3);
     sheet.Cells[begin,1].Value2=prefix+" "+t;string header80=section=="A"?"Scheme 1 - RC":"Section B";if(Convert.ToString(sheet.PageSetup.CenterHeader)!=header80)sheet.PageSetup.CenterHeader=header80;
     if(section=="B"&&oldNumber.Success)for(int rr=begin+1;rr<=end;rr++){string sub=Convert.ToString(labels82[rr,1]);if(sub!=null&&sub.StartsWith("B."+oldNumber.Groups[1].Value+"."))sheet.Cells[rr,1].Value2=prefix+sub.Substring(2+oldNumber.Groups[1].Value.Length);}
+    if(section=="A"&&m.ContainsKey("truss109")) {
+     var q=Obj(m["truss109"]);dynamic wb=sheet.Parent,cs=wb.Worksheets["Section A Column Loading"];
+     string[] lines={prefix+" Column "+Convert.ToString(m["id"])+" - physical G/Q", "Transfer truss reactions plus downstream vertical load accumulation.", "Contributors: "+String.Join(", ",Arr(q["from"]).Select(Convert.ToString)), "G = "+D(q,"dead").ToString("0.00")+" kN; Q = "+D(q,"live").ToString("0.00")+" kN", "N = 1.4 G + 1.6 Q = "+Convert.ToDouble(Val(cs.Range["J36"])).ToString("0.00")+" kN", "Project factor = "+Convert.ToString(Val(cs.Range["B10"]))+"; design N = "+Convert.ToDouble(Val(cs.Range["E38"])).ToString("0.00")+" kN", "Adopt B x D = "+Convert.ToString(Val(cs.Range["B5"]))+" x "+Convert.ToString(Val(cs.Range["B6"]))+" mm", "fcu = "+Convert.ToString(Val(cs.Range["B7"]))+" MPa; rho = "+Convert.ToString(Val(cs.Range["B9"]))+"%", "Axial capacity = "+Convert.ToDouble(Val(cs.Range["E39"])).ToString("0.00")+" kN; "+Convert.ToString(Val(cs.Range["E41"])), "The workbook input multiplier of 1 is a reaction-table adapter, not a tributary area."};
+     sheet.Range["A"+begin+":H"+end].ClearContents();for(int k=0;k<lines.Length;k++){dynamic row=sheet.Range["A"+(begin+k)+":H"+(begin+k)];row.UnMerge();row.Merge();row.Value2="'"+lines[k];row.WrapText=true;row.Font.Size=k==0?12:10;row.RowHeight=k==0?30:32;}end=begin+lines.Length-1;
+    }
     sheet.ResetAllPageBreaks();sheet.PageSetup.PrintArea="$A$"+begin+":$H$"+end;
     string file="Section-"+section+"-RC-"+i+".pdf";ExportCopy(sheet,dir,file);files.Add(new{file=file,reportOrder=(section=="A"?11:1)+rank+serial/10000});
    }

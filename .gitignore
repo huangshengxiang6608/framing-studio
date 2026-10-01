@@ -29,3 +29,6 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# Synthetic transfer-truss example (no user project data)
+!/FramingStudio/示例模型/S460_两层转换桁架.framing.json

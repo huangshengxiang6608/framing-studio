@@ -28,8 +28,8 @@ for(let i=0;i<job.reportPages.length;i++){const html=await page.evaluate(p=>Repo
 if(process.env.FRAMING_BASELINE_HTML){
  const old=await browser.newPage();old.on('dialog',d=>d.accept());await old.goto('file:///'+path.resolve(process.env.FRAMING_BASELINE_HTML).replaceAll('\\','/'));
  const legacy=await old.evaluate(()=>JSON.parse(document.getElementById('seed').textContent));
- const snapshot=async tab=>tab.evaluate(p=>{const r=Engine.generate(p),o=Loading.run(p,r);return {rows:o.rows,issues:o.issues,geometry:r};},legacy);
- assert.deepEqual(await snapshot(page),await snapshot(old));await old.close();checks.push('Legacy no-truss geometry and complete load output match supplied baseline');
+ const snapshot=async tab=>tab.evaluate(p=>{const r=Engine.generate(p),o=Loading.run(p,r);return {rows:o.rows,issues:o.issues,geometry:r,reportPages:[...ReportContent.framing(p,r),...ReportContent.references(p,r)]};},legacy);
+ assert.deepEqual(await snapshot(page),await snapshot(old));await old.close();checks.push('Legacy no-truss geometry, complete loads and report pages match supplied baseline');
 }
 assert.equal(errors.length,0,errors.join('\n'));const result={ok:true,checks:checks.length,passed:checks,errors,failureCases};fs.writeFileSync(path.join(out,'browser-result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));await browser.close();
 })().catch(e=>{fs.writeFileSync(path.join(out,'browser-failure.txt'),e.stack);console.error(e);process.exit(1);});

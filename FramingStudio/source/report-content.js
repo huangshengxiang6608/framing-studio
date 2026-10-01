@@ -108,6 +108,7 @@ window.ReportContent=(()=>{
   const get=id=>{const b=blocks.find(b=>b.id===id);return {b,text:notes[id]??notes.blocks?.[id]??b?.text??''};};
   const page=(id,title,order)=>({key:id,name:id,title,order,reference:true,lines:String(get(id).text).split('\n').filter(Boolean).map(text=>({text}))});
   const vertical=page('vertical','Vertical Load Path & Stability',20),horizontal=page('horizontal','Horizontal Load Path & Stability',21);
+  if(get('horizontal').text==="The main building's horizontal stability is provided by the core wall and the beam-column frame.\nHorizontal loads acting on the external surface are transferred to vertical elements through a rigid floor diaphragm.")horizontal.lines="Horizontal Stability.\n- The horizontal load acts on the external surface of the building and transfers to columns and core walls via the rigid floor diaphragm.\n- Horizontal stability relies on the R.C. beam-column frame and core wall.".split('\n').map(text=>({text}));
   for(const [q,file,h]of [[vertical,'vertical-load-path.png',350],[horizontal,'horizontal-load-path.png',305]]){q.after=q.lines;if(LoadPath84.settings(p,model).replace[q.key]){const section=LoadPath84.reportDiagram(p,model,q.key);q.shapes=section.shapes;q.shapeHeight=section.height;q.shapeTop=38;q.lines=[];}else{q.image=file;q.imageHeight=h;q.lines=[];}}
 
   const robust=page('robustness','Robustness & Progressive Collapse',22),other=page('other','Other Considerations',23);
@@ -115,7 +116,7 @@ window.ReportContent=(()=>{
   const comparison=page('recommendation','Scheme Comparison & Recommendation',60);
   comparison.after=[{text:'Recommendation.',level:1},...comparison.lines.filter(r=>!/^Recommendation\.?$/i.test(r.text.trim())).map((r,i)=>({...r,text:(i+1)+'. '+r.text.replace(/Scheme A/g,'Scheme 1').replace(/Scheme B/g,'Scheme 2')}))];
   comparison.lines=[{text:'Superstructure',level:1}];comparison.table=(notes.tables?.recommendation??get('recommendation').b.tables[0]).map(r=>r.map(t=>t.replace(/Scheme A/g,'Scheme 1').replace(/Scheme B/g,'Scheme 2')));
-  const foundation=page('foundation','Foundation Recommendation',89);
+  const foundation=page('foundation','Foundation Recommendation',91);
   return [vertical,horizontal,robust,other,comparison,foundation];
  }
  function decorate(p,jobs,section){if(section!=='A')return jobs;const model=Engine.generate(p),rc=jobs.filter(j=>j.type==='RC'),extra=[...framing(p,model),...references(p,model)];

@@ -29,16 +29,16 @@ const LoadPath84=(()=>{
     if(k==='COL'||k==='WALL'){
      // One centre line per structural support, irrespective of its real B / D.
      const center=k==='COL'?(along?(q.cy??q.y):(q.cx??q.x)):(a+b)/2,key=k+'|'+s.id+'|'+center+'|'+s.z0+'|'+s.z1;
-     if(drawn.has(key))continue;drawn.add(key);line(X(center),yt,X(center),yb,k==='WALL'?C.black:C.blue,k==='WALL'?1.5:1);
+     if(drawn.has(key))continue;drawn.add(key);line(X(center),yt,X(center),yb,C.blue,k==='WALL'?1.5:1);
      shapes[shapes.length-1].schematic108=k;members.push([k==='COL'?'column':'wall',f.n,s.id,center]);
      if(k==='COL'&&settings84.tags&&(q.status==='上层柱'||f.n>1&&TransferMarkers83.landing(p,model,f.n-1).some(t=>Math.hypot(t.column.x-q.x,t.column.y-q.y)<1e-6)))text('TC',X(center)+4,yt+5,25,6,C.red);
-     if(kind==='vertical'&&yb-yt>8)line(X(center),yt+3,X(center),yb-2,C.red,.9,true);
+     if(kind==='vertical'&&yb-yt>8)line(X(center)+3,yt+3,X(center)+3,yb-2,C.red,.9,true);
     }else if(k==='TB'){
      // Transfer beams are schematic hatched strips, not actual-depth cross sections.
      const key=s.id+'|'+a+'|'+b+'|'+s.z1;if(drawn.has(key))continue;drawn.add(key);
-     rect(X(a),yt-3,Math.max(4,X(b)-X(a)),4,C.red,1.2);shapes[shapes.length-1].schematic108='TB';
-     for(let x=X(a)+2;x<X(b)-2;x+=7)line(x,yt+1,x+4,yt-3,C.red,.5);
-     if(settings84.tags&&!transferLabel){text('Transfer beam',X(lo),yt-10,75,6,C.red);transferLabel=true;}members.push(['TB',f.n,s.id,a,b]);
+     rect(X(a),yt-3,Math.max(4,X(b)-X(a)),4,C.blue,1.2);shapes[shapes.length-1].schematic108='TB';
+     for(let x=X(a)+2;x<X(b)-2;x+=7)line(x,yt+1,x+4,yt-3,C.blue,.5);
+     if(settings84.tags&&!transferLabel){text('Transfer beam',X(lo),yt-10,75,6,C.blue);transferLabel=true;}members.push(['TB',f.n,s.id,a,b]);
     }
     // Slabs and beams parallel to the section become a single floor line.
     if(k==='SLAB'||['MB','CB','TB'].includes(k)&&Math.abs((q.rawA||q.a)[index]-(q.rawZ||q.z)[index])<1e-8){
@@ -59,17 +59,17 @@ const LoadPath84=(()=>{
   }
 
   if(typeof TrussModel109!=='undefined')for(const v of TrussModel109.visuals(p,model,settings84.lo,settings84.hi)){if(v.nodes.some(n=>Math.abs(n[index]-cut)>.001))continue;for(const m of v.mesh.members){const a=v.nodes[m.i],b=v.nodes[m.j];line(X(a[along]),Y(a[2]-offset),X(b[along]),Y(b[2]-offset),C.red,1.1);}members.push(['TT',v.t.topFloor,v.t.name,v.g.a[along],v.g.z[along]]);text(v.t.name+' · transfer truss',X(v.g.a[along])+3,Y(v.g.zTop-offset)-12,130,7,C.red);}
-  line(X(lo),Y(0)+3,X(hi),Y(0)+3,C.black,2);text(settings84.lo===1?'Foundation':'Section bottom',X(lo),Y(0)+14,160,8);
+  if(settings84.lo===1){rect(X(lo),Y(0),X(hi)-X(lo),18,C.blue,1.2);shapes[shapes.length-1].schematic112='FOUNDATION';text('FOUNDATION',X(lo),Y(0)+1,X(hi)-X(lo),8,C.blue);shapes[shapes.length-1].center=true;}else{line(X(lo),Y(0)+3,X(hi),Y(0)+3,C.blue,1.2);text('Section bottom',X(lo),Y(0)+14,160,8,C.blue);}
   if(!members.length)text('No members intersect this section.',60,160,265,9,C.red);
   fixed=true;text('Load Transfer Mechanism',354,7,175,9,C.blue);
   if(kind==='vertical'){
    const labels=[['Vertical load',43],['Slab',89],['Beam',135],['Column / wall',181],['Column / wall',279],['Foundation',325]];
    for(const [label,y]of labels)text(label,355,y,115,8,C.blue);
-   for(const [a,b]of [[59,83],[105,129],[151,175],[198,272],[295,319]])line(390,a,390,b,C.blue,1,true);
+   for(const [a,b]of [[59,83],[105,129],[151,175],[198,272],[295,319]])line(390,a,390,b,C.red,1,true);
    text('#',407,111,18,11,C.red);text('#',407,156,18,11,C.red);text('△',404,220,20,12,C.red);text('△',405,302,20,12,C.red);
-   line(430,188,488,213,C.blue,1,true);text('△',462,189,20,12,C.red);text(TrussModel109.active(p).length?'Transfer truss':'Transfer beam',455,225,85,8,C.blue);line(487,242,429,273,C.blue,1,true);text('#',481,256,18,11,C.red);
+   line(430,188,488,213,C.red,1,true);text('△',462,189,20,12,C.red);text(TrussModel109.active(p).length?'Transfer truss':'Transfer beam',455,225,85,8,C.blue);line(487,242,429,273,C.red,1,true);text('#',481,256,18,11,C.red);
    text('# Bending + Shear',450,35,90,8,C.red);text('△ Axial',450,51,90,8,C.red);
-  }else {const mechanism=['Horizontal load','External surface','Rigid floor diaphragm','Column / core wall','Foundation'];mechanism.forEach((t,i)=>{text(t,355,43+i*38,175,8,C.blue);shapes[shapes.length-1].center=true;if(i<mechanism.length-1)line(442.5,62+i*38,442.5,77+i*38,C.blue,1,true);});}
+  }else {const mechanism=['Horizontal load','External surface','Rigid floor diaphragm','Column / core wall','Foundation'];mechanism.forEach((t,i)=>{text(t,355,43+i*38,175,8,C.blue);shapes[shapes.length-1].center=true;if(i<mechanism.length-1)line(442.5,62+i*38,442.5,77+i*38,C.red,1,true);});}
   fixed=false;if(kind==='horizontal'){
    const input=OverallGeometry.input(p,opt.face),valid=v=>typeof v==='number'&&Number.isFinite(v);text('Overall face '+opt.face,18,386,180,8,C.black);
    if(input&&base!==null){const top=base+height,ground=input.leftEL;
@@ -105,6 +105,8 @@ const LoadPath84=(()=>{
    }else lines.push({text:'Overall levels not available: wind / soil / water diagram requires completed inputs.'});
   }
   if(kind==='horizontal'){text('Axial Push-Pull effect',145,350,135,7,C.green);shapes[shapes.length-1].center=true;text('under lateral load.',145,365,135,7,C.green);shapes[shapes.length-1].center=true;const cols=members.filter(m=>m[0]==='column'),xs=[...new Set(cols.map(c=>c[3]))].sort((a,b)=>a-b);if(xs.length>=2){line(X(xs[0])+5,Y(height*.32),X(xs[0])+5,Y(height*.65),C.green,1,true);line(X(xs.at(-1))-5,Y(height*.65),X(xs.at(-1))-5,Y(height*.32),C.green,1,true);}}
+  text('Load Path (Section '+(which==='one'?'1–1':'2–2')+')',84,399,245,8,C.blue);shapes[shapes.length-1].center=true;
+  fixed=true;text('Load Transfer Mechanism',354,kind==='vertical'?353:239,175,8,C.blue);shapes[shapes.length-1].center=true;fixed=false;
   if(opt.note)lines.push({text:opt.note});
   lines.push({text:'Schematic floor / support lines follow Framing and local heights. Member dimensions are not drawn to scale.'});
   return {shapes,lines,height:410,members,selection:opt};

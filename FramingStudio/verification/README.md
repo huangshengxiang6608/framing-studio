@@ -6,11 +6,12 @@ Run from `FramingStudio/verification`. Node.js is required; the browser suites a
 node truss-core-tests.cjs
 node truss-browser-tests.cjs
 node truss-integration-tests.cjs
+node truss-downstream-tests.cjs
 ```
 
 Run the browser suite before the integration suite: it creates the synthetic fixture. Generated fixtures, screenshots, workbook jobs and PDFs are ignored by Git. These tests do not use a user's project or change their saved application profile.
 
-For an additional no-truss regression, set `FRAMING_BASELINE_HTML` to the absolute path of an unmodified baseline `assets/index.html` before running the browser suite. The test compares complete geometry and loading output using the baseline's embedded seed project.
+For an additional no-truss regression, set `FRAMING_BASELINE_HTML` to the absolute path of an unmodified baseline `assets/index.html` before running the browser suite. The test compares complete geometry, loading output and report pages using the baseline's embedded seed project.
 
 For the native Windows truss workflow, build the app with `source/compile.ps1`, then run this from `FramingStudio/verification` with desktop Excel and WebView2 installed:
 
@@ -27,17 +28,22 @@ if ($trussProcess.ExitCode -ne 0) { throw 'Native truss check failed' }
 
 Use a fresh output directory for each native run. The app uses an isolated profile beneath that directory. The fixture has no RC members selected for A/B export: the truss workbook is macro-free.
 
-## Results on the E2.112 integration branch — 2026-10-01
+## Results on the E2.113 integration branch — 2026-10-01
 
 - C# desktop and Excel bridge compilation: passed.
 - Core: 11 groups passed (section data, material boundaries, independent equilibrium/virtual work, buckling, load envelopes, selection and invalid inputs).
-- Browser: 8 groups passed, including complete no-truss geometry/loading comparison against repository E2.111, UI edits/undo, serialization and rejection of invalid transfer paths.
+- Browser: 8 groups passed, including complete no-truss geometry/loading/report-page comparison against repository E2.112 (`befa222`), UI edits/undo, serialization and rejection of invalid transfer paths.
 - Integration: 7 groups passed, including actual floor heights, physical lower-column A/B inputs, all drawing views, report selection and export planning.
 - Windows native truss workflow: 10 checks passed, including A/B PDF preview/export, stale report invalidation, undo and project save.
 - Native A/B truss workbooks: 451 comparisons each, zero differences.
+- Downstream transfer: 15 groups passed. Includes TT → column → TB → column, further TB → MB/CB → column paths, continuous walls with unsupported column landings, independent force equilibrium, A/B RC export inputs, manual/area overrides, missing support and incomplete upstream inputs. Unaffected branches remain exportable.
+
+The new downstream test failed against the original PR bundle because BASE-L had no TT provenance. In the reported B case, the fixed column retains G = 1332.978794 kN and Q = 471.428571 kN rather than the manual area schedule's 10 / 2 kN. These physical values also reach the exported C26/C27 inputs.
 
 ## RC macro limitation
 
-The lower-column G/Q propagation and A/B input plans passed JavaScript checks. End-to-end RC macro export is **not verified**. With user-authorized retesting, the original E2.108 and E2.109 RC templates failed during macro-enabled `Workbooks.Open` with `0x800A03EC`, before calculation checks could run. Macro-disabled opening succeeded and a Steel template opened with macros enabled. The precise cause is unresolved; this is not evidence that the RC calculations passed.
+The lower-column G/Q propagation and A/B input plans passed JavaScript checks. End-to-end RC macro export remains **unverified in this development environment**. With user-authorized retesting, the original E2.108 and E2.109 RC templates failed during macro-enabled `Workbooks.Open` with `0x800A03EC`, before calculation checks could run. Macro-disabled opening succeeded and a Steel template opened with macros enabled. The precise local cause is unresolved.
+
+The [maintainer's review](https://github.com/huangshengxiang6608/framing-studio/pull/1#pullrequestreview-5377552928) independently reports successful native downstream-column A/B exports on the original PR commit `964aa9e`, with 16 / 31 comparisons and zero differences. That result is distinct from the new downstream-input regression tests and is not presented as a fresh native RC run on this revision.
 
 This PR preserves the repository's Excel templates and VBA. It does not change Office security settings or include diagnostic workbook modifications. The previously reported 6,199 native comparisons in the E2.111 changelog are historical baseline evidence, not a new RC validation result for this PR.

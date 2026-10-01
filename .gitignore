@@ -1,0 +1,31 @@
+# Local release history, previews and verification fixtures
+/output/
+/tmp/
+/preview/
+/framing-axis-preview*
+
+# User projects and generated reports
+*.framing.json
+~$*
+*.log
+*.tmp
+*.bak
+*.zip
+ExcelRuns/
+Backups/
+UserData/
+WebView2/
+*.WebView2/
+
+# Credentials and editor state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.vs/
+.vscode/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

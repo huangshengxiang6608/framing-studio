@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.framingstudio.offline" android:versionCode="297" android:versionName="E2.97">
+ <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/>
+ <application android:label="Framing Studio" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:usesCleartextTraffic="false" android:hardwareAccelerated="true" android:icon="@drawable/icon">
+  <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|keyboardHidden">
+   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+  </activity>
+ </application>
+</manifest>

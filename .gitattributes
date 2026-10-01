@@ -1,0 +1,8 @@
+# Preserve the exact bytes of the verified E2.110 distribution.
+* -text
+*.exe binary
+*.dll binary
+*.xlsm binary
+*.pdf binary
+*.png binary
+*.ico binary

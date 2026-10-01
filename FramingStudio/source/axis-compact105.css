@@ -1,0 +1,12 @@
+#side .axis-compact105 h3{margin:12px 0 6px;font-size:14px}
+#side .axis-compact105 .table-wrap{margin:6px 0;border-radius:5px}
+#side .axis-compact105 table{width:100%;min-width:0!important;table-layout:fixed;font-size:12px}
+#side .axis-compact105 th{padding:6px 4px;white-space:normal;line-height:1.3}
+#side .axis-compact105 td{padding:3px 4px;white-space:nowrap;line-height:1.3;font-variant-numeric:tabular-nums}
+#side .axis-compact105 th:first-child{width:36px}
+#side .axis-compact105 th:nth-child(2){width:27%}
+#side .axis-compact105 th:nth-child(3){width:30%}
+#side .axis-compact105 td input{width:100%;max-width:90px;min-width:0;height:29px;padding:3px 5px;font-size:12px}
+#side .axis-compact105 td button{width:25px;min-height:27px;padding:2px;font-size:12px}
+#side .axis-compact105 .row{margin:6px 0 10px;gap:6px}
+#side .axis-compact105 .row button{padding:5px 9px;font-size:12px}

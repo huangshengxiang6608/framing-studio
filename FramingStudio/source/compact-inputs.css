@@ -1,0 +1,10 @@
+
+/* E2.73: shared editable fields, compact floor groups */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([readonly]):not([disabled]),select:not([disabled]),textarea:not([readonly]):not([disabled]){background:#fff3bf!important;border:1px solid #cba247!important;color:#193d4c}
+input:focus,select:focus,textarea:focus{outline:2px solid #23778a;outline-offset:1px}
+input[readonly],input[disabled],select[disabled],textarea[readonly],output{background:#f1f5f7;color:#526d79}
+.floor-group-compact table{table-layout:fixed;min-width:560px!important;width:100%}
+.floor-group-compact th,.floor-group-compact td{padding:5px 3px!important;font-size:13px;white-space:normal!important}
+.floor-group-compact th:first-child,.floor-group-compact td:first-child{width:34px}
+.floor-group-compact input,.floor-group-compact select{width:100%!important;min-width:0!important;padding:6px 3px!important;font-size:13px;box-sizing:border-box}
+.floor-group-compact button{padding:5px 8px;min-width:0}.floor-group-compact small{font-size:11px}

@@ -36,7 +36,7 @@ window.DeflectionUI=(()=>{
   if(action==='wind'){host.navigate('elevation');}if(action==='materials'){host.navigate('checks');requestAnimationFrame(()=>{const control=document.getElementById('ex-wallFcu');if(control){for(let parent=control.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;control.scrollIntoView({block:'center'});control.focus({preventScroll:true});}});}
   if(action==='face'){face=a.dataset.face;enter(host);WorkspacePages.refresh();}
   if(action==='trace'){folds.inputs=true;face=a.dataset.face;enter(host);WorkspacePages.refresh();requestAnimationFrame(()=>{const input=document.querySelector('[data-df-output=base]');input?.closest('.wp-card')?.scrollIntoView({behavior:'smooth',block:'start'});input?.focus({preventScroll:true});});}
-  if(action==='excel'){host.navigate('excel');ExcelSync.generate('Deflection');}
+  if(action==='excel'){host.navigate('reportA');ExcelSync.generate('Deflection');}
   if(action==='copy-core')host.transact(()=>{const s=Deflection.saved(p,key,face),target=Deflection.edit(p,key,face==='B'?'D':'B');for(const k of ['selected','selectedColumns','selection92','floor94'])target[k]=s[k]===undefined?undefined:JSON.parse(JSON.stringify(s[k]));delete target.checkSignature94;});
   if(action==='add-wall')host.transact(()=>{const s=Deflection.edit(p,key,face);let i=1;while(s.walls.some(w=>w.id==='W'+i))i++;s.walls.push({id:'W'+i,x1:null,y1:null,x2:null,y2:null,t:null});delete s.checkSignature94;});
   if(action==='remove-wall')host.transact(()=>{const s=Deflection.edit(p,key,face);s.walls.splice(+a.dataset.index,1);delete s.checkSignature94;});return true;

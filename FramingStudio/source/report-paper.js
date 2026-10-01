@@ -11,6 +11,7 @@ const ReportPaper=(function createReportPaper(){
  .answer-paper-content table{background:#fff;max-width:100%;min-width:0!important}
  .answer-paper-content th{position:static!important}
  .answer-paper-content th,.answer-paper-content td{text-align:center!important;vertical-align:middle!important;padding:3pt!important;background-color:#fff}
+ .answer-paper-content table[data-excel-source="Section A 抄!A9:H17"] :is(th,td){text-align:left!important}
  .answer-paper-content tr{break-inside:avoid}
  .answer-paper-content .copy-figure{margin:0!important;padding:0!important;break-inside:avoid;background:#fff}
  .answer-paper-content .copy-figure img{display:block;width:100%;max-height:160mm;object-fit:contain}

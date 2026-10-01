@@ -39,7 +39,7 @@ function ExplorerUI(host){
    }
    if(fresh(h.p)){const rows=output.rows.filter(r=>r.floor===h.floor);html+='<h3>本层全部构件</h3><div class="table-wrap"><table><thead><tr><th>选择</th><th>构件</th><th>Check</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+`<input type="checkbox" data-ex="include-row" data-token="${esc(r.token)}" ${h.p.explorer?.selected?.[h.floor+'|'+r.token]?'checked':''}>`+'</td><td>'+btn(esc(r.id),'choose',`data-token="${esc(r.token)}"`)+'</td><td>'+esc(r.result.status)+'</td></tr>').join('')+'</tbody></table></div>';html+=output.issues.filter(i=>i.floor===h.floor).map(i=>'<div class="issue">'+esc(i.msg)+'</div>').join('');}
   }else{
-   html='<h2>Section A / Section B 抄</h2>'+html+'<p class="muted">Section A：尺寸初筛及荷载记录。Section B：采用配筋、计算数值及检查结果。两份报告与当前项目共用输入。</p><div class="row">'+floorField('从楼层','ex-report-lo',1)+floorField('至楼层','ex-report-hi',h.p.total)+'</div><div class="row">'+btn('Section A 抄','report-a')+btn('Section B 抄','report-b')+'</div><p class="muted">在 Section A / B 页面直接查看原 Excel 抄并 Print PDF；Excel 工作簿在 14 生成 Excel 中生成。</p>';
+   html='<h2>Section A / Section B 抄</h2>'+html+'<p class="muted">Section A：尺寸初筛及荷载记录。Section B：采用配筋、计算数值及检查结果。两份报告与当前项目共用输入。</p><div class="row">'+floorField('从楼层','ex-report-lo',1)+floorField('至楼层','ex-report-hi',h.p.total)+'</div><div class="row">'+btn('Section A 抄','report-a')+btn('Section B 抄','report-b')+'</div><p class="muted">在 Section A / B 页面直接查看原 Excel 抄并 Print PDF；Excel 工作簿随抄生成，可在对应抄页打开。</p>';
   }
   return html;
  }

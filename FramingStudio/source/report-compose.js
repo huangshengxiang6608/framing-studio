@@ -124,6 +124,7 @@ window.ReportCompose=(()=>{
       for(const row of block.rows){const i=lineIndex(cursor,(row.crop.top-row.base)*scale);const record=textRow(row,grid[i]);cursor=record.y-2;}cursor=Math.min(cursor,start-figureHeight-3);continue;
      }
      if(block.kind==='table'){
+      const leftAligned=section==='A'&&block.items.some(t=>/^Site Constraint\s*\//.test(t.str))&&block.items.some(t=>t.str.trim()==='Design Implications');
       const xs=block.xs.map(x=>left+(x-c.left)*scale),header=block.parts[0],hasFloorHeader111=introFlow&&header.cells.some(c=>c.items.some(t=>t.str.trim()==='Floor')),carry111=introFlow&&!hasFloorHeader111&&introHeader111?.columns===block.xs.length?introHeader111:null;let first=true;
       const slotsIn=part=>block.slots.slice(part.start,part.end).reduce((a,b)=>a+b,0);
       const drawPart=(part,repeated=false)=>{const needed=slotsIn(part);let idx=lineIndex(cursor);if(idx<0||idx+needed>=grid.length)return false;const offsets=[0];for(let r=part.start;r<part.end;r++)offsets.push(offsets.at(-1)+block.slots[r]);const ys=offsets.map(i=>grid[idx+i]);
@@ -132,7 +133,7 @@ window.ReportCompose=(()=>{
         current.page.drawRectangle({x,y:yb,width:w,height:yt-yb,color:PDFLib.rgb(...(cell.fill||[1,1,1])),borderColor:PDFLib.rgb(.15,.15,.15),borderWidth:.9});
         if(!cell.rows.length)continue;
         const pitch=grid[idx]-grid[idx+1],rows=cell.rows,s=Math.min(scale,(w-6)/Math.max(...rows.map(r=>r.crop.right-r.crop.left))),above=(rows[0].crop.top-rows[0].base)*s,below=(rows.at(-1).base-rows.at(-1).crop.bottom)*s,firstBase=(yt+yb+(rows.length-1)*pitch+below-above)/2;
-        for(const [j,row]of rows.entries()){const crop=row.crop,baseline=firstBase-j*pitch,record=place(row.items,crop,x+(w-(crop.right-crop.left)*s)/2,baseline-(row.base-crop.bottom)*s,s,true,repeated);record.baseline=baseline;record.sourceBaseline=row.base;record.cell={left:x,right:x+w,top:yt,bottom:yb};stats.centeredRows++;}
+        for(const [j,row]of rows.entries()){const crop=row.crop,baseline=firstBase-j*pitch,record=place(row.items,crop,x+(leftAligned?3:(w-(crop.right-crop.left)*s)/2),baseline-(row.base-crop.bottom)*s,s,true,repeated);record.baseline=baseline;record.sourceBaseline=row.base;record.cell={left:x,right:x+w,top:yt,bottom:yb};stats.centeredRows++;}
        }stats.tables.push({file:file.file,sourcePage:pageIndex+1,outputPage:layouts.length,xs,ys,repeated,rows:part.end-part.start,borderWidth:.9});cursor=ys.at(-1);return true;};
       if(hasFloorHeader111)introHeader111={columns:block.xs.length,slots:slotsIn(header),repeat:()=>drawPart(header,true)};
       for(const [partIndex,part]of block.parts.entries()){

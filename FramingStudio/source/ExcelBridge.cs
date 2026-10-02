@@ -795,10 +795,11 @@ static class ExcelBridge {
    string source=Convert.ToString(beams[i]["kind"])=="TB"?"Section A Transfer Beam":"Input";
    string sourceRow=Convert.ToString(member["row"]);
    resultFormulas[i,0]="=INDIRECT(\"'\"&K"+row+"&\"'!A\"&L"+row+")";
-   resultFormulas[i,1]="=INDIRECT(\"'\"&K"+row+"&\"'!B\"&L"+row+")";
+   bool cantilever=Convert.ToString(beams[i]["kind"])=="CB";
+   resultFormulas[i,1]="=INDIRECT(\"'\"&K"+row+"&\"'!"+(cantilever?"C":"B")+"\"&L"+row+")";
    resultFormulas[i,10]=source;resultFormulas[i,11]=Convert.ToInt32(sourceRow);
    string[] codes={"M","V","RA","RB","G","Q","X","VALID"};
-   for(int j=0;j<codes.Length;j++)resultFormulas[i,j+2]="=FullAction73(A"+row+",B"+row+",RCLoads73[#Data],\""+codes[j]+"\")";
+   for(int j=0;j<codes.Length;j++)resultFormulas[i,j+2]="=FullAction73(A"+row+",B"+row+",RCLoads73[#Data],\""+codes[j]+"\""+(cantilever?",TRUE":"")+")";
   }
   if(beams.Length>0)results.Range["A5:L"+(4+beams.Length)].Formula=resultFormulas;
   if(job.ContainsKey("projectFloors")){

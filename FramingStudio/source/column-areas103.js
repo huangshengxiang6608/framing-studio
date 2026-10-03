@@ -84,13 +84,14 @@ const ColumnAreas103=(()=>{
    }
    return {entries:merge(entries),errors:[...new Set(err)]};
   }
-  function route(n,c){
-   const k=n+'|'+Loading.token('COL',c);if(memo.has(k))return memo.get(k);
+  const overrides=(n,c,source)=>{const o=Loading.input(p,n,Loading.token('COL',c));return !!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto'||Object.hasOwn(o.sectionAAreaOverrides115||{},source));};
+  function route(n,c,source=n,bypass=false){
+   const k=n+'|'+Loading.token('COL',c)+'|'+source+'|'+bypass;if(n>f&&!bypass&&overrides(n,c,source))return {entries:[],errors:[]};if(memo.has(k))return memo.get(k);
    if(n===f){const answer={entries:[{column:c,weight:1}],errors:[]};memo.set(k,answer);return answer;}
    const below=Engine.floorModel(result,n-1),matches=active(below).filter(d=>Engine.overlap(Engine.columnRect(c),Engine.columnRect(d)));let landing;
    if(matches.length===1)landing={entries:[{column:matches[0],weight:1}],errors:[]};
    else{const tbs=below.beams.filter(b=>b.kind==='TB'&&on([c.x,c.y],b));landing=tbs.length===1?beamLanding(below,n-1,tbs[0],[c.x,c.y]):{entries:[],errors:[FloorLevels.name(p,n)+' 柱 '+c.id+' 至下层的柱／TB 关系待确认']};}
-   const entries=[],err=[...landing.errors];for(const e of landing.entries){const next=route(n-1,e.column);entries.push(...next.entries.map(q=>({...q,weight:q.weight*e.weight})));err.push(...next.errors);}const answer={entries:merge(entries),errors:[...new Set(err)]};memo.set(k,answer);return answer;
+   const entries=[],err=[...landing.errors];for(const e of landing.entries){const next=route(n-1,e.column,source);entries.push(...next.entries.map(q=>({...q,weight:q.weight*e.weight})));err.push(...next.errors);}const answer={entries:merge(entries),errors:[...new Set(err)]};memo.set(k,answer);return answer;
   }
   for(let n=f;n<=p.total;n++){
    const m=Engine.floorModel(result,n);
@@ -104,8 +105,17 @@ const ColumnAreas103=(()=>{
     for(const load of loads){const regions=R.union(R.region(load)),ps=free.flatMap(poly=>regions.map(r=>clipPolygon(poly,r)).filter(q=>q.length));add(ps,load);for(const r of regions)free=free.flatMap(poly=>subtractPolygon(poly,r));}add(free,null);
    }
   }
+  // A confirmed upper-column area replaces its geometric contribution exactly
+  // once along the same column/TB route, including further transfers below it.
+  for(let n=f+1;n<=p.total;n++)for(const c of active(Engine.floorModel(result,n))){
+   const o=Loading.input(p,n,Loading.token('COL',c));if(!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto')&&!Object.keys(o.sectionAAreaOverrides115||{}).length)continue;
+   const a=Reports.columnA(p,{floor:n,token:Loading.token('COL',c),id:c.id},result);
+   for(let source=n;source<=p.total;source++){if(!overrides(n,c,source))continue;const routing=route(n,c,source,true),weight=routing.entries.filter(e=>Loading.token('COL',e.column)===target).reduce((v,e)=>v+e.weight,0);if(weight<eps)continue;errors.push(...routing.errors,...a.errors);
+    for(const x of a.rows.filter(x=>x.lo<=source&&x.hi>=source)){const named=x.areaName&&x.areaName!=='整层默认',load=named?LoadData.areas(p,source).find(l=>l.name===x.areaName||l.id===x.areaName):null;groups.push({lo:source,hi:source,area:x.area*weight,b:null,d:null,areaId:load?.id??null,areaName:load?.name||'整层默认',automatic:true,manualArea:true,rects:[],polygons:[],sourceColumn:c.id,transferWeight:weight});}
+   }
+  }
   // One row per source floor and load region, including several columns carried by a TB.
-  const grouped=new Map();for(const g of groups){const k=g.lo+'|'+g.areaId;const previous=grouped.get(k);if(previous){previous.area+=g.area;previous.rects.push(...g.rects);previous.polygons.push(...g.polygons);previous.partitioned||=g.partitioned;previous.sourceColumns.push({id:g.sourceColumn,weight:g.transferWeight});}else grouped.set(k,{...g,sourceColumns:[{id:g.sourceColumn,weight:g.transferWeight}]});}
+  const grouped=new Map();for(const g of groups){const k=g.lo+'|'+g.areaId;const previous=grouped.get(k);if(previous){previous.area+=g.area;previous.rects.push(...g.rects);previous.polygons.push(...g.polygons);previous.partitioned||=g.partitioned;previous.manualArea||=g.manualArea;previous.sourceColumns.push({id:g.sourceColumn,weight:g.transferWeight});}else grouped.set(k,{...g,sourceColumns:[{id:g.sourceColumn,weight:g.transferWeight}]});}
   for(const g of grouped.values()){
    const rects=new Map();for(const r of g.rects){const k=JSON.stringify([r.x0,r.x1,r.y0,r.y1]),prev=rects.get(k);if(prev)prev.fraction+=r.fraction;else rects.set(k,{...r});}g.rects=[...rects.values()];
    const points=pieces(g).flat(),box=points.length?bounds(points):null,rectangular=box&&[...g.rects,...g.polygons].every(r=>Math.abs(r.fraction-1)<eps)&&Math.abs(area(box)-g.area)<eps;g.b=rectangular?box.x1-box.x0:null;g.d=rectangular?box.y1-box.y0:null;if(g.sourceColumns.length>1){delete g.sourceColumn;delete g.transferWeight;}

@@ -13,7 +13,14 @@ const LoadRegions83=(()=>{
   return out.concat(free.map(r=>({...r,load:{...base,ll:LoadData.live(base),areaName:'整层默认',areaId:null}})));
  }
  function summary(parts){const total=parts.reduce((n,r)=>n+area(r),0),v={...parts[0]?.load};for(const k of ['dl','sdl','ll'])v[k]=parts.every(r=>Number.isFinite(r.load[k]))?parts.reduce((n,r)=>n+area(r)*r.load[k],0)/total:null;v.mixed=new Set(parts.map(r=>JSON.stringify([r.load.dl,r.load.sdl,r.load.ll,r.load.basis]))).size>1;v.basis=parts.every(r=>r.load.basis==='total')?'total':'legacy-additional';v.areaName=[...new Set(parts.map(r=>r.load.areaName))].join(' / ');return v;}
+ // Physical concrete between member faces. Subtract the union so crossing beams
+ // and openings cannot deduct the same part of the slab twice. Surface loads
+ // retain their original footprint; only concrete self-weight uses these pieces.
+ function netSelfWeight(s,model){
+  const cuts=[...model.beams,...model.walls].map(b=>{const r=Engine.rect(b);return {x0:r.x-r.w/2,x1:r.x+r.w/2,y0:r.y-r.d/2,y1:r.y+r.d/2};});
+  return difference(s.rects,cuts).map(r=>({...r,load:{dl:0,sdl:0,ll:0}}));
+ }
  // Reaction per metre along the support, integrated across the original span.
  function reaction(parts,dir,mid,lo,span,right,cs,sw,autoSW){const axis=dir==='X'?'y':'x',cross=dir==='X'?'x':'y';let out={g:0,q:0,sw:0,dl:0,sdl:0,mG:0,mQ:0,good:true};for(const r of parts){if(mid<=r[axis+'0']||mid>=r[axis+'1'])continue;const u=r[cross+'0']-lo,v=r[cross+'1']-lo,len=v-u,moment=right?span*len-(v*v-u*u)/2:(v*v-u*u)/2,weight=cs?len:right?(v*v-u*u)/(2*span):len-(v*v-u*u)/(2*span),load=r.load,dl=autoSW?0:load.dl;if(![dl,load.sdl,load.ll].every(x=>typeof x==='number'&&Number.isFinite(x)&&x>=0)){out.good=false;continue;}out.sw+=sw*weight;out.dl+=dl*weight;out.sdl+=load.sdl*weight;out.g+=(sw+dl+load.sdl)*weight;out.q+=load.ll*weight;out.mG+=(sw+dl+load.sdl)*moment;out.mQ+=load.ll*moment;}return out;}
- return {area,valid,intersect,subtract,difference,union,region,clip,pieces,summary,reaction};
+ return {area,valid,intersect,subtract,difference,union,region,clip,pieces,summary,reaction,netSelfWeight};
 })();

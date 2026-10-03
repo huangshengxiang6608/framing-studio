@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.113**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.119**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -11,13 +11,18 @@ Windows 结构建模与工程检查工具。当前版本为 **E2.113**（仓库�
 
 现有项目通过 App 的“打开项目”载入。项目、自动备份、测试报告及开发机器临时文件不在本仓库内。
 
+## S460 转换桁架
+
+本版将 PR #1 的转换桁架整合到 E2.118。保留最新梁布置、支承与荷载编辑、板边界传荷，以及原有 A/B 抄版式。桁架反力沿下部梁／柱／墙路径保留来源，不能被面积法或手动总荷载覆盖。
+
+[桁架使用说明](FramingStudio/docs/transfer-truss.md) · [验证步骤](FramingStudio/verification/README.md)。合成示例位于 `FramingStudio/示例模型/S460_两层转换桁架.framing.json`。
+
 ## 功能范围
 
 - 轴线、楼层、区域、Framing、墙柱梁板及三维浏览。
 - Loading、RC Member Check、Overall、Deflection、Foundation。
 - Section A / B 抄、几何出图和原生 Excel 导出。
 - 原有独立 Steel 方案功能及对应模板。
-- S460 柱到柱转换桁架：跨一层／两层、杆件选型、反力传递、图形及 A/B 与无巨集 Excel 输出。详见 [使用与范围说明](FramingStudio/docs/transfer-truss.md)。
 
 ## 目录
 
@@ -41,16 +46,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 该命令使用系统 .NET Framework C# 编译器及随附的 WebView2 库重建桌面程序。省略 `-DesktopOnly` 可同时重建 ExcelBridge.exe。
 
-`compile.ps1` 不负责网页资源打包。修改 JavaScript/CSS 模块时，也需要同步 `assets/index.html` 中对应的打包内容；仅改 `source/` 下的模块不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
-
-## 验证
-
-[桁架测试与重跑步骤](FramingStudio/verification/README.md)。示例模型位于 `FramingStudio/示例模型/S460_两层转换桁架.framing.json`。
+`compile.ps1` 不负责网页资源打包。修改已标记的 8 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
 
-E2.113 将 S460 转换桁架整合到 E2.112，保留既有报告排版。桁架工作簿为无巨集 xlsx；本机此前 RC 巨集打开遇到 `0x800A03EC`；审查者已在原 PR 提交验证下层柱 A/B 巨集导出，本次下游输入修正另有回归检查，详见测试记录。Excel 模板及 VBA 未修改。
+E2.118 修正不规则外边界及开洞板的荷载分配，按实际连续板区逐段匹配支承，避免通过外包矩形跨空白区域传荷。原有非矩形板设计和缺少支承的限制继续提示。梁页增加“梁方向 A → B”显示/隐藏开关，选中梁标明两端，显示偏好自动记住。
 
-E2.112 按参考照片调整 Floor Summary 居中、表格线宽、Load Path 颜色及基础框、Wind/Overall 排版，隐藏不适用和确定为零的荷载项，精简 Deflection，并将 Foundation Recommendation 排在验算后。适用但缺失输入的项目仍显示。当前样例 A 14 页 / B 6 页；原生计算核对 6,199 项无差异，Excel 模板/VBA 与模型数据保持不变。
+当前检查入口：`source/tests/boundary118.cjs`（47 组边界/UI）、`loading115.cjs`（55 项）、`layout116.cjs`（9 组）、`support117.cjs`（4 组）和 `preserve118.py`（相对 E2.117 的报告、模板及无关模块保护）。楼层局部净高、E&M、结构区预览尚未合入本版。
+
+E2.117 将梁页调整为先 Support 后 Loading，各自保存；识别到的柱／墙／梁编号与自由端在上方显示。保留原支承和传荷规则，支承保存不会丢掉未完成的荷载草稿。
+
+E2.116 将梁布置侧栏接入正式软件：主梁、次梁与板方向各自折叠，布置应用于当前 Framing 的所有楼层，可分别重新布置、删除单根梁、连接端点与中点；新布置的普通板默认沿短跨，可点击或拖框修改方向。梁原有荷载、实际 Support、反力、尺寸与手动设置保留。Member Check 增加配筋示意图，点击标注编辑，仍使用原保存及检查流程。
+
+E2.115 的全截面梁自重、净面积板自重、荷载向上取两位小数、柱逐层面积与 TC → TB 传荷继续沿用。
+
+Section A / Section B 两个抄的文字、横线纸、格式、表格、图示及分页规则保持不变；现有字段的计算数值随输入更新。以后只有用户明确要求改抄时才修改，详见 `AGENTS.md`。本次 Excel 模板和原生计算桥接程序未改。
+
+E2.117 验证：4 组贴边 CB 支承及分步保存检查通过；86 个原文件字节一致，报告处理和样式未改。当前入口为 `source/tests/support117.cjs`（Node/Playwright，可用 `CHROME_PATH` 指定 Chrome）及 `source/tests/preserve117.py`（Python + Git，使用 E2.116 历史版本）。E2.116 的荷载、梁布置模块保持原样，原 55 项荷载与 9 组界面检查留作回归；测试均用独立数据。
 
 第三方组件保留其随附许可文件。本仓库未另行授予开源许可。

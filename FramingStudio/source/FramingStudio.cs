@@ -14,8 +14,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8",FrameworkDisplayName=".NET Framework 4.8")]
 
 [assembly: System.Reflection.AssemblyTitle("Framing Studio")]
-[assembly: System.Reflection.AssemblyVersion("2.113.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.113.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.119.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.119.0.0")]
 
 static class Program {
     [STAThread] static int Main(string[] args) {
@@ -56,7 +56,7 @@ sealed class Studio : Form {
         Data = TestDir == null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FramingStudio") : Path.Combine(TestDir, "isolated-user-data");
         Profile = Path.Combine(Data, "WebView2"); Directory.CreateDirectory(Data);
         if (TestDir != null) { Directory.CreateDirectory(TestDir); Opacity = .01; ShowInTaskbar = false; }
-        Text = "Framing Studio · E2.113 Desktop"; Width = 1500; Height = 950;
+        Text = "Framing Studio · E2.119 Desktop"; Width = 1500; Height = 950;
         MinimumSize = new Size(900, 650); StartPosition = FormStartPosition.CenterScreen;
         if (File.Exists(Path.Combine(Root,"FramingStudio.ico"))) Icon = new Icon(Path.Combine(Root,"FramingStudio.ico"));
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("项目");
@@ -118,7 +118,7 @@ sealed class Studio : Form {
             await web.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(Path.Combine(Root,"desktop-bridge.js")));
             web.NavigationCompleted += async delegate(object s, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { Log("Navigation: " + e.WebErrorStatus); Status.Text = "页面加载失败：" + e.WebErrorStatus; return; }
-                Ready = true; Status.Text = "离线模式 · E2.113 · 项目请保存为 .framing.json";
+                Ready = true; Status.Text = "离线模式 · E2.119 · 项目请保存为 .framing.json";
                 if (TestDir != null && TestNavigation++ == 0) await SelfTest();
             };
             if (TestDir != null) web.ScriptDialogOpening += delegate(object s, CoreWebView2ScriptDialogOpeningEventArgs e) { e.Accept(); };
@@ -546,8 +546,35 @@ sealed class Studio : Form {
         finally{ClosingConfirmed=true;Close();}
     }
 
+    async Task LayoutSmokeTest116() {
+        try {
+            await Task.Delay(700);
+            await ImportProject(Path.Combine(TestDir,"fixture.framing.json"));
+            await Task.Delay(250);
+            await JS("document.querySelectorAll('dialog[open]').forEach(d=>d.close());window.layoutBefore116=JSON.stringify(StudioHost.get().p);StudioHost.navigate('beamLayout')");
+            await Check("Layout opens without changing the project", "JSON.stringify(StudioHost.get().p)===layoutBefore116");
+            await Check("Three independent panels above Beam menu", "document.querySelectorAll('.beam-layout-fold116').length===3 && document.querySelector('#nav [data-tab=beamLayout]').nextElementSibling.dataset.tab==='beams'");
+            await JS("document.querySelector('[data-bl116=main]').click()");
+            await Check("Preview preserves original settings", "JSON.stringify(StudioHost.get().p)===layoutBefore116");
+            await JS("document.querySelector('[data-bl116=apply]').click();document.getElementById('bl116-secondary-direction').value='X';document.getElementById('bl116-gap').value='2';document.querySelector('[data-bl116=secondary]').click();document.querySelector('[data-bl116=apply]').click()");
+            await Check("Shared Framing layout reaches both floors", "(()=>{const h=StudioHost.get(),a=Engine.floorModel(h.result,1),b=Engine.floorModel(h.result,2),old=JSON.parse(layoutBefore116);return a.beams.filter(b=>b.kind==='MB').length===4 && a.beams.filter(b=>b.kind==='SB').length===1 && JSON.stringify(a.beams.map(x=>[x.kind,x.rawA,x.rawZ,x.b,x.d]))===JSON.stringify(b.beams.map(x=>[x.kind,x.rawA,x.rawZ,x.b,x.d])) && JSON.stringify(h.p.types.F2)===JSON.stringify(old.types.F2) && JSON.stringify(h.p.explorer)===JSON.stringify(old.explorer)})()");
+            await JS("(()=>{const h=StudioHost.get(),s=Engine.floorModel(h.result,1).slabs;StudioHost.transact(()=>BeamLayout116.setDirections(h.p,h.key,s,'X'))})()");
+            await Check("Manual slab direction reaches live calculations", "Loading.run(StudioHost.get().p,StudioHost.get().result,'B').rows.filter(r=>r.kind==='SLAB'&&r.floor<=2).every(r=>r.loading.direction==='X')");
+            await Task.Delay(300);
+            using(var stream=File.Create(Path.Combine(TestDir,"beam-layout.png"))) await View.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream);
+            await JS("window.savedLayout116=JSON.stringify(StudioHost.get().p);document.getElementById('save').click()");
+            for(int i=0;i<50 && SavedDownload==null;i++)await Task.Delay(100);
+            if(SavedDownload==null||!File.Exists(SavedDownload))throw new Exception("Native save missing");
+            await ImportProject(SavedDownload);
+            await Check("Native save and reopen preserve new and old settings", "JSON.stringify(StudioHost.get().p)===savedLayout116");
+            if(Errors.Count>0)throw new Exception("JavaScript errors: "+String.Join(" | ",Errors));
+            File.WriteAllText(Path.Combine(TestDir,"result.json"),Json.Serialize(new{ok=true,passed=Passed,errors=Errors,runtime=View.CoreWebView2.Environment.BrowserVersionString}));
+        }catch(Exception ex){ExitCode=1;File.WriteAllText(Path.Combine(TestDir,"result.json"),Json.Serialize(new{ok=false,passed=Passed,errors=Errors,failure=ex.ToString()}));}
+        finally{ClosingConfirmed=true;View.Dispose();Close();}
+    }
     async Task SelfTest() {
         if(File.Exists(Path.Combine(TestDir,"truss-smoke.flag"))){await TrussSmokeTest109();return;}
+        if(File.Exists(Path.Combine(TestDir,"layout-smoke.flag"))){await LayoutSmokeTest116();return;}
         if(File.Exists(Path.Combine(TestDir,"complete-smoke.flag"))){await CompleteSmokeTest();return;}
         if(File.Exists(Path.Combine(TestDir,"deflection-smoke.flag"))){await DeflectionSmokeTest();return;}
         if(File.Exists(Path.Combine(TestDir,"display-smoke.flag"))){await DisplaySmokeTest();return;}

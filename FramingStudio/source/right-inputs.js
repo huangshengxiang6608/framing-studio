@@ -25,13 +25,10 @@ const RightInputPreview=(()=>{
    fold(side,'常用参数',rows,'beam-defaults',true);
    const areaTitle=[...side.children].find(e=>e.tagName==='H3'&&e.textContent.includes('次梁 Area'));
    if(areaTitle){const nodes=[];for(let n=areaTitle;n&&!n.matches('[data-preview-fold="beam-manual"]');n=n.nextElementSibling)nodes.push(n);fold(side,'次梁分区',nodes,'beam-areas',false);areaTitle.remove()}
-   const man=side.querySelector('[data-preview-fold="beam-manual"]');if(man)man.open=folds.get('beam-manual')??false;
+
   }
   if(tab==='loading'){
    const overview=side.querySelector('#lg-overview');fold(side,'本层荷载图例',[overview],'load-overview',false);
-  }
-  if(tab==='alignment'){
-   const ca=side.querySelector('.column-alignment');if(ca){ca.querySelector('h3')?.remove();const desc=ca.querySelector('p');if(desc)desc.textContent='选择参考楼层和要调整的楼层范围，再预览、应用。上层或下层都可作为参考。';ca.querySelectorAll('label').forEach(l=>{const t=l.firstChild;if(t?.nodeType!==3)return;if(t.textContent.includes('基准楼层'))t.textContent='参考楼层（保持不动）';if(t.textContent==='应用起始层')t.textContent='移动柱子 · 起始层';if(t.textContent==='应用结束层')t.textContent='移动柱子 · 结束层'});const p=[...ca.querySelectorAll(':scope > p')].find(p=>p.textContent.startsWith('各层已有要求'));p?.remove()}
   }
   side.querySelectorAll('input,select,textarea').forEach(e=>{if(['checkbox','range','file','hidden'].includes(e.type)||e.readOnly||e.disabled)return;if(manual.has(fieldKey(e)))e.dataset.inputState='manual';else if(e.id==='lg-dl'&&e.value==='10'||e.dataset.action==='framing-depth')e.dataset.inputState='default';else if(!e.dataset.inputState)e.dataset.inputState=e.value===''?'required':'manual'});
   legend(side);
@@ -40,6 +37,7 @@ const RightInputPreview=(()=>{
  document.addEventListener('input',e=>{if(e.target.matches?.('#side input:not([readonly]),#side select,#side textarea')){manual.add(fieldKey(e.target));e.target.dataset.inputState='manual';queueMicrotask(()=>{if(e.target.isConnected)e.target.dataset.inputState='manual'})}},true);
  document.addEventListener('change',e=>{if(e.target.dataset.previewWall){const value=e.target.value,[key,id]=e.target.dataset.previewWall.split('|');StudioHost.transact(()=>{const w=StudioHost.get().p.types[key].walls.find(w=>w.id===id);if(!w)throw Error('墙已不存在');w.axisPosition=value;});}},true);
  document.addEventListener('DOMContentLoaded',()=>{for(const type of ['input','change'])document.addEventListener(type,e=>{if(e.target.closest?.('#side')&&manual.has(fieldKey(e.target)))e.target.dataset.inputState='manual'});});
- document.addEventListener('DOMContentLoaded',()=>{const nav=document.getElementById('nav'),beam=nav.querySelector('[data-tab="beams"]'),loading=nav.querySelector('[data-tab="loading"]'),column=nav.querySelector('[data-tab="columns"]');const a=document.createElement('button');a.dataset.tab='alignment';a.setAttribute('aria-pressed','false');a.innerHTML='<span>06</span> 柱子对齐';column.after(a);beam.after(loading);[...nav.querySelectorAll('button[data-tab]')].forEach((b,i)=>{const s=b.querySelector('span');if(s)s.textContent=String(i+1).padStart(2,'0')});});
+ document.addEventListener('DOMContentLoaded',()=>{const nav=document.getElementById('nav'),beam=nav.querySelector('[data-tab="beams"]'),loading=nav.querySelector('[data-tab="loading"]');beam.after(loading);[...nav.querySelectorAll('button[data-tab]')].forEach((b,i)=>{const s=b.querySelector('span');if(s)s.textContent=String(i+1).padStart(2,'0')});});
+
  return {decorate};
 })();

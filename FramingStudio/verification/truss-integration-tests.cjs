@@ -38,6 +38,10 @@ const root=path.resolve(__dirname,'..'),passed=[],errors=[];
  fs.writeFileSync(path.join(__dirname,'truss-plan.svg'),data.svg);delete data.svg;delete data.columnHTML;
  const native=path.join(__dirname,'native-final');fs.mkdirSync(native,{recursive:true});fs.writeFileSync(path.join(native,'fixture.framing.json'),JSON.stringify(data.native,null,2));fs.writeFileSync(path.join(native,'truss-smoke.flag'),'1');delete data.native;
  for(const section of ['A','B']){const dir=path.join(__dirname,'rc-'+section);fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'job.json'),JSON.stringify({...data['rc'+section].batches[0],preview:true,fingerprint:'truss-lower-column-final-'+section}));}
- await page.locator('[data-tab="excel"]').click();assert.equal(await page.locator('[data-type="Truss"]').count(),1);passed.push('Excel page offers a single transfer truss export');
+ await page.locator('[data-tab="truss"]').click();assert.equal(await page.locator('[data-tt="excel"]').count(),1);
+ await page.locator('[data-tt="excel"]').click();assert.equal(await page.locator('#workspace-pages h1').innerText(),'Section A 抄');
+ await page.evaluate(()=>ExcelSync.receive({record:{id:'tt-test',type:'Truss',label:'TT1 standalone check',ok:true,compared:451,differences:[],files:[]},done:true}));
+ for(const section of ['A','B']){await page.locator('button[data-tab="report'+section+'"]').click();await page.locator('[data-report-workbooks]').waitFor();assert((await page.locator('[data-report-workbooks]').textContent()).includes('TT1 standalone check'));}
+ passed.push('Single truss export opens Section A; standalone workbook results remain visible in A/B pages');
  assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(__dirname,'integration-result.json'),JSON.stringify({ok:true,passed,errors,data},null,2));console.log(JSON.stringify({ok:true,passed,errors}));await browser.close();
 })().catch(e=>{console.error(e);process.exit(1);});

@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.119**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.120**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -40,13 +40,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 该命令使用系统 .NET Framework C# 编译器及随附的 WebView2 库重建桌面程序。省略 `-DesktopOnly` 可同时重建 ExcelBridge.exe。
 
-`compile.ps1` 不负责网页资源打包。修改已标记的 9 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
+`compile.ps1` 不负责网页资源打包。修改已标记的 12 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
 
-E2.119 将 slab 单向板受力方向双箭头加入“梁”窗口，与“梁布置”使用同一方向来源，可显示／隐藏。局部层高加入净高、E&M、自动结构高度及平面结构区标注，保持原表格和 Area 拖框操作；局部空间高度不再移动当前层梁板标高。E2.118 的实际板边界传荷修正继续保留。
+E2.120 统一使用梁、墙、柱的实际占地生成独立净板区，修复外围板块错误连通。方向、净面积、自重与支承匹配共用该边界；默认单向短跨，等边板需选 X/Y。保留梁窗口板方向开关、局部净高／E&M／结构区以及原操作流程。打开旧项目会迁移原板区设置，建议另存项目文件。
 
-当前检查入口：`source/tests/clearance119.cjs`（46 组板边界回归及 5 组新交互／局部净高检查）、`loading115.cjs`（55 项）、`layout116.cjs`（9 组）、`support117.cjs`（4 组）和 `preserve119.py`（相对 E2.118 的报告、模板及无关模块保护）。`boundary118.cjs` 保留为历史版本检查，其梁 A → B 显示断言已由 E2.119 的 slab 方向检查取代。
+当前检查入口：`source/tests/geometry120.cjs`（净板区、支承、旧设置迁移）、`clearance119.cjs`（46 组边界回归及 5 组交互／局部净高检查）、`loading115.cjs`、`layout116.cjs`、`support117.cjs` 和 `preserve120.py`（相对 E2.119 的报告、模板及无关模块保护）。旧荷载回归样例已按实际净板区更新预期面积；真实物理支承缺口要求下游保持待确认。
 
 E2.117 将梁页调整为先 Support 后 Loading，各自保存；识别到的柱／墙／梁编号与自由端在上方显示。保留原支承和传荷规则，支承保存不会丢掉未完成的荷载草稿。
 

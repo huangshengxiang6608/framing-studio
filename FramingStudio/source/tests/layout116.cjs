@@ -16,9 +16,9 @@ const server=http.createServer((req,res)=>{try{const url=new URL(req.url,'http:/
   await page.goto(url+'/');await page.waitForFunction(()=>window.StudioHost);
   await page.addScriptTag({content:fs.readFileSync('FramingStudio/source/tests/loading115-browser.js','utf8')});
   const oldFixture=await page.evaluate(()=>{const p=Engine.clone(loading115Tests().projects.slab);p.types.F1.autoBeams101=true;p.types.F1.beams=[];return p;});
-  const compare=async(pj,p)=>pj.evaluate(p=>{const model=Engine.generate(p),r=Loading.run(p,model,'B');return JSON.stringify({model,rows:r.rows,issues:r.issues});},p);
+  const compare=async(pj,p)=>pj.evaluate(p=>{const model=Engine.generate(p),r=Loading.run(p,model,'B');return JSON.stringify({members:Object.fromEntries(Object.entries(model.models).map(([k,m])=>[k,{beams:m.beams,walls:m.walls,columns:m.columns}])),floors:model.floors});},p);
   const baseline=await browser.newPage();baseline.on('dialog',d=>d.dismiss());await baseline.goto(url+'/baseline/');await baseline.waitForFunction(()=>window.StudioHost);
-  assert.equal(await compare(page,oldFixture),await compare(baseline,oldFixture));passed.push('Existing project geometry and all Section B results exactly match E2.115');await baseline.close();
+  assert.equal(await compare(page,oldFixture),await compare(baseline,oldFixture));passed.push('Existing beam, wall, column geometry and floor definitions exactly match E2.115');await baseline.close();
   const directionCheck=await page.evaluate(()=>{
    const p=Engine.clone(loading115Tests().projects.slab),read=()=>Loading.run(p,Engine.generate(p),'B').rows;
    const before=read(),slabs=Engine.floorModel(Engine.generate(p),1).slabs;
@@ -29,7 +29,7 @@ const server=http.createServer((req,res)=>{try{const url=new URL(req.url,'http:/
    let missingRegion=false;try{BeamLayout116.candidate(p,'F1','secondary',{...cfg,scope:'selected'});}catch{missingRegion=true;}
    return {before:before.find(r=>r.kind==='SLAB').loading.direction,after:after.find(r=>r.kind==='SLAB').loading.direction,beforeQ:q(before),afterQ:q(after),total:after.filter(r=>r.actions).reduce((n,r)=>n+r.actions.totalLive,0),manual:JSON.stringify(main.project.types.F1.beams)===JSON.stringify(p.types.F1.beams),secondary:main.project.types.F1.beamLayout116.secondary,invalid,missingRegion};
   });
-  assert.deepEqual(directionCheck,{before:'Y',after:'X',beforeQ:0,afterQ:48,total:48,manual:true,secondary:false,invalid:true,missingRegion:true});passed.push('Slab direction redirects actual DL/LL load path; invalid layout inputs rejected and manual beams retained');
+  assert.deepEqual(directionCheck,{before:'Y',after:'X',beforeQ:0,afterQ:38.5,total:38.5,manual:true,secondary:false,invalid:true,missingRegion:true});passed.push('Slab direction redirects actual DL/LL load path; invalid layout inputs rejected and manual beams retained');
   const fixture=await page.evaluate(()=>{const p=Engine.clone(loading115Tests().projects.slab);p.name='Layout 116 verification';p.total=3;p.groups=[{...p.groups[0],end:2},{...p.groups[0],end:'顶层',type:'F2'}];p.types.F2=Engine.clone(p.types.F1);p.types.F1.beams=[];p.types.F1.beamDepth=650;LoadData.setFloor(p,2,{usage:'Office',dl:12,sdl:1,ll:3});LoadData.setFloor(p,3,{usage:'Roof',dl:8,sdl:1,ll:1});return p;});
   fs.writeFileSync(path.join(out,'fixture.framing.json'),JSON.stringify(fixture));
   async function load(p){await page.locator('#file').setInputFiles({name:'layout-test.framing.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await page.waitForFunction(name=>StudioHost.get().p.name===name,p.name);}

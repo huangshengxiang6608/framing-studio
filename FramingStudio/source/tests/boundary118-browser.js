@@ -15,12 +15,14 @@ function boundary118Tests(){
   const out=Loading.run(p,Engine.generate(p),section,areaTracing),rows=out.rows.filter(r=>['MB','SB','CB','TB'].includes(r.kind)),spanAxis=dir==='X'?0:1,along=1-spanAxis;let g=0,q=0,len=0,trace=0;
   for(const row of rows)for(const l of row.loading.automaticLines){
    fail(l.start>=-1e-7&&l.end<=row.loading.L+1e-7,'line lies within receiving beam');
-   const a=row.member.rawA,z=row.member.rawZ,L=Math.hypot(z[0]-a[0],z[1]-a[1]),mid=a.map((v,i)=>v+(z[i]-v)*(l.start+l.end)/(2*L)),inside=point=>s.rects.some(r=>point[0]>r.x0&&point[0]<r.x1&&point[1]>r.y0&&point[1]<r.y1),low=[...mid],high=[...mid];low[spanAxis]-=1e-5;high[spanAxis]+=1e-5;
+   const a=row.member.rawA,z=row.member.rawZ,L=Math.hypot(z[0]-a[0],z[1]-a[1]),mid=a.map((v,i)=>v+(z[i]-v)*(l.start+l.end)/(2*L)),inside=point=>s.rects.some(r=>point[0]>r.x0&&point[0]<r.x1&&point[1]>r.y0&&point[1]<r.y1),low=[...mid],high=[...mid];const physical=Engine.rect(row.member),c=spanAxis===0?physical.x:physical.y,w=spanAxis===0?physical.w:physical.d;low[spanAxis]=c-w/2-1e-5;high[spanAxis]=c+w/2+1e-5;
    fail(inside(low)!==inside(high),'line touches actual slab boundary, never an empty bounding-box edge: '+row.id+' '+JSON.stringify(mid));fail(Math.abs(a[spanAxis]-z[spanAxis])<1e-8,'receiver perpendicular to slab span');
    g+=l.g*(l.end-l.start);q+=l.q*(l.end-l.start);len+=l.end-l.start;trace+=(l.sources101||[]).reduce((v,s)=>v+s.area,0);
   }
   const net=LoadRegions83.netSelfWeight(s,m).reduce((v,r)=>v+LoadRegions83.area(r),0),parts=LoadRegions83.pieces(p,1,s),expectedG=(section==='B'?net*4.9:0)+parts.reduce((v,r)=>v+LoadRegions83.area(r)*(r.load.sdl+(section==='A'?r.load.dl:0)),0),expectedQ=parts.reduce((v,r)=>v+LoadRegions83.area(r)*r.load.ll,0);
-  fail(g>=expectedG-1e-7&&g-expectedG<=.01*len+1e-7,'dead load conserved including roundup '+g+'/'+expectedG);fail(q>=expectedQ-1e-7&&q-expectedQ<=.01*len+1e-7,'live load conserved');if(areaTracing)near(trace,expectedQ,'source tracing conserved');
+  const unresolved=out.rows.find(r=>r.kind==='SLAB').loadErrors.some(e=>e.includes('支承边不完整'));
+  if(unresolved){fail(g<=expectedG+.01*len+1e-7&&q<=expectedQ+.01*len+1e-7,'unresolved strips never duplicate total loads');fail(rows.filter(r=>r.loading.automaticLines.length).every(r=>!r.actions&&r.loadErrors.some(e=>e.includes('支承边不完整')||e.includes('荷载'))),'physical end-face gaps block downstream design');if(areaTracing)fail(trace<=expectedQ+1e-7,'unresolved source tracing never invents area');}
+  else{fail(g>=expectedG-1e-7&&g-expectedG<=.01*len+1e-7,'dead load conserved including roundup '+g+'/'+expectedG);fail(q>=expectedQ-1e-7&&q-expectedQ<=.01*len+1e-7,'live load conserved');if(areaTracing)near(trace,expectedQ,'source tracing conserved');}
   if(!s.rectangular){fail(rows.filter(r=>r.loading.automaticLines.length).every(r=>!r.actions&&r.loadErrors.length),'irregular slab does not bypass design validation');}
   return {p,rows,g,q,s};
  }

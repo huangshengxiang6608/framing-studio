@@ -1,5 +1,6 @@
 /* Framing App A1. Geometry in metres; section inputs in millimetres. No external dependencies. */
 const Engine=(()=>{
+ const slabGeometry=typeof SlabGeometry120!=='undefined'?SlabGeometry120:require('./slab-geometry120.js');
  const eps=1e-6, clone=x=>JSON.parse(JSON.stringify(x)), near=(a,b)=>Math.abs(a-b)<eps;
  const unique=a=>[...new Set(a.map(x=>+x.toFixed(6)))].sort((a,b)=>a-b);
  function axisData(p,key){return (typeof key==='string'?p.types[key]:key)?.axes||p.axes;}
@@ -194,13 +195,40 @@ const Engine=(()=>{
   }
   for(const b of beams)if(b.kind==='SB'&&b.displayKind==='CB')b.d=sh;
   const slabVoids=(t.slabVoids||[]).flatMap(r=>ts.filter(t=>t.state===1).map(t=>({x0:Math.max(t.x0,r.x0),x1:Math.min(t.x1,r.x1),y0:Math.max(t.y0,r.y0),y1:Math.min(t.y1,r.y1)})).filter(r=>r.x1>r.x0&&r.y1>r.y0));
-  const slabs=slabPanels(ts,beams,walls,slabVoids);if(slabs===null)issue('SLAB','板块分隔过于复杂，未显示板块信息；请减少自由坐标分段');
-  for(const s of slabs||[]){const zone=(t.secondaryAreas||[]).find(a=>a.cantilever101&&a.rects.some(r=>s.x0>=r.x0-eps&&s.x1<=r.x1+eps&&s.y0>=r.y0-eps&&s.y1<=r.y1+eps));if(zone)s.direction101=zone.direction==='X'?'Y':'X';}for(const s of slabs||[]){s.thickness=t.slabSizes?.find(o=>o.signature===slabSignature(s))?.value??df.slab;if(t.slabDirections116&&typeof Loading!=='undefined')s.direction116=t.slabDirections116[Loading.token('SLAB',s)];if(layout)s.shortSpan116=true;}
+  const slabs=slabPanels(ts,beams,walls,slabVoids,columns);if(slabs===null)issue('SLAB','板块分隔过于复杂，未显示板块信息；请减少自由坐标分段');
+  for(const s of slabs||[]){const zone=(t.secondaryAreas||[]).find(a=>a.cantilever101&&a.rects.some(r=>s.x0>=r.x0-eps&&s.x1<=r.x1+eps&&s.y0>=r.y0-eps&&s.y1<=r.y1+eps));if(zone)s.direction101=zone.direction==='X'?'Y':'X';}for(const s of slabs||[]){s.thickness=t.slabSizes?.find(o=>o.signature===slabSignature(s))?.value??t.slabSizes?.find(o=>s.legacySignatures120.includes(o.signature))?.value??df.slab;if(t.slabDirections116&&typeof Loading!=='undefined')s.direction116=slabGeometry.record(t.slabDirections116,s);if(layout)s.shortSpan116=true;}
   const uncovered=(slabs||[]).flatMap(s=>s.rects).reduce((sum,t)=>{let coveredArea=0;for(const [a,b,c,d]of panels)coveredArea+=Math.max(0,Math.min(b,t.x1)-Math.max(a,t.x0))*Math.max(0,Math.min(d,t.y1)-Math.max(c,t.y0));return sum+Math.max(0,(t.x1-t.x0)*(t.y1-t.y0)-coveredArea);},0);
   if(uncovered>.001)issue('SLAB',uncovered.toFixed(1)+' m² 未识别封闭梁格，请核对支承；未按悬臂板处理');
   return {key,ts,columns,walls,beams,issues,panels,slabs:slabs||[],slabVoids,sh,min};
  }
- function slabPanels(ts,beams,walls,voids=[]){
+ function slabPanels(ts,beams,walls,voids=[],columns=[]){
+  const concrete=slabGeometry.concrete(beams,walls,columns),cuts=[...voids,...concrete],xs=unique([...ts.flatMap(t=>[t.x0,t.x1]),...cuts.flatMap(r=>[r.x0,r.x1])]),ys=unique([...ts.flatMap(t=>[t.y0,t.y1]),...cuts.flatMap(r=>[r.y0,r.y1])]);
+  const nx=xs.length-1,ny=ys.length-1;if(nx*ny>250000)return null;if(nx<1||ny<1)return [];
+  const ix=new Map(xs.map((v,i)=>[v.toFixed(6),i])),iy=new Map(ys.map((v,i)=>[v.toFixed(6),i])),xi=v=>ix.get(v.toFixed(6)),yi=v=>iy.get(v.toFixed(6));
+  const cells=new Int32Array(nx*ny).fill(-1),tileKeys=new Array(nx*ny),vertical=new Uint8Array((nx+1)*ny),horizontal=new Uint8Array(nx*(ny+1));
+  for(const t of ts)if(t.state===1)for(let j=yi(t.y0);j<yi(t.y1);j++)for(let i=xi(t.x0);i<xi(t.x1);i++){const n=j*nx+i;cells[n]=-2;tileKeys[n]=t.k;}
+  for(const r of cuts)for(let j=yi(r.y0);j<yi(r.y1);j++)for(let i=xi(r.x0);i<xi(r.x1);i++)cells[j*nx+i]=-1;
+  const out=[];
+  for(let seed=0;seed<cells.length;seed++)if(cells[seed]===-2){
+   const group=out.length,queue=[seed];cells[seed]=group;
+   for(let at=0;at<queue.length;at++){const n=queue[at],i=n%nx,j=Math.floor(n/nx);const visit=(to,blocked)=>{if(!blocked&&cells[to]===-2){cells[to]=group;queue.push(to);}};
+    if(i>0)visit(n-1,vertical[j*(nx+1)+i]);if(i<nx-1)visit(n+1,vertical[j*(nx+1)+i+1]);if(j>0)visit(n-nx,horizontal[j*nx+i]);if(j<ny-1)visit(n+nx,horizontal[(j+1)*nx+i]);
+   }
+   queue.sort((a,b)=>a-b);let area=0,x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;const edges=[],keys=new Set(),rects=[];let previous=new Map(),row=-1;
+   // Merge cell runs into rectangles for economical rendering; retain true outer edges.
+   for(let at=0;at<queue.length;){const n=queue[at],j=Math.floor(n/nx),first=n%nx;let last=first;
+    while(at+1<queue.length&&Math.floor(queue[at+1]/nx)===j&&queue[at+1]%nx===last+1){last++;at++;}at++;
+    if(j!==row){previous=j===row+1?new Map(rects.filter(r=>r.lastRow===row).map(r=>[r.run,r])):new Map();row=j;}
+    const run=first+','+last,r=previous.get(run);if(r){r.y1=ys[j+1];r.lastRow=j;}else rects.push({x0:xs[first],x1:xs[last+1],y0:ys[j],y1:ys[j+1],lastRow:j,run});
+   }
+   for(const n of queue){const i=n%nx,j=Math.floor(n/nx),a=xs[i],b=xs[i+1],c=ys[j],d=ys[j+1];area+=(b-a)*(d-c);x0=Math.min(x0,a);x1=Math.max(x1,b);y0=Math.min(y0,c);y1=Math.max(y1,d);keys.add(tileKeys[n]);
+    if(i===0||cells[n-1]!==group)edges.push([[a,c],[a,d]]);if(i===nx-1||cells[n+1]!==group)edges.push([[b,c],[b,d]]);if(j===0||cells[n-nx]!==group)edges.push([[a,c],[b,c]]);if(j===ny-1||cells[n+nx]!==group)edges.push([[a,d],[b,d]]);
+   }
+   out.push({id:'SL-'+String(group+1).padStart(2,'0'),x0,x1,y0,y1,area,rectangular:Math.abs(area-(x1-x0)*(y1-y0))<1e-6,tileKeys:[...keys],rects:rects.map(({x0,x1,y0,y1})=>({x0,x1,y0,y1})),edges});
+  }
+  return slabGeometry.decorate(out,referencePanels120(ts,beams,walls,voids)||[]);
+ }
+ function referencePanels120(ts,beams,walls,voids=[]){
   // Coordinate-compressed planar cells; only physical segments block connectivity.
   // Axis lines alone and the extension of a short beam do not divide a slab.
   const lines=[...beams,...walls],xs=unique([...ts.flatMap(t=>[t.x0,t.x1]),...lines.flatMap(b=>[b.rawA[0],b.rawZ[0]]),...voids.flatMap(r=>[r.x0,r.x1])]),ys=unique([...ts.flatMap(t=>[t.y0,t.y1]),...lines.flatMap(b=>[b.rawA[1],b.rawZ[1]]),...voids.flatMap(r=>[r.y0,r.y1])]);
@@ -288,7 +316,7 @@ const Engine=(()=>{
   if(get(fs[i])===get(fs[i-1]))continue;const up=get(fs[i]),dn=get(fs[i-1]);const supports=[...dn.walls,...dn.beams.filter(b=>b.kind==='TB')];
   for(const c of up.columns.filter(c=>c.status!=='上层柱'))if(dn.columns.filter(d=>d.status!=='上层柱'&&overlap(columnRect(c),columnRect(d))).length!==1&&!supports.some(w=>on([c.x,c.y],w)))issues.push({type:up.key,id:c.id,msg:fs[i].n+'/F 上层柱与下层支承不连续；请核对并手动指定 TB'});
   for(const w of up.walls){const r=rect(w),h=near(w.a[1],w.z[1]),eligible=supports.filter(s=>{const rr=rect(s);return h?Math.abs(rr.y-r.y)+r.d/2<=rr.d/2+eps:Math.abs(rr.x-r.x)+r.w/2<=rr.w/2+eps;}).map(s=>({...s,rawA:s.a,rawZ:s.z}));if(!covered(eligible,w.a,w.z))issues.push({type:up.key,id:w.id,msg:fs[i].n+'/F 墙与下层墙／TB 不连续，请核对支承'});}
- }for(const f of fs){const m=get(f),local=typeof LocalHeights96!=='undefined'&&LocalHeights96.hasClearance(p,f.n),deep=m.beams.filter(b=>b.d*1000>(local?LocalHeights96.beamAllowance(p,f.n,b):f.sh)+1e-6);if(deep.length)issues.push({type:f.type,floor:f.n,id:deep.map(b=>b.displayId||b.id).join('、'),msg:FloorLevels.name(p,f.n)+'：'+deep.length+' 根梁深超过'+(local?'本层／局部结构预留高度':'本层结构预留高度 '+f.sh+' mm')+'；Framing 截面保持不变，请检查净高安排'});}for(const [n,m]of Object.entries(floorModels))issues.push(...m.issues.map(q=>({...q,floor:+n})));const result={models,floorModels,issues,floors:fs};return typeof LocalHeights96!=="undefined"?LocalHeights96.build(p,result,baseModel):result;}
+ }for(const f of fs){const m=get(f),local=typeof LocalHeights96!=='undefined'&&LocalHeights96.hasClearance(p,f.n),deep=m.beams.filter(b=>b.d*1000>(local?LocalHeights96.beamAllowance(p,f.n,b):f.sh)+1e-6);if(deep.length)issues.push({type:f.type,floor:f.n,id:deep.map(b=>b.displayId||b.id).join('、'),msg:FloorLevels.name(p,f.n)+'：'+deep.length+' 根梁深超过'+(local?'本层／局部结构预留高度':'本层结构预留高度 '+f.sh+' mm')+'；Framing 截面保持不变，请检查净高安排'});}for(const [n,m]of Object.entries(floorModels))issues.push(...m.issues.map(q=>({...q,floor:+n})));const result={models,floorModels,issues,floors:fs};const final=typeof LocalHeights96!=="undefined"?LocalHeights96.build(p,result,baseModel):result;slabGeometry.migrate(p,final);return final;}
  function removeAxis(p,dim,index,key){if(!key||!p.types[key])throw Error('请选择要修改轴线的 Framing');const grid=ownAxes(p,key);return removeAxisLocal({...p,axes:grid,types:{[key]:p.types[key]}},dim,index);}
  function removeAxisLocal(p,dim,index){
   const arr=p.axes[dim],count=arr.length;

@@ -10,6 +10,6 @@ def replace(match):
     body=(root/name).read_bytes().removeprefix(b'\xef\xbb\xbf').strip(b'\r\n')
     return b'/* studio-source:'+match[1]+b':start */'+match[2]+body+match[2]+b'/* studio-source:'+match[1]+b':end */'
 updated,count=re.subn(pattern,replace,source,flags=re.S)
-if count!=9:raise SystemExit(f'Expected 9 marked modules, found {count}; no file written')
+if count!=12:raise SystemExit(f'Expected 12 marked modules, found {count}; no file written')
 target.write_bytes(updated)
 print(f'Synchronized {count} UI and geometry modules')

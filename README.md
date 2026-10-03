@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.123**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.124**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -43,6 +43,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 `compile.ps1` 不负责网页资源打包。修改已标记的 17 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
+
+E2.124 精简 Summary Check 的柱面板：突出本层 G/Q，保留累计荷载和逐层明细，移除重复的柱尺寸、受荷范围控件和柱验算块。柱仍按原面积法计算，详细验算沿用 Member Check。梁支承自动完整识别时默认收起手动 Support，待确认和手动支承保持展开；计算及两个抄均未改。
 
 E2.123 将“梁”窗口改名为 **Summary Check**，在原梁／板面板中加入柱受力查看：本层、上部和累计 G/Q，逐层面积，验算轴力与原柱 Check 结果。可隐藏受荷范围，或打开该柱的 Member Check。荷载与面积使用既有输入，查看时不勾选报告、不改变项目。菜单为“梁布置 → Loading → Summary Check → Member Check”。新增检查为 `source/tests/summary123.cjs` 和 `preserve123.py`。
 

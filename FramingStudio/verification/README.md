@@ -28,6 +28,10 @@ if ($trussProcess.ExitCode -ne 0) { throw 'Native truss check failed' }
 
 Use a fresh output directory for each native run. The app uses an isolated profile beneath that directory. The fixture has no RC members selected for A/B export: the truss workbook is macro-free.
 
+## E2.121 RC scheme entry — 2026-10-03
+
+The truss entry now appears under Scheme 1 · RC. A browser check with `scheme2` removed verified the visible RC entry, successful truss calculation, downstream RC A/B input plans, and truss A/B report jobs. Complete loading results and report job content exactly match E2.120 for the same RC-only project. The Windows host was recompiled; calculation, report-rendering and Excel-template files are unchanged from the tested E2.120 release. The RC macro limitation below still applies.
+
 ## Results on the E2.120 integration branch — 2026-10-03
 
 - C# desktop and Excel bridge compilation: passed.

@@ -67,3 +67,7 @@ Section A / Section B 两个抄的文字、横线纸、格式、表格、图示�
 E2.117 验证：4 组贴边 CB 支承及分步保存检查通过；86 个原文件字节一致，报告处理和样式未改。当前入口为 `source/tests/support117.cjs`（Node/Playwright，可用 `CHROME_PATH` 指定 Chrome）及 `source/tests/preserve117.py`（Python + Git，使用 E2.116 历史版本）。E2.116 的荷载、梁布置模块保持原样，原 55 项荷载与 9 组界面检查留作回归；测试均用独立数据。
 
 第三方组件保留其随附许可文件。本仓库未另行授予开源许可。
+
+## 可测试的 RC 桁架 Demo
+
+打开 `FramingStudio/示例模型/RC_转换桁架_Demo/RC_转换桁架_Demo.framing.json`。该项目包含 12 m 跨、6 m 高的 S460 转换桁架，上部柱给定 G/Q，下部 RC 柱和桁架已加入 A/B 选择。文件夹内附基准反力、位移、修改测试步骤及实际 App 示意图；无需建立 Scheme 2。

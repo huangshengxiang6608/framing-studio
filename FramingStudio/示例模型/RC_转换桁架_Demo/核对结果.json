@@ -1,0 +1,181 @@
+{
+  "name": "RC Demo - 12m S460 两层转换桁架",
+  "scheme2Absent": true,
+  "status": "OK",
+  "fail": [],
+  "geometry": {
+    "span": 12,
+    "depth": 6,
+    "zBottom": 4,
+    "zTop": 10
+  },
+  "loads": [
+    {
+      "id": "U1",
+      "x": 3,
+      "g": 1200,
+      "q": 300
+    },
+    {
+      "id": "U2",
+      "x": 9,
+      "g": 600,
+      "q": 900
+    }
+  ],
+  "reactions": {
+    "dead": [
+      1095.4482922118432,
+      795.4482922118427
+    ],
+    "live": [
+      450,
+      749.9999999999995
+    ],
+    "uls": [
+      {
+        "min": 1095.4482922118432,
+        "max": 2253.6276090965803,
+        "minFactors": [
+          1,
+          1,
+          1,
+          0,
+          1,
+          0
+        ],
+        "maxFactors": [
+          1.4,
+          1.4,
+          1.4,
+          1.6,
+          1.4,
+          1.6
+        ]
+      },
+      {
+        "min": 795.4482922118427,
+        "max": 2313.6276090965794,
+        "minFactors": [
+          1,
+          1,
+          1,
+          0,
+          1,
+          0
+        ],
+        "maxFactors": [
+          1.4,
+          1.4,
+          1.4,
+          1.6,
+          1.4,
+          1.6
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "bottom": "UB 203x133x25",
+    "top": "UC 152x152x51",
+    "diagonal": "UC 203x203x52",
+    "vertical": "UC 254x254x132"
+  },
+  "deflection": {
+    "total": 19.01908405737977,
+    "live": 8.40388334219266,
+    "differential": 3.913730551917607,
+    "fullLoadTotal": 19.019084057379768,
+    "fullLoadLive": 8.403883342192659
+  },
+  "mass": 6270.90641795987,
+  "steelWeight": 61.496584423686144,
+  "concreteWeight": 29.400000000000002,
+  "maxUtil": 0.8339148390816997,
+  "members": 17,
+  "forceResidual": -9.094947017729282e-13,
+  "momentResidual": -7.275957614183426e-12,
+  "lower": [
+    {
+      "id": "L",
+      "g": 1095.4482922118432,
+      "q": 450,
+      "tt": [
+        "TT1"
+      ],
+      "status": "OK (AXIAL ONLY)"
+    },
+    {
+      "id": "R",
+      "g": 795.4482922118427,
+      "q": 749.9999999999995,
+      "tt": [
+        "TT1"
+      ],
+      "status": "OK (AXIAL ONLY)"
+    }
+  ],
+  "intermediate": [
+    {
+      "id": "L",
+      "g": 0,
+      "q": 0
+    },
+    {
+      "id": "R",
+      "g": 0,
+      "q": 0
+    }
+  ],
+  "plans": {
+    "A": {
+      "trussJobs": 1,
+      "rcJobs": 2,
+      "rcMembers": [
+        {
+          "id": "L",
+          "kind": "COL"
+        },
+        {
+          "id": "R",
+          "kind": "COL"
+        }
+      ],
+      "rcIssues": []
+    },
+    "B": {
+      "trussJobs": 1,
+      "rcJobs": 2,
+      "rcMembers": [
+        {
+          "id": "L",
+          "kind": "COL"
+        },
+        {
+          "id": "R",
+          "kind": "COL"
+        }
+      ],
+      "rcIssues": []
+    }
+  },
+  "blocked": {
+    "status": "NOT OK",
+    "lower": [
+      "INPUT REQUIRED",
+      "INPUT REQUIRED"
+    ]
+  },
+  "tight": {
+    "status": "NOT OK",
+    "fail": [
+      "G+Q 挠度包络超限"
+    ]
+  },
+  "toggle": {
+    "A": 0,
+    "B": 1
+  },
+  "roundtrip": true,
+  "ok": true
+}

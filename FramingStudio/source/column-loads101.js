@@ -65,7 +65,7 @@ const ColumnLoads101=(()=>{
 
  function badge(ctx,plot,w,h,data,paint){
   if(!data||w<80||h<60)return null;
-  const margin=12,bw=Math.min(w<700?242:280,w-2*margin),bh=Math.min(98,h-2*margin),overlap=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+  const margin=12,bw=Math.min(w<700?242:280,w-2*margin),bh=Math.min(data.compact?44:98,h-2*margin),overlap=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
   const canvasBox=ctx.canvas.id==='canvas'?ctx.canvas.getBoundingClientRect():null,overlays=canvasBox?[document.getElementById('hint'),ctx.canvas.parentElement.querySelector('.canvas-actions')].filter(Boolean).map(el=>{const r=el.getBoundingClientRect();return {x:r.left-canvasBox.left-6,y:r.top-canvasBox.top-6,w:r.width+12,h:r.height+12};}):[];
   const belowHint=Math.max(margin,...overlays.filter(r=>r.y<h/2).map(r=>r.y+r.h+6));
   const candidates=[{x:margin,y:margin},{x:w-bw-margin,y:margin},{x:margin,y:belowHint},{x:w-bw-margin,y:belowHint},{x:margin,y:h-bh-48},{x:w-bw-margin,y:h-bh-48}].map(r=>({...r,y:Math.max(margin,Math.min(h-bh-margin,r.y)),w:bw,h:bh}));
@@ -76,10 +76,10 @@ const ColumnLoads101=(()=>{
   ctx.beginPath();ctx.rect(box.x+8,box.y+4,box.w-16,box.h-8);ctx.clip();
   const write=(s,y,size=12,bold=false,ink=colour,whole=false)=>{const font=()=>ctx.font=(bold?'600 ':'')+size+'px "Segoe UI", "Microsoft YaHei", sans-serif';font();ctx.fillStyle=ink;const max=box.w-28;if(whole)while(ctx.measureText(s).width>max&&size>10){size--;font();}while(ctx.measureText(s).width>max&&s.length>1)s=s.slice(0,-2)+'…';ctx.fillText(s,box.x+14,box.y+y);};
   const same=data.floor===data.targetFloor,title=same?data.id+' · '+data.floorName:data.id+' · 目标柱 '+data.targetName;
-  write(title,19,13,true);write(Number.isFinite(data.area)?'受荷面积 '+num(data.area)+' m²':'受荷面积待确认',46,21,true,colour,true);
-  write('来源楼层：'+data.floorName,66,12,false,'#36586d');
+  write(title+(data.compact&&!data.auto?' · 手动面积':''),data.compact?14:19,data.compact?11:13,true);write(Number.isFinite(data.area)?'受荷面积 '+num(data.area)+' m²':'受荷面积待确认',data.compact?35:46,data.compact?18:21,true,colour,true);
+  if(!data.compact)write('来源楼层：'+data.floorName,66,12,false,'#36586d');
   const caption=issueCaption(data)||(!data.rects.length&&!data.polygons?.length?(data.auto?'所选范围没有楼板面积':'手动面积，暂无对应几何范围'):data.weighted?'斜线：几何面积经转换梁分配':data.partitioned?'半跨按等距线分界 · Opening 已扣除':'几何半跨范围 · Opening 已扣除');
-  write(caption,87,12,false,'#36586d',true);ctx.restore();
+  if(!data.compact)write(caption,87,12,false,'#36586d',true);ctx.restore();
   return {...box,title,caption,area:data.area,floor:data.floor,targetFloor:data.targetFloor,overlayOverlap:overlays.reduce((n,t)=>n+overlap(box,t),0)};
  }
 

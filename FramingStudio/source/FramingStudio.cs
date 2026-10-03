@@ -14,8 +14,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8",FrameworkDisplayName=".NET Framework 4.8")]
 
 [assembly: System.Reflection.AssemblyTitle("Framing Studio")]
-[assembly: System.Reflection.AssemblyVersion("2.119.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.119.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.120.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.120.0.0")]
 
 static class Program {
     [STAThread] static int Main(string[] args) {
@@ -56,7 +56,7 @@ sealed class Studio : Form {
         Data = TestDir == null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FramingStudio") : Path.Combine(TestDir, "isolated-user-data");
         Profile = Path.Combine(Data, "WebView2"); Directory.CreateDirectory(Data);
         if (TestDir != null) { Directory.CreateDirectory(TestDir); Opacity = .01; ShowInTaskbar = false; }
-        Text = "Framing Studio · E2.119 Desktop"; Width = 1500; Height = 950;
+        Text = "Framing Studio · E2.120 Desktop"; Width = 1500; Height = 950;
         MinimumSize = new Size(900, 650); StartPosition = FormStartPosition.CenterScreen;
         if (File.Exists(Path.Combine(Root,"FramingStudio.ico"))) Icon = new Icon(Path.Combine(Root,"FramingStudio.ico"));
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("项目");
@@ -118,7 +118,7 @@ sealed class Studio : Form {
             await web.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(Path.Combine(Root,"desktop-bridge.js")));
             web.NavigationCompleted += async delegate(object s, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { Log("Navigation: " + e.WebErrorStatus); Status.Text = "页面加载失败：" + e.WebErrorStatus; return; }
-                Ready = true; Status.Text = "离线模式 · E2.119 · 项目请保存为 .framing.json";
+                Ready = true; Status.Text = "离线模式 · E2.120 · 项目请保存为 .framing.json";
                 if (TestDir != null && TestNavigation++ == 0) await SelfTest();
             };
             if (TestDir != null) web.ScriptDialogOpening += delegate(object s, CoreWebView2ScriptDialogOpeningEventArgs e) { e.Accept(); };
@@ -184,7 +184,7 @@ sealed class Studio : Form {
                       var job=new Dictionary<string,object>(source);job.Remove("_reportSection");string runId=DateTime.Now.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N").Substring(0,8);
                       string directory=Path.Combine(Data,"ExcelRuns",runId);Directory.CreateDirectory(directory);ExcelRuns.Add(runId,directory);
                       object extraPages=null;
-                      if(section!=null&&job.TryGetValue("reportPages",out extraPages)){job.Remove("reportPages");File.WriteAllText(Path.Combine(directory,"report-pages.json"),Json.Serialize(extraPages),new UTF8Encoding(false));}
+                      if((section!=null||Convert.ToString(job["type"])=="Truss")&&job.TryGetValue("reportPages",out extraPages)){job.Remove("reportPages");File.WriteAllText(Path.Combine(directory,"report-pages.json"),Json.Serialize(extraPages),new UTF8Encoding(false));}
                       string path=Path.Combine(directory,"job.json");File.WriteAllText(path,Json.Serialize(job),new UTF8Encoding(false));
                     await ExcelNotify(new {progress=(section==null?"":"Section "+section+" · ")+"Excel 正在计算 "+index+" / "+total+" · "+Convert.ToString(job["label"])});
                     var start=new ProcessStartInfo(Path.Combine(Root,"Excel","ExcelBridge.exe"),"\""+Path.Combine(Root,"Excel")+"\" \""+path+"\"") { UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden };
@@ -514,6 +514,38 @@ sealed class Studio : Form {
         finally{ClosingConfirmed=true;Close();}
     }
 
+    async Task TrussSmokeTest109() {
+        try {
+            await Task.Delay(400);await ImportProject(Path.Combine(TestDir,"fixture.framing.json"));await Task.Delay(250);
+            await Check("Native import retains transfer truss", "ExcelProject().project.transferTrusses[0].sourceIds.length===2");
+            await JS("document.querySelectorAll('dialog[open]').forEach(d=>d.close());StudioHost.navigate('truss')");
+            await Check("Truss page displays successful check", "document.querySelector('#workspace-pages h2').textContent.includes('TT1 · OK')");
+            using(var stream=File.Create(Path.Combine(TestDir,"native-truss.png")))await View.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream);
+            foreach(string section in new[]{"B","A"}) {
+                await JS("StudioHost.navigate('report"+section+"');ExcelSync.generateReport('"+section+"')");
+                for(int i=0;i<3000;i++){await Task.Delay(100);if(await JS("!ExcelSync.state().busy&&ExcelSync.state().records.length>0")=="true")break;}
+                await Check("Native "+section+" single truss workbook checked", "!ExcelSync.state().busy&&ExcelSync.state().records.filter(r=>r.type==='Truss').length===1&&ExcelSync.state().records.some(r=>r.type==='Truss'&&r.ok&&r.compared>400&&!r.differences.length)");
+                if(await JS("Object.values(ExcelProject().project.explorer.report"+section+"||{}).some(Boolean)")=="true")await Check("Native "+section+" downstream column workbook checked", "ExcelSync.state().records.some(r=>r.type==='RC'&&r.ok&&r.compared>0&&!r.differences.length)");
+                for(int i=0;i<150;i++){if(await JS("!!document.querySelector('#workspace-pages canvas[data-rendered=true]')")=="true")break;await Task.Delay(100);}
+                await Check("Section "+section+" PDF preview rendered", "!!document.querySelector('#workspace-pages canvas[data-rendered=true]')&&!document.querySelector('[data-wp=print]').disabled");
+                SavedDownload=null;await JS("document.querySelector('[data-wp=print]').click()");for(int i=0;i<100&&SavedDownload==null;i++)await Task.Delay(100);
+                if(SavedDownload==null||!File.Exists(SavedDownload))throw new Exception("Section "+section+" export missing");File.Copy(SavedDownload,Path.Combine(TestDir,"Section-"+section+"-truss.pdf"),true);
+                using(var stream=File.Create(Path.Combine(TestDir,"native-report-"+section+".png")))await View.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream);
+            }
+            await JS("StudioHost.navigate('truss');document.querySelector('[data-tt-field=\"reportB\"]').click()");
+            await Check("B selection changes preserve A report version", "!ExcelSync.reportState('A').stale&&ExcelSync.reportState('B').stale");
+            await JS("document.getElementById('undo').click();const input=document.querySelector('[data-tt-field=\"limits.total\"]');input.value='25';input.dispatchEvent(new Event('change',{bubbles:true}))");
+            await Check("Truss edits invalidate both report versions", "ExcelSync.reportState('A').stale&&ExcelSync.reportState('B').stale");
+            await JS("document.getElementById('undo').click()");
+            await Check("Undo restores verified input", "ExcelProject().project.transferTrusses[0].limits.total===20");
+            SavedDownload=null;await JS("document.getElementById('save').click()");for(int i=0;i<100&&SavedDownload==null;i++)await Task.Delay(100);
+            var saved=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(SavedDownload));if(!saved.ContainsKey("transferTrusses"))throw new Exception("Saved TT data missing");Passed.Add("Native save roundtrip preserves single TT design object");
+            if(Errors.Count>0)throw new Exception(String.Join(" | ",Errors));
+            File.WriteAllText(Path.Combine(TestDir,"result.json"),Json.Serialize(new {ok=true,passed=Passed,errors=Errors}));
+        }catch(Exception e){ExitCode=1;File.WriteAllText(Path.Combine(TestDir,"result.json"),Json.Serialize(new {ok=false,error=e.ToString(),passed=Passed,errors=Errors}));}
+        finally{ClosingConfirmed=true;Close();}
+    }
+
     async Task LayoutSmokeTest116() {
         try {
             await Task.Delay(700);
@@ -541,6 +573,7 @@ sealed class Studio : Form {
         finally{ClosingConfirmed=true;View.Dispose();Close();}
     }
     async Task SelfTest() {
+        if(File.Exists(Path.Combine(TestDir,"truss-smoke.flag"))){await TrussSmokeTest109();return;}
         if(File.Exists(Path.Combine(TestDir,"layout-smoke.flag"))){await LayoutSmokeTest116();return;}
         if(File.Exists(Path.Combine(TestDir,"complete-smoke.flag"))){await CompleteSmokeTest();return;}
         if(File.Exists(Path.Combine(TestDir,"deflection-smoke.flag"))){await DeflectionSmokeTest();return;}

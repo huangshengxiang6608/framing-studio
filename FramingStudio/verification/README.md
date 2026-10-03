@@ -28,19 +28,19 @@ if ($trussProcess.ExitCode -ne 0) { throw 'Native truss check failed' }
 
 Use a fresh output directory for each native run. The app uses an isolated profile beneath that directory. The fixture has no RC members selected for A/B export: the truss workbook is macro-free.
 
-## Results on the E2.119 integration branch — 2026-10-03
+## Results on the E2.120 integration branch — 2026-10-03
 
 - C# desktop and Excel bridge compilation: passed.
-- Main regressions: 55 loading assertions, 47 boundary groups, 9 layout groups and 4 support groups passed.
-- E2.118 Excel templates/resources, report paper/composition and selected new layout/loading modules: 19 files byte-identical.
+- Main regressions: 55 loading assertions, 46 boundary groups plus 5 slab-direction/local-clearance groups, 9 layout groups and 4 support groups passed.
+- E2.119 Excel templates/resources, report paper/composition and selected new layout/loading modules: 20 files byte-identical.
 - Core: 11 groups passed (section data, material boundaries, independent equilibrium/virtual work, buckling, load envelopes, selection and invalid inputs).
-- Browser: 8 groups passed, including complete no-truss geometry/loading/report-page comparison against repository E2.118 (`224d0e0`), UI edits/undo, serialization and rejection of invalid transfer paths.
-- Integration: 7 groups passed, including actual floor heights, physical lower-column A/B inputs, all drawing views, report selection and export planning.
+- Browser: 8 groups passed, including complete no-truss geometry/loading/report-page comparison against repository E2.119 (`afa70fa`), UI edits/undo, serialization and rejection of invalid transfer paths.
+- Integration: 7 groups passed, including actual floor heights and fixed chord elevations under local clearance edits, physical lower-column A/B inputs, all drawing views, report selection and export planning.
 - Windows native truss workflow: 10 checks passed, including A/B PDF preview/export, stale report invalidation, undo and project save.
 - Native A/B truss workbooks: 451 comparisons each, zero differences.
 - Downstream transfer: 15 groups passed. Includes TT → column → TB → column, further TB → MB/CB → column paths, continuous walls with unsupported column landings, independent force equilibrium, A/B RC export inputs, manual/area overrides, missing support and incomplete upstream inputs. Unaffected branches remain exportable.
 
-The downstream test originally failed against the first PR bundle because BASE-L had no TT provenance. In E2.119 the independent equilibrium expectations apply main's upward 0.01 kN rounding at each beam input, including successive TB / MB / CB transfers. Physical G/Q values reach the exported C26/C27 inputs rather than being replaced by manual area schedules.
+The downstream test originally failed against the first PR bundle because BASE-L had no TT provenance. In E2.120 the independent equilibrium expectations apply main's upward 0.01 kN rounding at each beam input, including successive TB / MB / CB transfers. Physical G/Q values reach the exported C26/C27 inputs rather than being replaced by manual area schedules.
 
 ## RC macro limitation
 
@@ -48,4 +48,4 @@ The lower-column G/Q propagation and A/B input plans passed JavaScript checks. E
 
 The [maintainer's review](https://github.com/huangshengxiang6608/framing-studio/pull/1#pullrequestreview-5377552928) independently reports successful native downstream-column A/B exports on the original PR commit `964aa9e`, with 16 / 31 comparisons and zero differences. That result is distinct from the new downstream-input regression tests and is not presented as a fresh native RC run on this revision.
 
-This revision preserves E2.118's Excel templates and VBA byte-for-byte, including the changes supplied by main. It does not change Office security settings or include diagnostic workbook modifications. The previously reported 6,199 native comparisons in the E2.111 changelog are historical baseline evidence, not a new RC validation result for this PR.
+This revision preserves E2.119's Excel templates and VBA byte-for-byte, including the changes supplied by main. It does not change Office security settings or include diagnostic workbook modifications. The previously reported 6,199 native comparisons in the E2.111 changelog are historical baseline evidence, not a new RC validation result for this PR.

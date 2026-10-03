@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.119**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.120**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -13,7 +13,7 @@ Windows 结构建模与工程检查工具。当前版本为 **E2.119**（仓库�
 
 ## S460 转换桁架
 
-本版将 PR #1 的转换桁架整合到 E2.118。保留最新梁布置、支承与荷载编辑、板边界传荷，以及原有 A/B 抄版式。桁架反力沿下部梁／柱／墙路径保留来源，不能被面积法或手动总荷载覆盖。
+本版将 PR #1 的转换桁架整合到 E2.119。保留最新梁布置、支承与荷载编辑、板边界传荷，以及原有 A/B 抄版式。桁架反力沿下部梁／柱／墙路径保留来源，不能被面积法或手动总荷载覆盖。
 
 [桁架使用说明](FramingStudio/docs/transfer-truss.md) · [验证步骤](FramingStudio/verification/README.md)。合成示例位于 `FramingStudio/示例模型/S460_两层转换桁架.framing.json`。
 
@@ -46,13 +46,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 该命令使用系统 .NET Framework C# 编译器及随附的 WebView2 库重建桌面程序。省略 `-DesktopOnly` 可同时重建 ExcelBridge.exe。
 
-`compile.ps1` 不负责网页资源打包。修改已标记的 8 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
+`compile.ps1` 不负责网页资源打包。修改已标记的 9 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
 
-E2.118 修正不规则外边界及开洞板的荷载分配，按实际连续板区逐段匹配支承，避免通过外包矩形跨空白区域传荷。原有非矩形板设计和缺少支承的限制继续提示。梁页增加“梁方向 A → B”显示/隐藏开关，选中梁标明两端，显示偏好自动记住。
+E2.119 将 slab 单向板受力方向双箭头加入“梁”窗口，与“梁布置”使用同一方向来源，可显示／隐藏。局部层高加入净高、E&M、自动结构高度及平面结构区标注，保持原表格和 Area 拖框操作；局部空间高度不再移动当前层梁板标高。E2.118 的实际板边界传荷修正继续保留。
 
-当前检查入口：`source/tests/boundary118.cjs`（47 组边界/UI）、`loading115.cjs`（55 项）、`layout116.cjs`（9 组）、`support117.cjs`（4 组）和 `preserve118.py`（相对 E2.117 的报告、模板及无关模块保护）。楼层局部净高、E&M、结构区预览尚未合入本版。
+当前检查入口：`source/tests/clearance119.cjs`（46 组板边界回归及 5 组新交互／局部净高检查）、`loading115.cjs`（55 项）、`layout116.cjs`（9 组）、`support117.cjs`（4 组）和 `preserve119.py`（相对 E2.118 的报告、模板及无关模块保护）。`boundary118.cjs` 保留为历史版本检查，其梁 A → B 显示断言已由 E2.119 的 slab 方向检查取代。
 
 E2.117 将梁页调整为先 Support 后 Loading，各自保存；识别到的柱／墙／梁编号与自由端在上方显示。保留原支承和传荷规则，支承保存不会丢掉未完成的荷载草稿。
 

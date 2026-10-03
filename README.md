@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.121**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.122**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -40,9 +40,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 该命令使用系统 .NET Framework C# 编译器及随附的 WebView2 库重建桌面程序。省略 `-DesktopOnly` 可同时重建 ExcelBridge.exe。
 
-`compile.ps1` 不负责网页资源打包。修改已标记的 15 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
+`compile.ps1` 不负责网页资源打包。修改已标记的 16 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
+
+E2.122 修正梁荷载图的反力显示：竖向反力已算出而构件弯矩／抗扭设计待补时，同时显示数值和待验算提示。接墙、接柱一致；真实缺荷载或缺支承仍阻止反力显示。计算程序和两个抄均未修改。新增检查为 `source/tests/reaction122.cjs` 和 `preserve122.py`。
 
 E2.121 菜单顺序为“梁布置 → Loading → 梁 → Member Check”。在“梁”页加入板计算面板：点选板后查看或修改板厚与单向方向，查看实际支承分段、荷载、反力、尺寸初筛和配筋结果。面板与 Member Check 共用输入，打开面板不会改变 Check/A/B 勾选。保留净板区、梁布置、中心线／端点／中点、板方向显示开关、局部净高／E&M／结构区等既有功能。
 

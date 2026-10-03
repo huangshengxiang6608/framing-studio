@@ -62,10 +62,19 @@ const Drawing=(()=>{
    if(slab){ctx.save();ctx.fillStyle='rgba(0,175,255,.28)';for(const t of slab.rects){const [x,y]=xy(t.x0,t.y0);ctx.fillRect(x,y,(t.x1-t.x0)*scale,(t.y1-t.y0)*scale);}ctx.setLineDash([]);ctx.beginPath();for(const [a,z]of slab.edges){ctx.moveTo(...xy(...a));ctx.lineTo(...xy(...z));}ctx.strokeStyle='#fff';ctx.lineWidth=6;ctx.stroke();ctx.strokeStyle='#008cdb';ctx.lineWidth=3;ctx.stroke();ctx.restore();const [x,y]=xy(slab.x0,slab.y0);text(ctx,'选中 '+slab.id,x+5,y-10,12,'#006da8');}
    if(r){const [x,y]=xy(r.x-r.w/2,r.y-r.d/2),ww=r.w*scale,dd=r.d*scale;ctx.save();ctx.setLineDash([]);ctx.fillStyle='rgba(0,175,255,.28)';ctx.fillRect(x,y,ww,dd);ctx.strokeStyle='#ffffff';ctx.lineWidth=6;ctx.strokeRect(x-3,y-3,ww+6,dd+6);ctx.strokeStyle='#008cdb';ctx.lineWidth=3;ctx.strokeRect(x-3,y-3,ww+6,dd+6);ctx.restore();text(ctx,'选中 '+(o?.displayId||s.id),x+5,y-10,12,'#006da8');}
   }
+  const beamDirections=[];
+  if(opt.beamDirections)for(const b of m.beams){
+   if(opt.visible?.[b.kind]===false)continue;
+   const a=xy(...b.a),z=xy(...b.z),len=Math.hypot(z[0]-a[0],z[1]-a[1]);if(len<12)continue;
+   const ux=(z[0]-a[0])/len,uy=(z[1]-a[1])/len,shaft=Math.min(22,len*.28),tip=[a[0]+(z[0]-a[0])*.72,a[1]+(z[1]-a[1])*.72],head=Math.min(6,shaft*.4);
+   ctx.save();ctx.setLineDash([]);ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();ctx.moveTo(tip[0]-ux*shaft,tip[1]-uy*shaft);ctx.lineTo(...tip);ctx.moveTo(tip[0]-ux*head-uy*head*.65,tip[1]-uy*head+ux*head*.65);ctx.lineTo(...tip);ctx.lineTo(tip[0]-ux*head+uy*head*.65,tip[1]-uy*head-ux*head*.65);ctx.strokeStyle='#fff';ctx.lineWidth=4.5;ctx.stroke();ctx.strokeStyle='#163f59';ctx.lineWidth=2;ctx.stroke();
+   if(opt.selected?.id===b.id&&opt.selected?.kind===b.kind){for(const [label,q]of [['A',a],['B',z]]){const x=q[0]-uy*14,y=q[1]+ux*14;ctx.fillStyle='#fffffff2';ctx.fillRect(x-7,y-10,15,16);text(ctx,label,x-4,y+2,12,'#163f59');}}
+   ctx.restore();beamDirections.push({id:b.id,kind:b.kind,a:b.a,z:b.z});
+  }
   for(const area of opt.loadAreas||[]){if(area.unassigned||!area.overview&&!area.draft)continue;const r=area.rects?.[0];if(!r)continue;ctx.save();if(area.draft){ctx.strokeStyle=area.colour;ctx.lineWidth=3;for(const t of area.rects)ctx.strokeRect(ox+t.x0*scale+2,oy+t.y0*scale+2,Math.max(1,(t.x1-t.x0)*scale-4),Math.max(1,(t.y1-t.y0)*scale-4));}if(area.draft){ctx.restore();continue;}const x=ox+(r.x0+r.x1)/2*scale,y=oy+(r.y0+r.y1)/2*scale;ctx.font='12px "Segoe UI", "Microsoft YaHei", sans-serif';const label=(r.x1-r.x0)*scale<120?String(area.number||'选'):area.name,width=ctx.measureText(label).width+12;ctx.fillStyle='#ffffff';ctx.globalAlpha=.94;ctx.fillRect(x-width/2,y-11,width,22);ctx.globalAlpha=1;text(ctx,label,x-width/2+6,y+4,12,area.colour);ctx.restore();}
   checkLegend(ctx,opt,checkHighlights.length,20,h-18);
   const columnAreaBadge=opt.columnLoadArea&&typeof ColumnLoads101!=='undefined'?ColumnLoads101.badge(ctx,areaPlot,w,h,opt.columnLoadArea,columnAreaPaint):null;
-  return {scale,ox,oy,hits,csMarkers,checkHighlights,columnAreaPaint,columnAreaBadge,slabs:opt.membersOnly?[]:m.slabs,world:(x,y)=>[(x-ox)/scale,(y-oy)/scale]};
+  return {scale,ox,oy,hits,beamDirections,csMarkers,checkHighlights,columnAreaPaint,columnAreaBadge,slabs:opt.membersOnly?[]:m.slabs,world:(x,y)=>[(x-ox)/scale,(y-oy)/scale]};
  }
  function elevationData(p,result,direction,opt={}){
   const lo=Math.max(1,Math.min(result.floors.length,opt.lo||1)),hi=Math.max(lo,Math.min(result.floors.length,opt.hi||result.floors.length)),axis=direction==='X'?0:1,cross=1-axis,cut=opt.cut===undefined||opt.cut==='all'?null:Number(opt.cut),tops=[0],items=[];

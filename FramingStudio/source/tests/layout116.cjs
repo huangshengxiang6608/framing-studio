@@ -37,7 +37,7 @@ const server=http.createServer((req,res)=>{try{const url=new URL(req.url,'http:/
   const snapshot=()=>page.evaluate(()=>JSON.stringify(StudioHost.get().p));
   const before=await snapshot();await page.locator('#nav [data-tab=beamLayout]').click();await page.waitForFunction(()=>window.plot116);
   assert.equal(await snapshot(),before);assert.equal(await page.locator('.beam-layout-fold116').count(),3);
-  assert.equal(await page.locator('#nav [data-tab=beamLayout]').evaluate(el=>el.nextElementSibling.dataset.tab),'beams');
+  assert.deepEqual(await page.locator('#nav button[data-tab]').evaluateAll(els=>els.map(el=>el.dataset.tab).slice(5,9)),['beamLayout','loading','beams','checks']);
   assert.equal(await page.locator('#scope').isVisible(),false);
   await page.locator('[data-bl-fold=main]>summary').click();assert.equal(await page.locator('[data-bl116=main]').isVisible(),false);assert.equal(await page.locator('[data-bl116=secondary]').isVisible(),true);await page.locator('[data-bl-fold=main]>summary').click();
   await page.locator('[data-bl116=main]').click();assert.equal(await snapshot(),before);await page.locator('[data-bl116=apply]').click();

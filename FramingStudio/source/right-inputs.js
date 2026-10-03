@@ -37,7 +37,7 @@ const RightInputPreview=(()=>{
  document.addEventListener('input',e=>{if(e.target.matches?.('#side input:not([readonly]),#side select,#side textarea')){manual.add(fieldKey(e.target));e.target.dataset.inputState='manual';queueMicrotask(()=>{if(e.target.isConnected)e.target.dataset.inputState='manual'})}},true);
  document.addEventListener('change',e=>{if(e.target.dataset.previewWall){const value=e.target.value,[key,id]=e.target.dataset.previewWall.split('|');StudioHost.transact(()=>{const w=StudioHost.get().p.types[key].walls.find(w=>w.id===id);if(!w)throw Error('墙已不存在');w.axisPosition=value;});}},true);
  document.addEventListener('DOMContentLoaded',()=>{for(const type of ['input','change'])document.addEventListener(type,e=>{if(e.target.closest?.('#side')&&manual.has(fieldKey(e.target)))e.target.dataset.inputState='manual'});});
- document.addEventListener('DOMContentLoaded',()=>{const nav=document.getElementById('nav'),beam=nav.querySelector('[data-tab="beams"]'),loading=nav.querySelector('[data-tab="loading"]');beam.after(loading);[...nav.querySelectorAll('button[data-tab]')].forEach((b,i)=>{const s=b.querySelector('span');if(s)s.textContent=String(i+1).padStart(2,'0')});});
+ document.addEventListener('DOMContentLoaded',()=>{const nav=document.getElementById('nav'),beam=nav.querySelector('[data-tab="beams"]'),loading=nav.querySelector('[data-tab="loading"]');beam.before(loading);[...nav.querySelectorAll('button[data-tab]')].forEach((b,i)=>{const s=b.querySelector('span');if(s)s.textContent=String(i+1).padStart(2,'0')});});
 
  return {decorate};
 })();

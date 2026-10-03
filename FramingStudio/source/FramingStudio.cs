@@ -14,8 +14,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8",FrameworkDisplayName=".NET Framework 4.8")]
 
 [assembly: System.Reflection.AssemblyTitle("Framing Studio")]
-[assembly: System.Reflection.AssemblyVersion("2.120.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.120.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.121.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.121.0.0")]
 
 static class Program {
     [STAThread] static int Main(string[] args) {
@@ -56,7 +56,7 @@ sealed class Studio : Form {
         Data = TestDir == null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FramingStudio") : Path.Combine(TestDir, "isolated-user-data");
         Profile = Path.Combine(Data, "WebView2"); Directory.CreateDirectory(Data);
         if (TestDir != null) { Directory.CreateDirectory(TestDir); Opacity = .01; ShowInTaskbar = false; }
-        Text = "Framing Studio · E2.120 Desktop"; Width = 1500; Height = 950;
+        Text = "Framing Studio · E2.121 Desktop"; Width = 1500; Height = 950;
         MinimumSize = new Size(900, 650); StartPosition = FormStartPosition.CenterScreen;
         if (File.Exists(Path.Combine(Root,"FramingStudio.ico"))) Icon = new Icon(Path.Combine(Root,"FramingStudio.ico"));
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("项目");
@@ -118,7 +118,7 @@ sealed class Studio : Form {
             await web.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(Path.Combine(Root,"desktop-bridge.js")));
             web.NavigationCompleted += async delegate(object s, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { Log("Navigation: " + e.WebErrorStatus); Status.Text = "页面加载失败：" + e.WebErrorStatus; return; }
-                Ready = true; Status.Text = "离线模式 · E2.120 · 项目请保存为 .framing.json";
+                Ready = true; Status.Text = "离线模式 · E2.121 · 项目请保存为 .framing.json";
                 if (TestDir != null && TestNavigation++ == 0) await SelfTest();
             };
             if (TestDir != null) web.ScriptDialogOpening += delegate(object s, CoreWebView2ScriptDialogOpeningEventArgs e) { e.Accept(); };
@@ -521,7 +521,7 @@ sealed class Studio : Form {
             await Task.Delay(250);
             await JS("document.querySelectorAll('dialog[open]').forEach(d=>d.close());window.layoutBefore116=JSON.stringify(StudioHost.get().p);StudioHost.navigate('beamLayout')");
             await Check("Layout opens without changing the project", "JSON.stringify(StudioHost.get().p)===layoutBefore116");
-            await Check("Three independent panels above Beam menu", "document.querySelectorAll('.beam-layout-fold116').length===3 && document.querySelector('#nav [data-tab=beamLayout]').nextElementSibling.dataset.tab==='beams'");
+            await Check("Three independent panels above Beam menu", "document.querySelectorAll('.beam-layout-fold116').length===3 && document.querySelector('#nav [data-tab=beamLayout]').nextElementSibling.dataset.tab==='loading' && document.querySelector('#nav [data-tab=loading]').nextElementSibling.dataset.tab==='beams'");
             await JS("document.querySelector('[data-bl116=main]').click()");
             await Check("Preview preserves original settings", "JSON.stringify(StudioHost.get().p)===layoutBefore116");
             await JS("document.querySelector('[data-bl116=apply]').click();document.getElementById('bl116-secondary-direction').value='X';document.getElementById('bl116-gap').value='2';document.querySelector('[data-bl116=secondary]').click();document.querySelector('[data-bl116=apply]').click()");

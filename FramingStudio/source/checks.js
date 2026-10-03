@@ -34,7 +34,7 @@ const SectionB=(()=>{
  }
  const checks=['N40','N44','N52','N59','N69','N77','N78','N87'],checkLabels=['受压面钢筋','受拉面钢筋','最大剪应力','抗剪箍筋','剪扭组合','抗扭箍筋','抗扭纵筋','挠度'];
  function beam(o){positive(o,['L','b','h','fcu']);nonnegative(o,['M','V','T']);const kind=o.kind||'MB',m=machine(kind,{G12:o.L,G13:0,G14:o.b,G15:o.h,G16:o.cover??cover(kind,o.fire),G17:o.fcu,G18:500,G19:500,G23:o.M,G24:o.V,K25:o.T,G85:kind==='CB'?7:20,T8:40,T9:250,T10:150,T11:4,E76:2,G58:10,H58:200,G76:'',H76:''});
-  const g=m.get,s=m.set;for(const f of [40,44])for(let i=0;i<8;i++){s('C'+row(f,i),'');s('D'+row(f,i),'');}
+  const g=m.get,s=m.set;const initialCover=o.cover??cover(kind,o.fire);if(!Number.isFinite(initialCover)||initialCover<0)throw Error('梁保护层须为有效非负数');if(o.steel){for(const [k,v]of Object.entries(o.steel))s(k,v);}else for(const f of [40,44]){s('C'+f,Math.floor(o.b/100));s('D'+f,10);}const initial=m.geometry();if(!initial.groups||initial.faces.some(f=>!(f.depth>0&&f.depth<o.h)||!f.fit))throw Error('梁截面／配筋无法形成有效截面：梁宽 '+o.b+' mm、梁深 '+o.h+' mm、保护层 '+initialCover+' mm；请检查钢筋排布、净距及有效高度');for(const f of [40,44])for(let i=0;i<8;i++){s('C'+row(f,i),'');s('D'+row(f,i),'');}
   const as=f=>m.geometry().faces[f===40?0:1].area,cap=d=>Math.max(0,Math.min(Math.floor(o.b/100),Math.floor((o.b-2*(g('G16')+g('G58'))+Math.max(25,d))/(d+Math.max(25,d))))),lim=o.b*o.h*Math.min(4,g('T11'))/100;let stopped='';
   function bar(f){let r=f;while(r<f+3&&g('D'+(r+1))!=='')r++;const d=g('D'+r);if(d===40){if(r<f+3){s('C'+(r+1),Math.floor(o.b/100));s('D'+(r+1),10);}}else s('D'+r,diameters[Math.min(6,diameters.indexOf(d)+1)]);}
   function link(f){for(const sp of [300,275,250,225,200,175,150,125,100]){if(g('N'+(f+1))==='OKAY')break;s('H'+f,Math.min(sp,g('T9')));}}

@@ -27,9 +27,9 @@ function ExplorerUI(host){
    }
    html+='<div class="row">'+btn(busy?'计算中…':'计算 Section B Check','run',busy?'disabled':'')+btn('查看 Check','goto-checks')+'</div>';
   }else if(tab==='checks'){
-   html='<h2>Member Check · '+esc(FloorLevels.name(h.p,h.floor))+'</h2>'+html+'<div class="row">'+btn(busy?'计算中…':'计算／更新 Check','run',busy?'disabled':'')+'</div>';
-   if(!fresh(h.p))html+='<div class="notice">'+(output?'输入已变化，请重新计算。旧结果不会用于报告。':'填写 Loading 后点击“计算／更新 Check”。')+'</div>';
-   html+='<p class="muted">柱、梁、板均由你勾选 Check，可选择多根柱。未勾选的构件仍参与全楼传荷；A 抄、B 抄分别选择。</p>';
+   html='<h2>Member Check · '+esc(FloorLevels.name(h.p,h.floor))+'</h2><div class="row">'+btn(busy?'计算中…':'计算／更新 Check','run',busy?'disabled':'')+'</div>';
+   if(!fresh(h.p)&&output)html+='<div class="notice">输入已变化，请重新计算。旧结果不会用于报告。</div>';
+
 
    html+=picker(h)+(m&&m.kind!=='COL'&&m.kind!=='SLAB'&&m.member.d*1000>h.result.floors[h.floor-1].sh+1e-6?'<div class="issue">本层结构预留高度 '+num(h.result.floors[h.floor-1].sh)+' mm，小于梁深 '+num(m.member.d*1000)+' mm，请检查净高安排。共用 Framing 截面未自动修改。</div>':'')+(m&&['COL','SLAB'].includes(m.kind)?'<details open><summary>构件设置</summary>'+memberInputs(h)+'</details>':'')+sectionACard(h)+sectionAColumnCard(h);if(rr){const d=rr.result;html+='<h3>'+esc(rr.id)+' · '+esc(d.status)+'</h3><div class="notice">'+esc(d.description)+'</div>'+(d.fail||[]).map(x=>'<div class="issue">'+esc(x)+'</div>').join('');if(rr.actions)html+='<p>M = '+num(rr.actions.M)+' kNm；V = '+num(rr.actions.V)+' kN</p>';if(rr.rootMoments?.length||rr.supportMoments?.length)html+='<div class="notice"><b>CS 固定边作用（每米边长）</b>'+(rr.rootMoments||rr.supportMoments).map(x=>'<p>'+esc(x.slab)+' → '+esc(x.supportId)+'：G '+num(x.g)+' kN/m；Q '+num(x.q)+' kN/m；M ULS '+num(x.mULS)+' kNm/m；边长 '+num(x.length)+' m</p>').join('')+'<small>根部弯矩已列出；承托构件及节点抗弯／抗扭须另行验算。</small></div>';if(rr.cbSupportMoments?.length)html+='<div class="issue">'+rr.cbSupportMoments.map(x=>'CB '+esc(x.id)+' 根部 M ULS = '+num(x.mULS)+' kNm（梁系弯矩／扭矩分配待分析）').join('<br>')+'</div>';if(rr.loading?.L)html+='<p>参考跨度 L = '+num(rr.loading.L)+' m</p>';if(rr.loadErrors?.length)html+='<div class="issue">Loading 待补：'+rr.loadErrors.map(esc).join('；')+'</div>';if(m&&['COL','SLAB'].includes(m.kind)&&((d.fail||[]).length||(rr.loadErrors||[]).length))html+=inlineColumnArea(h,rr,'B');if(d.source)html+='<p class="muted">来源：'+esc(d.source)+'</p>';
     html+='<details><summary>查看计算结果及 Excel 单元格</summary><div class="table-wrap"><table><thead><tr><th>单元格</th><th>结果</th></tr></thead><tbody>'+Object.entries(d.values||{}).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+num(v)+'</td></tr>').join('')+'</tbody></table></div></details>';
@@ -53,8 +53,8 @@ function ExplorerUI(host){
  function slabInputs(h){const m=h.selected,o=h.data,cs=o.slabType==='CS',dir=Loading.slabDirection(h.p,h.floor,m.token,m.member),labels={left:'左',right:'右',top:'上',bottom:'下'};
   let html='<label class="field">板类型<select id="ex-slab-type"><option value="SLAB" '+(!cs?'selected':'')+'>普通单向板 · 两侧传荷</option><option value="CS" '+(cs?'selected':'')+'>CS · Cantilever Slab 悬臂板</option></select></label>';
   if(cs)html+='<label class="field">CS 固定边（平面图方向）<select id="ex-cs-edge"><option value="">请选择固定边</option>'+Object.entries(labels).map(([k,v])=>'<option value="'+k+'" '+(o.csFixedEdge===k?'selected':'')+'>'+v+'边</option>').join('')+'</select></label><p>CS · '+(dir?'跨向 '+dir+'；悬挑长度 '+num(dir==='X'?m.member.x1-m.member.x0:m.member.y1-m.member.y0)+' m；荷载全部传到'+labels[o.csFixedEdge]+'边。':'请选择固定边后计算。')+'</p><p class="muted">指定边按完全固定、对边自由的单向悬臂模型计算，顶部主筋受拉。B 自重自动＋SDL＋LL；A 使用 Loading 的 DL。根部弯矩另列；承托梁抗扭、墙及节点抗弯须另行验算。</p>';
-  else html+='<p class="notice">单向简支板 · 自动支承跨向 '+dir+' · 荷载传到'+(dir==='X'?'左、右':'上、下')+'两侧支承。荷载在 Loading 填写。</p>';
-  return (o.supportConflicts?.length?'<p class="issue">同 Framing 各层存在不同的支承设置；请重新选择一次，统一所有同类型楼层。</p>':'')+html+'<small>按 Framing 共用板类型及固定边，选择后自动保存到所有同类型楼层；计算／更新 Check 后更新结果。</small>';
+
+  return (o.supportConflicts?.length?'<p class="issue">同 Framing 各层存在不同的支承设置；请重新选择一次，统一所有同类型楼层。</p>':'')+html;
  }
  document.addEventListener('change',e=>{if(!['ex-slab-type','ex-cs-edge'].includes(e.target.id))return;const h=state();if(h.selected?.kind!=='SLAB')return;const v=e.target.value;if(e.target.id==='ex-slab-type'){if(!['SLAB','CS'].includes(v))return;memberSave(o=>{o.slabType=v;delete o.csFixedEdge;delete o.sectionASupport;},['slabType','csFixedEdge','sectionASupport']);}else if(['','left','right','top','bottom'].includes(v))memberSave(o=>{o.csFixedEdge=v;},['csFixedEdge']);});
 

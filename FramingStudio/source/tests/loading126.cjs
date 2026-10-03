@@ -1,0 +1,8 @@
+const fs=require('fs'),path=require('path'),http=require('http'),assert=require('assert'),{chromium}=require('playwright');
+const root=path.resolve(__dirname,'../../assets'),out=path.resolve(process.env.TEST_OUTPUT||'tmp/e2126');fs.mkdirSync(out,{recursive:true});
+const server=http.createServer((req,res)=>{try{const f=path.resolve(root,'.'+new URL(req.url,'http://localhost').pathname.replace(/\/$/,'/index.html'));if(!f.startsWith(root+path.sep))throw Error();res.setHeader('Content-Type',f.endsWith('.html')?'text/html; charset=utf-8':'text/javascript');res.end(fs.readFileSync(f));}catch{res.writeHead(404).end();}});
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});try{
+ const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.stack));await page.goto('http://127.0.0.1:'+server.address().port);await page.waitForFunction(()=>window.StudioHost);
+ for(const name of ['loading115-browser.js','loading126-browser.js','boundary118-browser.js','geometry120-browser.js'])await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,name),'utf8')});
+ const result=await page.evaluate(()=>({loading:loading126Tests(),boundary:boundary118Tests().passed,geometry:geometry120Tests().passed}));assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'loading126.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+ }finally{await browser.close();server.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

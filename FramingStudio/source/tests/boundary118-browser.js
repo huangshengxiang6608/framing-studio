@@ -13,7 +13,7 @@ function boundary118Tests(){
  function inspect(p,dir,section,areaTracing=false){
   const r=Engine.generate(p),m=Engine.floorModel(r,1);fail(m.slabs.length===1,'fixture has one connected slab');const s=m.slabs[0];BeamLayout116.setDirections(p,'F1',[s],dir);
   const out=Loading.run(p,Engine.generate(p),section,areaTracing),rows=out.rows.filter(r=>['MB','SB','CB','TB'].includes(r.kind)),spanAxis=dir==='X'?0:1,along=1-spanAxis;let g=0,q=0,len=0,trace=0;
-  for(const row of rows)for(const l of row.loading.automaticLines){
+  for(const row of rows)for(const l of row.loading.automaticLines.filter(l=>!l.surface126)){
    fail(l.start>=-1e-7&&l.end<=row.loading.L+1e-7,'line lies within receiving beam');
    const a=row.member.rawA,z=row.member.rawZ,L=Math.hypot(z[0]-a[0],z[1]-a[1]),mid=a.map((v,i)=>v+(z[i]-v)*(l.start+l.end)/(2*L)),inside=point=>s.rects.some(r=>point[0]>r.x0&&point[0]<r.x1&&point[1]>r.y0&&point[1]<r.y1),low=[...mid],high=[...mid];const physical=Engine.rect(row.member),c=spanAxis===0?physical.x:physical.y,w=spanAxis===0?physical.w:physical.d;low[spanAxis]=c-w/2-1e-5;high[spanAxis]=c+w/2+1e-5;
    fail(inside(low)!==inside(high),'line touches actual slab boundary, never an empty bounding-box edge: '+row.id+' '+JSON.stringify(mid));fail(Math.abs(a[spanAxis]-z[spanAxis])<1e-8,'receiver perpendicular to slab span');

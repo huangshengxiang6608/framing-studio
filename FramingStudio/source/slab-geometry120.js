@@ -19,7 +19,7 @@ const SlabGeometry120=(()=>{
   }
   for(const f of result.floors){const m=engine().floorModel(result,f.n),current=new Set(m.slabs.map(token)),mapped=new Map();for(const s of m.slabs)for(const t of s.legacyTokens120)mapped.set(t,[...(mapped.get(t)||[]),token(s)]);
    for(const kind of ['members','selected','reportA','reportB']){const table=p.explorer?.[kind];if(!table)continue;for(const [key,value]of Object.entries({...table})){const prefix=f.n+'|';if(!key.startsWith(prefix+'SLAB|'))continue;const old=key.slice(prefix.length);if(current.has(old))continue;const targets=mapped.get(old)||[];archive[kind][key]=clone(value);for(const next of targets)if(!Object.hasOwn(table,prefix+next))table[prefix+next]=clone(value);delete table[key];count++;if(!targets.length)result.issues.push({floor:f.n,type:f.type,id:'SLAB',msg:'旧板块设置已保留在项目备份字段；对应净板区已不存在，请重新选择构件'});}}
-   for(const a of p.explorer?.areas?.[f.n]||[]){archive.areas[f.n+'|'+a.id]=clone(a);if(a.rects)a.rects=regions().clip(a.rects,m.slabs);else a.panels=[...new Set((a.panels||[]).flatMap(t=>current.has(t)?[t]:mapped.get(t)||[t]))];}
+   for(const a of p.explorer?.areas?.[f.n]||[]){archive.areas[f.n+'|'+a.id]=clone(a);if(a.rects)a.rects=regions().clipSurface(a.rects,m);else a.panels=[...new Set((a.panels||[]).flatMap(t=>current.has(t)?[t]:mapped.get(t)||[t]))];}
   }
   p.slabBoundary120=1;if(count||Object.keys(archive.areas).length||Object.keys(archive.directions).length||Object.keys(archive.sizes).length)p.slabMigration120=archive;
  }

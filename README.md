@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.125**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.126**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -43,6 +43,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 `compile.ps1` 不负责网页资源打包。修改已标记的 17 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
+
+E2.126 补齐梁顶 SDL／LL，梁自重仍按全截面、板自重按净面积；板验算使用有效跨度，传荷按实际净范围。页面排版和 Section A／B 抄保持原样。
 
 E2.125 在 Summary Check 点选柱时，在 Framing 平面图标明本层受荷面积及范围，并移除柱面板内重复的荷载区域明细块。面积和本层 G/Q 读取同一套原有面积法数据；计算及两个抄未改。
 

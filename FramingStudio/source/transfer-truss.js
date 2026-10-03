@@ -31,7 +31,26 @@ const TransferTruss109=(()=>{
   return {nodes,members,xs,count,fixed:[0,1,2*(count-1)+1],loadNodes:input.loads.map(a=>count+xs.findIndex(x=>Math.abs(x-a.x)<1e-6))};
  }
  function lengths(m,input){const chord=['top','bottom'].includes(m.group),requested=input.restraints?.[m.group],ly=chord?(positive(requested)?requested:input.span):m.L;if(chord&&(ly<m.L-eps||ly>input.span+eps))throw Error('弦杆平面外无支承长度须不小于最长分格，且不大于跨度');return [m.L,ly];}
- function analyse(input,chosen){const model=mesh(input),{nodes,members,fixed,loadNodes}=model,nd=nodes.length*2,free=Array.from({length:nd},(_,i)=>i).filter(i=>!fixed.includes(i)),K=Array.from({length:nd},()=>zeros(nd)),self=zeros(nd),joint=zeros(nd);
+ // Structural depth is the outside envelope, not the distance between chord axes.
+ // Include the vertical projection of diagonal sections where it exceeds a chord.
+ function fitGeometry(input,chosen){
+  if(input.structuralDepth===undefined)return input;
+  const H=input.structuralDepth,top=section(chosen.top),bottom=section(chosen.bottom),diagonal=section(chosen.diagonal);
+  if(!positive(H)||!top||!bottom||!diagonal)throw Error('同层桁架须有有效 Structural depth 及上下弦／腹杆截面');
+  let topInset=top.D/2000,bottomInset=bottom.D/2000,h=H-topInset-bottomInset;
+  if(h<=eps)throw Error('上下弦截面无法放入指定 Structural depth');
+  const model=mesh({...input,depth:h}),runs=model.members.filter(m=>m.group==='diagonal').map(m=>Math.abs(model.nodes[m.j].x-model.nodes[m.i].x));
+  for(let i=0;i<100;i++){
+   const webInset=Math.max(0,...runs.map(dx=>diagonal.D/2000*dx/Math.hypot(dx,h)));
+   topInset=Math.max(top.D/2000,webInset);bottomInset=Math.max(bottom.D/2000,webInset);
+   const next=H-topInset-bottomInset;
+   if(next<=eps)throw Error('弦杆／腹杆截面外包无法放入指定 Structural depth');
+   if(Math.abs(next-h)<1e-10)return {...input,depth:next,structuralEnvelope:{depth:H,topInset,bottomInset}};
+   h=next;
+  }
+  throw Error('Structural zone 内的杆件外包高度未收敛，请调整截面或结构高度');
+ }
+ function analyse(input,chosen){input=fitGeometry(input,chosen);const model=mesh(input),{nodes,members,fixed,loadNodes}=model,nd=nodes.length*2,free=Array.from({length:nd},(_,i)=>i).filter(i=>!fixed.includes(i)),K=Array.from({length:nd},()=>zeros(nd)),self=zeros(nd),joint=zeros(nd);
   for(const m of members){m.section=section(chosen[m.group]);if(!m.section)throw Error('截面不存在：'+chosen[m.group]);m.k=E*m.section.A/1000/m.L;m.weight=m.L*m.section.mass*gravity/1000;m.capacity=capacity(m.section,...lengths(m,input));for(let i=0;i<4;i++)for(let j=0;j<4;j++)K[m.dofs[i]][m.dofs[j]]+=m.k*m.v[i]*m.v[j];self[2*m.i+1]-=m.weight/2;self[2*m.j+1]-=m.weight/2;}
   const volumes=input.jointVolumes??{};for(const v of Object.values(volumes))if(!finite(v)||v<0)throw Error('接驳区新增混凝土体积须明确填 0 或正值');
   joint[1]-=(volumes.left??0)*24.5;joint[2*(model.count-1)+1]-=(volumes.right??0)*24.5;input.loads.forEach((a,i)=>joint[2*loadNodes[i]+1]-=(volumes[a.id]??0)*24.5);
@@ -61,14 +80,15 @@ const TransferTruss109=(()=>{
   return {...model,members:checks,cases,free,Kff,dead,live,sls,vertical,slsEnvelopes:deflection,deflection:{total:slsTotal,live:slsLive,differential,fullLoadTotal:maxTotal,fullLoadLive:maxLive},reactions,totalG,totalQ,steelWeight:-sum(self),concreteWeight:-sum(joint),mass:sum(members.map(m=>m.weight))*1000/gravity,stable,forceResidual,momentResidual,input,chosen:{...chosen},status:fail.length?'NOT OK':'OK',fail};
  }
  function design(input){const selectable=catalog.sections.filter(s=>py(Math.max(s.tw,s.tf))),choices={},auto=groups.filter(g=>!input.sections?.[g]||input.sections[g]==='auto');for(const g of groups)choices[g]=auto.includes(g)?selectable[0].id:input.sections[g];let output,iterations=0;
-  for(;iterations<50;iterations++){output=analyse(input,choices);let changed=false;for(const g of auto){const members=output.members.filter(m=>m.group===g),current=section(choices[g]);const candidates=selectable.filter(s=>s.mass>=current.mass-1e-8);const next=candidates.find(s=>members.every(m=>{const c=capacity(s,...lengths(m,input)),lambda=Math.max(c.lambdaX,c.lambdaY);return (m.Nc<eps||c.nonSlender&&lambda<=200&&m.Nc<=.97*c.Pc)&&(m.Nt<eps||lambda<=300&&m.Nt<=.97*c.Pt);}));if(next&&next.id!==choices[g]){choices[g]=next.id;changed=true;}}
+  function fits(group,s){if(input.structuralDepth===undefined)return true;try{fitGeometry(input,{...choices,[group]:s.id});return true;}catch{return false;}}
+  for(;iterations<50;iterations++){output=analyse(input,choices);let changed=false;for(const g of auto){const members=output.members.filter(m=>m.group===g),current=section(choices[g]);const candidates=selectable.filter(s=>s.mass>=current.mass-1e-8);const next=candidates.find(s=>fits(g,s)&&members.every(m=>{const c=capacity(s,...lengths(m,input)),lambda=Math.max(c.lambdaX,c.lambdaY);return (m.Nc<eps||c.nonSlender&&lambda<=200&&m.Nc<=.97*c.Pc)&&(m.Nt<eps||lambda<=300&&m.Nt<=.97*c.Pt);}));if(next&&next.id!==choices[g]){choices[g]=next.id;changed=true;}}
    if(changed)continue;
    const ratio=Math.max(output.deflection.total/(input.limits?.total||Infinity),output.deflection.live/(input.limits?.live||Infinity),output.deflection.differential/(input.limits?.differential||Infinity));
-   if(ratio>1.000001||!output.stable){for(const g of auto){const current=section(choices[g]),next=selectable.find(s=>s.A>current.A*Math.min(1.2,Math.max(1.05,ratio))&&s.mass>current.mass&&capacity(s,1,1).nonSlender);if(next){choices[g]=next.id;changed=true;}}}
+   if(ratio>1.000001||!output.stable){for(const g of auto){const current=section(choices[g]),next=selectable.find(s=>s.A>current.A*Math.min(1.2,Math.max(1.05,ratio))&&s.mass>current.mass&&capacity(s,1,1).nonSlender&&fits(g,s));if(next){choices[g]=next.id;changed=true;}}}
    if(!changed)break;
   }
   output=analyse(input,choices);output.iterations=iterations+1;if(iterations===50){output.status='NOT OK';output.fail.unshift('自动选型未收敛；请手动选定截面后复核');}return output;
  }
- return {E,gravity,groups,catalog,section,py,pc,capacity,cholesky,backsolve,mesh,analyse,design};
+ return {E,gravity,groups,catalog,section,py,pc,capacity,cholesky,backsolve,mesh,fitGeometry,analyse,design};
 })();
 if(typeof module!=='undefined')module.exports=TransferTruss109;

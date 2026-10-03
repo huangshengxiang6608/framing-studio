@@ -7,6 +7,7 @@ node truss-core-tests.cjs
 node truss-browser-tests.cjs
 node truss-integration-tests.cjs
 node truss-downstream-tests.cjs
+node truss-zone-tests.cjs
 ```
 
 Run the browser suite before the integration suite: it creates the synthetic fixture. Generated fixtures, screenshots, workbook jobs and PDFs are ignored by Git. These tests do not use a user's project or change their saved application profile.
@@ -27,6 +28,14 @@ if ($trussProcess.ExitCode -ne 0) { throw 'Native truss check failed' }
 ```
 
 Use a fresh output directory for each native run. The app uses an isolated profile beneath that directory. The fixture has no RC members selected for A/B export: the truss workbook is macro-free.
+
+## E2.122 same-floor zone and force solution — 2026-10-03
+
+- The existing 11 core, 8 browser, 7 integration and 15 downstream groups pass, including the no-truss E2.119 comparison.
+- 8 additional zone/solution groups pass: independent hand forces, section-envelope projection, multiple-panel joint equilibrium and tamper detection, full-width/partial-span zone coverage, same-floor downward reactions, input/export blocking, A/B solution pages, 3D geometry, UI case selection and undo.
+- Fresh E2.122 Windows run: 10 native truss workflow checks pass; A/B workbooks each have 451 comparisons and no differences. The final report wording was subsequently clarified for same-floor reaction transfer and the browser report suite rerun.
+- The new synthetic 2 m demo and its A/B truss PDFs are in `示例模型/RC_同层2m_StructuralZone_Demo`. Its full force trace is supplied for inspection. Only TT report content was expanded; RC report modules, Excel templates/VBA and ExcelBridge are byte-identical to E2.121.
+- The native test exports the isolated truss only. RC input plans pass browser checks; the existing RC macro limitation below remains unresolved.
 
 ## E2.121 RC scheme entry — 2026-10-03
 

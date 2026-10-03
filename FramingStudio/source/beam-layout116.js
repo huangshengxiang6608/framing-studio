@@ -22,7 +22,12 @@ const BeamLayout116=(()=>{
   t.slabDirections116??={};
   for(const s of slabs){const token=Loading.token('SLAB',s);t.slabDirections116[token]=direction;}
  }
- return {settings,candidate,setDirections};
+ function drawDirections(p,m,f,ctx,plot){
+  const arrows=[],xy=(x,y)=>[plot.ox+x*plot.scale,plot.oy+y*plot.scale];ctx.save();ctx.setLineDash([]);
+  for(const s of m.slabs){const r=[...s.rects].sort((a,b)=>(b.x1-b.x0)*(b.y1-b.y0)-(a.x1-a.x0)*(a.y1-a.y0))[0];if(!r)continue;const dir=Loading.slabDirection(p,f,Loading.token('SLAB',s),s,m),a=xy((r.x0+r.x1)/2,(r.y0+r.y1)/2),len=Math.min(13,(dir==='X'?r.x1-r.x0:r.y1-r.y0)*plot.scale*.25);if(!dir||len<3)continue;ctx.strokeStyle='#21709a';ctx.lineWidth=1.7;ctx.beginPath();for(const sign of [-1,1]){const x=a[0]+(dir==='X'?len*sign:0),y=a[1]+(dir==='Y'?len*sign:0);ctx.moveTo(...a);ctx.lineTo(x,y);ctx.moveTo(x-(dir==='X'?4*sign:4),y-(dir==='Y'?4*sign:4));ctx.lineTo(x,y);ctx.lineTo(x-(dir==='X'?4*sign:-4),y-(dir==='Y'?4*sign:-4));}ctx.stroke();arrows.push({id:s.id,dir,rect:r});}
+  ctx.restore();return arrows;
+ }
+ return {settings,candidate,setDirections,drawDirections};
 })();
 
 function BeamLayoutUI116(host){
@@ -71,7 +76,8 @@ function BeamLayoutUI116(host){
   const h=sync(),m=Engine.floorModel(h.result,h.floor,h.key),xy=(x,y)=>[plot.ox+x*plot.scale,plot.oy+y*plot.scale];ctx.save();
   if(draft){ctx.strokeStyle='#16899d';ctx.lineWidth=2.5;ctx.setLineDash([7,4]);for(const b of Engine.floorModel(draft.result,h.floor,h.key).beams.filter(b=>b.source==='auto'&&(draft.step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101))){ctx.beginPath();ctx.moveTo(...xy(...b.a));ctx.lineTo(...xy(...b.z));ctx.stroke();}ctx.setLineDash([]);}
   for(const s of m.slabs){if(selection.includes(Loading.token('SLAB',s))){ctx.fillStyle='rgba(0,130,210,.20)';ctx.strokeStyle='#0082d2';ctx.lineWidth=2;for(const r of s.rects){const a=xy(r.x0,r.y0),w=(r.x1-r.x0)*plot.scale,h=(r.y1-r.y0)*plot.scale;ctx.fillRect(...a,w,h);ctx.strokeRect(...a,w,h);}}
-   if(!showDirections)continue;const r=[...s.rects].sort((a,b)=>(b.x1-b.x0)*(b.y1-b.y0)-(a.x1-a.x0)*(a.y1-a.y0))[0];if(!r)continue;const dir=Loading.slabDirection(h.p,h.floor,Loading.token('SLAB',s),s,m),a=xy((r.x0+r.x1)/2,(r.y0+r.y1)/2),len=Math.min(13,(dir==='X'?r.x1-r.x0:r.y1-r.y0)*plot.scale*.25);if(!dir||len<3)continue;ctx.strokeStyle='#21709a';ctx.lineWidth=1.7;ctx.beginPath();for(const sign of [-1,1]){const x=a[0]+(dir==='X'?len*sign:0),y=a[1]+(dir==='Y'?len*sign:0);ctx.moveTo(...a);ctx.lineTo(x,y);ctx.moveTo(x-(dir==='X'?4*sign:4),y-(dir==='Y'?4*sign:4));ctx.lineTo(x,y);ctx.lineTo(x-(dir==='X'?4*sign:-4),y-(dir==='Y'?4*sign:-4));}ctx.stroke();}
+  }
+  plot.slabDirections=showDirections?BeamLayout116.drawDirections(h.p,m,h.floor,ctx,plot):[];
   if(gesture){ctx.strokeStyle='#0082d2';ctx.fillStyle='rgba(0,130,210,.12)';ctx.setLineDash([5,3]);const a=xy(...gesture.from),b=xy(...gesture.to);ctx.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);ctx.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);}ctx.restore();
  }
  function reset(){draft=null;selection=[];gesture=null;context='';form=null;}

@@ -11,7 +11,7 @@ const Loading=(()=>{
  const defaults={fcu:45,fire:2,columnFcu:60,columnFire:2,tbFcu:60,tbFire:2,columnRatio:2.5,columnFactor:1,columnProject:1.25,wallFcu:60};
  function settings(p){const cfg={...defaults,...p.explorer?.settings};if(cfg.wallFcu===null||cfg.wallFcu===undefined||cfg.wallFcu==='')cfg.wallFcu=defaults.wallFcu;return cfg;}
  function init(p){p.explorer??={};p.explorer.settings??={};p.explorer.floors??={};p.explorer.members??={};p.explorer.selected??={};return p.explorer;}
- const sharedSupportKeys=['supportA','supportZ','fixedEnd','slabType','csFixedEdge','sectionASupport'];
+ const sharedSupportKeys=['supportA','supportZ','fixedEnd','slabType','csFixedEdge','sectionASupport','beamSpan'];
  function framingFloors(p,f){if(!Array.isArray(p.groups))return [f];const floors=E.floors(p),type=floors[f-1]?.type;return type?floors.filter(x=>x.type===type).map(x=>x.n):[f];}
  function input(p,f,t){const records=p.explorer?.members||{},local=records[f+'|'+t]||{},out={...local},floors=framingFloors(p,f),conflicts=[];
   for(const k of sharedSupportKeys){const values=floors.map(n=>records[n+'|'+t]).filter(x=>x&&Object.hasOwn(x,k)).map(x=>x[k]==='auto'||x[k]===''?null:x[k]),distinct=[...new Map(values.map(v=>[JSON.stringify(v),v])).values()];if(distinct.length===1)out[k]=distinct[0];else if(distinct.length>1)conflicts.push(k);}
@@ -19,6 +19,19 @@ const Loading=(()=>{
  }
  function saveFramingSupports(p,f,t,values,keys=sharedSupportKeys){init(p);for(const n of framingFloors(p,f)){const row=p.explorer.members[n+'|'+t]??={};for(const k of keys){if(!sharedSupportKeys.includes(k))continue;if(Object.hasOwn(values,k)&&values[k]!==undefined)row[k]=values[k];else delete row[k];}}}
  function clearFramingRecord(p,f,t){for(const n of framingFloors(p,f))delete p.explorer?.members?.[n+'|'+t];}
+
+ // The plan remains geometric. Only the beam analysis coordinate uses a manual span.
+ function beamSpan(c,o={}){
+  const automatic=L(c),manual=o.beamSpan!=null&&o.beamSpan!==''&&o.beamSpan!=='auto',requested=manual?o.beamSpan:automatic;
+  const valid=typeof requested==='number'&&Number.isFinite(requested)&&requested>0&&(!manual||requested>=.001)&&Number.isFinite(requested/automatic)&&Number.isFinite(automatic/requested),conflict=o.supportConflicts?.includes('beamSpan');
+  return {automatic,value:valid?requested:automatic,manual,ratio:valid?requested/automatic:1,error:conflict?'同 Framing 各层 Span 设置冲突，请修改并保存统一':valid?null:'Span 须为不小于 0.001 m 的有效数值'};
+ }
+ function beamSpanLoads(span,lines,points){
+  const ratio=span.ratio,station=x=>Math.abs(x-span.automatic)<1e-9?span.value:Math.abs(x)<1e-9?0:x*ratio;
+  // Round at the receiving beam before rescaling; do not round again and alter the resultant.
+  const line=r=>{const v=BeamLoads.rounded(r);if(ratio===1)return v;const out={...v,start:station(r.start),end:station(r.end),spanAdjusted130:true};for(const k of ['g','q','sw','dl','sdl'])if(Number.isFinite(v[k]))out[k]=v[k]/ratio;return out;};
+  return {lines:lines.map(line),points:points.map(r=>{const v=BeamLoads.rounded(r);return ratio===1?v:{...v,x:station(r.x)};})};
+ }
 
  function members(p,r,f){const m=E.floorModel(r,f);return [...m.slabs.map(c=>({kind:'SLAB',id:c.id,member:c})),...m.beams.map(c=>({kind:c.kind,id:c.displayId||c.id,member:c})),...m.columns.map(c=>({kind:'COL',id:c.id,member:c}))].map(c=>({...c,token:token(c.kind,c.member)}));}
  function floorload(p,f){return LD.floor(p,f);}
@@ -37,7 +50,7 @@ const Loading=(()=>{
   return {dead,live,...calc(1.4,1.6),udlDead:gd,udlLive:ql,points,lines,totalDead:dead.left+dead.right,totalLive:live.left+live.right};
  }
  // All beams use their full depth. Slab self-weight is measured between faces.
- function beamSelfWeight(c){const len=L(c);if(!(len>tol&&c.b>0&&c.d>0))throw Error('梁自重计算缺少有效尺寸');return [{start:0,end:len,g:BeamLoads.up(24.5*c.b*c.d),q:0,label:'梁自重'}];}
+ function beamSelfWeight(c,len=L(c)){if(!(len>tol&&c.b>0&&c.d>0))throw Error('梁自重计算缺少有效尺寸');return [{start:0,end:len,g:BeamLoads.up(24.5*c.b*c.d),q:0,label:'梁自重'}];}
  function columnAreaGroups(p,result,f,t){
   const o=input(p,f,t),manual=String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto';
   const data=manual?{groups:parseColumnAreaRows(o.sectionAAreas,p,f),errors:[]}:columnAreas(p,result,f,t),overrides=o.sectionAAreaOverrides115||{};
@@ -183,15 +196,16 @@ const Loading=(()=>{
     if(new Set(pieces.map(r=>JSON.stringify(autoSW?[r.load.sdl,r.load.ll]:[r.load.dl,r.load.sdl,r.load.ll]))).size>1&&!areaTracing)errors.push('此板含局部或不同区域荷载：已按实际范围传荷；原 Excel 均布荷载板验算不适用，需单独验算');rr.result=errors.length?{status:'INPUT REQUIRED',fail:[...new Set(errors)],description:'—'}:queue('slab',{kind:cs?'CS':'SLAB',id:c.id,L:spanData.effective,h:c.thickness,fcu:cfg.fcu,fire:cfg.fire,dl:load.dl,sdl:load.sdl,ll:load.ll,steel:o.steel,dlIncludesSelfWeight:!autoSW});
    }
    addBeamSurface(p,f,model,beams,autoSW,areaTracing);
-   function solve(b,path=new Set()){if(b.done)return;if(path.has(b)){for(const item of path)item.errors.push('梁之间形成相互支承，简支传荷顺序不明确');b.errors.push('梁之间形成相互支承，简支传荷顺序不明确');return;}path=new Set(path);path.add(b);for(const child of beams.filter(x=>x.sinks.some(s=>s?.target===b)))solve(child,path);if(b.done)return;const c=b.member,rr=addRow(b.kind,c),o=resolvedInput(p,r,f,c),len=L(c),manual=o.mode==='manual',isCB=c.displayKind==='CB',table=Array.isArray(o.beamLoads)?BeamLoads.resolve(o,len):null;let gd=0,ql=0,points=b.points.map(x=>({...x})),error=[...b.errors];b.row=rr;
+   function solve(b,path=new Set()){if(b.done)return;if(path.has(b)){for(const item of path)item.errors.push('梁之间形成相互支承，简支传荷顺序不明确');b.errors.push('梁之间形成相互支承，简支传荷顺序不明确');return;}path=new Set(path);path.add(b);for(const child of beams.filter(x=>x.sinks.some(s=>s?.target===b)))solve(child,path);if(b.done)return;const c=b.member,rr=addRow(b.kind,c),o=resolvedInput(p,r,f,c),span=beamSpan(c,o),len=span.value,scaled=beamSpanLoads(span,b.lines,b.points),manual=o.mode==='manual',isCB=c.displayKind==='CB',table=Array.isArray(o.beamLoads)?BeamLoads.resolve(o,len):null;let gd=0,ql=0,points=scaled.points.map(x=>({...x})),error=[...b.errors];b.lines=scaled.lines;b.points=scaled.points;b.row=rr;
     if(manual){error=[...b.supportErrors,...b.errors.filter(x=>x.includes('相互支承'))];if(isCB&&!['a','z'].includes(o.fixedEnd))error.push('CB：'+cbRoot(p,r,f,c).message);if(table){error.push(...table.errors);}else if(!available(o.udlDead)||!available(o.udlLive))error.push('请填写手动线荷载 G、Q（含结构自重）');else {gd+=o.udlDead;ql=o.udlLive;}points=[];if(areaTracing)error.push('使用手动总荷载，无法对应自动承载面积');}
+    if(span.error)error.push(span.error);
     // Slab regions produce exact piecewise uniform line loads; do not average them.
     if(!table&&o.extraDead!==undefined&&o.extraDead!==null){if(!available(o.extraDead))error.push('附加线恒载须不小于 0');else gd+=o.extraDead;}
     if(!table&&o.points!=null&&!Array.isArray(o.points))error.push('集中荷载记录格式无效，请重新输入');for(const x of !table&&Array.isArray(o.points)?o.points:[]){if(!x||!available(x.x)||x.x>len||!available(x.g)||!available(x.q))error.push('集中荷载位置／G／Q 无效');else points.push({...x,label:x.label||'手动集中荷载'});}
     if(table){if(!manual)error.push(...table.errors);points.push(...table.points);}
-    const swParts=(manual?table?.selfWeight:autoSW)?beamSelfWeight(c):[],uniformSW=swParts[0]?.g||0,varyingSW=[];gd+=uniformSW;
-    gd=BeamLoads.up(gd);ql=BeamLoads.up(ql);points=points.map(BeamLoads.rounded);b.lines=b.lines.map(BeamLoads.rounded);b.points=b.points.map(BeamLoads.rounded);if(table){table.lines=table.lines.map(BeamLoads.rounded);table.points=table.points.map(BeamLoads.rounded);}
-    if(isCB&&o.fixedEnd==='z')points=points.map(x=>({...x,x:len-x.x}));rr.loading={L:len,fixedEnd:isCB?o.fixedEnd:null,rootSelection:isCB?cbRoot(p,r,f,c):null,sw:uniformSW,selfWeight:swParts.reduce((v,x)=>v+x.g*(x.end-x.start),0),selfWeightLines:swParts,automaticLines:[...b.lines,...varyingSW],automaticPoints:b.points.map(x=>({...x})),udlDead:gd,udlLive:ql,points,surfaceArea:b.surfaceArea||0,mode:manual?'手动总荷载':'自动传荷',support:isCB?'Cantilever':'Simply-supported',sources:manual?[]:b.lines};
+    const swParts=(manual?table?.selfWeight:autoSW)?beamSelfWeight(c,len):[],uniformSW=swParts[0]?.g||0,varyingSW=[];gd+=uniformSW;
+    gd=BeamLoads.up(gd);ql=BeamLoads.up(ql);points=points.map(BeamLoads.rounded);if(table){table.lines=table.lines.map(BeamLoads.rounded);table.points=table.points.map(BeamLoads.rounded);}
+    if(isCB&&o.fixedEnd==='z')points=points.map(x=>({...x,x:len-x.x}));rr.loading={L:span.error?null:len,...(span.manual?{automaticSpan:span.automatic,manualSpan:span.value}:{}),fixedEnd:isCB?o.fixedEnd:null,rootSelection:isCB?cbRoot(p,r,f,c):null,sw:uniformSW,selfWeight:swParts.reduce((v,x)=>v+x.g*(x.end-x.start),0),selfWeightLines:swParts,automaticLines:[...b.lines,...varyingSW],automaticPoints:b.points.map(x=>({...x})),udlDead:gd,udlLive:ql,points,surfaceArea:b.surfaceArea||0,mode:manual?'手动总荷载':'自动传荷',support:isCB?'Cantilever':'Simply-supported',sources:manual?[]:b.lines};
     rr.supportMoments=b.csMoments;rr.cbSupportMoments=b.cbMoments;const designErrors=isCB&&o.cover!=null&&(!Number.isFinite(o.cover)||o.cover<=0)?['CB 手动保护层 cover 须大于 0；留空按 FRR 自动取值']:[];
     if(b.cbMoments.length)designErrors.push('承托 CB '+b.cbMoments.map(x=>x.id).join('、')+' 根部：竖向反力已传入；根部弯矩及梁系抗扭尚未分析，须另行计算');
     if(b.csMoments.some(x=>x.mULS>tol))designErrors.push('承托 CS '+[...new Set(b.csMoments.map(x=>x.slab))].join('、')+'：竖向传荷已算；固定边弯矩会作用于承托梁，梁系抗扭及节点尚未分析，须另行计算');
@@ -248,6 +262,6 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
  // Slab inspection has no upper-floor dependencies; only expose its slab row,
  // never the partial column/beam accumulation from this single-floor preview.
  function inspectSlab(p,r,f,t){if(!Number.isInteger(f)||f<1||f>p.total||!E.floorModel(r,f).slabs.some(s=>token('SLAB',s)===t))throw Error('板块已变化，请重新选择');const preview=E.clone(p);init(preview).selected={[f+'|'+t]:true};return run(preview,r,'B',false,f).rows.find(row=>row.floor===f&&row.kind==='SLAB'&&row.token===t);}
- return {slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};
+ return {beamSpan,beamSpanLoads,slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};
 })();
 if(typeof module!=='undefined')module.exports=Loading;

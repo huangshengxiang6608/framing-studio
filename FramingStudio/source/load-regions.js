@@ -59,8 +59,20 @@ const LoadRegions83=(()=>{
    out.push({beam:b,rects:rs,parts:pieces(p,f,{rects:rs},assigned),errors});free=difference(free,[footprint]);}
   return out;
  }
+ // Select architectural axis bays, independently of the beam/slab mesh.
+ function axisBox(p,key,a,z=a){
+  function extent(dim,i){const v=Engine.axes(p,dim,key).map(a=>a.v),lo=Math.min(a[i],z[i]),hi=Math.max(a[i],z[i]);if(v.length<2||hi<v[0]||lo>v.at(-1))return null;
+   if(hi-lo<1e-8){const n=Math.min(v.length-2,Math.max(0,v.findIndex((x,j)=>j<v.length-1&&lo>=x-1e-8&&lo<v[j+1]-1e-8)));if(lo>=v.at(-1)-1e-8)return [v.at(-2),v.at(-1)];return [v[n],v[n+1]];}
+   const hits=v.slice(0,-1).map((x,j)=>[x,v[j+1]]).filter(([a,b])=>Math.min(hi,b)-Math.max(lo,a)>1e-8);return hits.length?[hits[0][0],hits.at(-1)[1]]:null;
+  }const x=extent('x',0),y=extent('y',1);return x&&y?{x0:x[0],x1:x[1],y0:y[0],y1:y[1]}:null;
+ }
+ // Cancel internal rectangle edges, retaining only the boundary of their union.
+ function boundary(rs){const groups=new Map();function add(axis,v,lo,hi,sign){const k=axis+'|'+v,items=groups.get(k)||[];items.push({axis,v,lo,hi,sign});groups.set(k,items);}
+  for(const r of union(rs)){add('x',r.x0,r.y0,r.y1,-1);add('x',r.x1,r.y0,r.y1,1);add('y',r.y0,r.x0,r.x1,-1);add('y',r.y1,r.x0,r.x1,1);}
+  const out=[];for(const items of groups.values()){const cuts=[...new Set(items.flatMap(e=>[e.lo,e.hi]))].sort((a,b)=>a-b),{axis,v}=items[0];for(let i=1;i<cuts.length;i++){const lo=cuts[i-1],hi=cuts[i],mid=(lo+hi)/2;if(items.reduce((n,e)=>n+(mid>e.lo&&mid<e.hi?e.sign:0),0))out.push(axis==='x'?[[v,lo],[v,hi]]:[[lo,v],[hi,v]]);}}return out;
+ }
  // Reaction per metre along the support, integrated across the original span.
  function reaction(parts,dir,mid,lo,span,right,cs,sw,autoSW){const axis=dir==='X'?'y':'x',cross=dir==='X'?'x':'y';let out={g:0,q:0,sw:0,dl:0,sdl:0,mG:0,mQ:0,good:true};for(const r of parts){if(mid<=r[axis+'0']||mid>=r[axis+'1'])continue;const u=r[cross+'0']-lo,v=r[cross+'1']-lo,len=v-u,moment=right?span*len-(v*v-u*u)/2:(v*v-u*u)/2,weight=cs?len:right?(v*v-u*u)/(2*span):len-(v*v-u*u)/(2*span),load=r.load,dl=autoSW?0:load.dl;if(![dl,load.sdl,load.ll].every(x=>typeof x==='number'&&Number.isFinite(x)&&x>=0)){out.good=false;continue;}out.sw+=sw*weight;out.dl+=dl*weight;out.sdl+=load.sdl*weight;out.g+=(sw+dl+load.sdl)*weight;out.q+=load.ll*weight;out.mG+=(sw+dl+load.sdl)*moment;out.mQ+=load.ll*moment;}return out;}
- return {area,valid,intersect,subtract,difference,union,region,clip,pieces,summary,reaction,netSelfWeight,surface,clipSurface,surfaceRegions,beamSurface};
+ return {area,valid,intersect,subtract,difference,union,region,clip,pieces,summary,reaction,netSelfWeight,surface,clipSurface,surfaceRegions,beamSurface,axisBox,boundary};
 })();
 if(typeof module!=='undefined')module.exports=LoadRegions83;

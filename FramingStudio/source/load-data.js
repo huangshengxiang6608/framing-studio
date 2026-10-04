@@ -17,7 +17,7 @@ const LoadData=(()=>{
   const unionArea=rs=>{const xs=[...new Set(rs.flatMap(r=>[r[0],r[1]]))].sort((a,b)=>a-b);let area=0;for(let i=1;i<xs.length;i++){const mid=(xs[i]+xs[i-1])/2,ys=rs.filter(r=>r[0]<mid&&r[1]>mid).map(r=>[r[2],r[3]]).sort((a,b)=>a[0]-b[0]);let end=-Infinity,len=0;for(const [a,b]of ys){len+=Math.max(0,b-Math.max(a,end));end=Math.max(end,b);}area+=(xs[i]-xs[i-1])*len;}return area;};
   const intersect=(a,b)=>{const r=[Math.max(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.min(a[3],b[3])];return r[1]>r[0]&&r[3]>r[2]?[r]:[];};
   for(const f of result.floors){const aa=areas(p,f.n),current=Engine.floorModel(result,f).slabs.map(s=>({token:tokenFn('SLAB',s),rs:s.rects.map(r=>[r.x0,r.x1,r.y0,r.y1])})),valid=new Set(current.map(s=>s.token));
-   const proposals=aa.map(a=>{if(a.panels.every(t=>valid.has(t)))return a.panels;const parsed=a.panels.map(rects);if(parsed.some(x=>!x))return a.panels;const region=parsed.flat(),total=unionArea(region),eps=Math.max(1e-8,total*1e-9),picked=[];let covered=0;
+   const proposals=aa.map(a=>{if(a.rects)return a.panels||[];if(a.panels.every(t=>valid.has(t)))return a.panels;const parsed=a.panels.map(rects);if(parsed.some(x=>!x))return a.panels;const region=parsed.flat(),total=unionArea(region),eps=Math.max(1e-8,total*1e-9),picked=[];let covered=0;
     for(const s of current){const overlap=unionArea(region.flatMap(a=>s.rs.flatMap(b=>intersect(a,b)))),size=unionArea(s.rs);if(overlap<=eps)continue;if(Math.abs(overlap-size)>eps)return a.panels;picked.push(s.token);covered+=size;}
     return Math.abs(covered-total)<=eps&&picked.length?picked:a.panels;
    });
@@ -51,14 +51,14 @@ const LoadGroups=(()=>{
   const panels=[...new Set(draft.panels||[])];if(draft.scope==='area'){
    if(!String(draft.name||'').trim())throw Error('请填写区域名称');if(!panels.length&&!draft.rects?.length)throw Error('请先在 Plan 拖框选择范围');if(draft.rects){const clipped=LoadRegions83.clipSurface(draft.rects,Engine.floorModel(result,range.lo,key));if(Math.abs(clipped.reduce((n,r)=>n+LoadRegions83.area(r),0)-draft.rects.reduce((n,r)=>n+LoadRegions83.area(r),0))>1e-6)throw Error('范围已超出楼板，请重新框选');}
    for(let f=range.lo;f<=range.hi;f++){if(result.floors[f-1].type!==key)throw Error(f+'/F 使用不同 Framing，请分开设置区域荷载组');if(draft.rects){const clipped=LoadRegions83.clipSurface(draft.rects,Engine.floorModel(result,f,key));if(Math.abs(clipped.reduce((n,r)=>n+LoadRegions83.area(r),0)-draft.rects.reduce((n,r)=>n+LoadRegions83.area(r),0))>1e-6)throw Error(FloorLevels.name(p,f)+' 区域穿过局部挑高或无楼板区，请分开设置');}const available=new Set(Engine.floorModel(result,f,key).slabs.map(c=>Loading.token('SLAB',c)));if(panels.some(t=>!available.has(t)))throw Error('所选板块已变化，请重新框选');
-    const own=source?.scope==='area'?source.refs.find(r=>r.f===f)?.id:null;const overlap=LoadData.areas(p,f).find(a=>a.id!==own&&LoadRegions83.region(a).some(r=>LoadRegions83.region(draft).some(q=>LoadRegions83.intersect(r,q))));if(overlap)throw Error(f+'/F 与 '+overlap.name+' 的区域重叠，请先调整板块');
+    const own=source?.scope==='area'?source.refs.find(r=>r.f===f)?.id:null,model=Engine.floorModel(result,f,key);const overlap=LoadRegions83.surfaceRegions(p,f,model).find(a=>a.id!==own&&LoadRegions83.region(a).some(r=>LoadRegions83.region(draft).some(q=>LoadRegions83.intersect(r,q))));if(overlap&&!draft.replaceOverlap)throw Error(f+'/F 与 '+overlap.name+' 的区域重叠，请先调整范围');
    }
   }
   const oldFloors=new Map();for(let f=range.lo;f<=range.hi;f++)oldFloors.set(f,LoadData.floor(p,f));
   if(source)remove(p,source);const ex=LoadData.init(p);
   for(let f=range.lo;f<=range.hi;f++){
    if(draft.scope==='whole')LoadData.setFloor(p,f,{...value,direction:oldFloors.get(f).direction});
-   else{const aa=ex.areas[f]??=[],old=source?.scope==='area'?source.refs.find(r=>r.f===f)?.snapshot:null;let n=1;while(aa.some(a=>a.id==='A'+n))n++;const id=old&&!aa.some(a=>a.id===old.id)?old.id:'A'+n;aa.push({...old,...value,id,name:String(draft.name).trim(),direction:source?.value?.direction||'短跨',colour:old?.colour||source?.value?.colour||LoadData.colours[(n-1)%LoadData.colours.length],panels:[...panels],...(draft.rects?{rects:LoadRegions83.union(draft.rects)}:{rects:undefined})});}
+   else{if(draft.replaceOverlap)removeRegion(p,result,f,LoadRegions83.region(draft));const aa=ex.areas[f]??=[],old=source?.scope==='area'?source.refs.find(r=>r.f===f)?.snapshot:null;let n=1;while(aa.some(a=>a.id==='A'+n))n++;const id=old&&!aa.some(a=>a.id===old.id)?old.id:'A'+n;aa.push({...old,...value,id,name:String(draft.name).trim(),direction:source?.value?.direction||'短跨',colour:old?.colour||source?.value?.colour||LoadData.colours[(n-1)%LoadData.colours.length],panels:[...panels],...(draft.rects?{rects:LoadRegions83.union(draft.rects),selectionRects:draft.selectionRects?LoadRegions83.union(draft.selectionRects):undefined}:{rects:undefined,selectionRects:undefined})});}
   }return range;
  }
  function pick(slabs,box){return slabs.filter(s=>s.rects.some(r=>Math.min(r.x1,box.x1)-Math.max(r.x0,box.x0)>1e-8&&Math.min(r.y1,box.y1)-Math.max(r.y0,box.y0)>1e-8)).map(s=>Loading.token('SLAB',s));}
@@ -71,9 +71,9 @@ const LoadGroups=(()=>{
  }
  function overview(p,result,f){
   const model=Engine.floorModel(result,f);if(!model)return [];const groups=[],byValue=new Map(),inks=inkMap84(p,result);
-  for(const slab of model.slabs)for(const part of LoadRegions83.pieces(p,f,slab)){const v=part.load,t=Loading.token('SLAB',slab),values={usage:v.usage||'',dl:v.dl??null,sdl:v.sdl??null,ll:LoadData.live(v),basis:v.basis},unassigned=v.areaId===null&&!v.usage&&v.ll==null&&(v.sdl==null||v.sdl===0),stamp=JSON.stringify([unassigned,values]),conflict=false;let g=byValue.get(stamp);
+  for(const part of LoadRegions83.pieces(p,f,{rects:LoadRegions83.surface(model)},LoadRegions83.surfaceRegions(p,f,model))){const v=part.load,values={usage:v.usage||'',dl:v.dl??null,sdl:v.sdl??null,ll:LoadData.live(v),basis:v.basis},unassigned=v.areaId===null&&!v.usage&&v.ll==null&&(v.sdl==null||v.sdl===0),stamp=JSON.stringify([unassigned,values]),conflict=false;let g=byValue.get(stamp);
    if(!g){const n=groups.filter(g=>!g.unassigned).length;let hash=2166136261;for(const ch of stamp)hash=Math.imul(hash^ch.charCodeAt(0),16777619)>>>0;g={...values,conflict,unassigned,number:unassigned?null:n+1,name:unassigned?'未分配荷载':values.usage||'未选用途',colour:unassigned?'#f7f8f9':inks.map.get(inks.stamp(v))||`hsl(${hash%360} 67% 40%)`,rects:[],panels:[],areaIds:[],area:0};groups.push(g);byValue.set(stamp,g);}
-   const {load,...rect}=part;g.rects.push(rect);if(!g.panels.includes(t))g.panels.push(t);if(!g.areaIds.includes(v.areaId))g.areaIds.push(v.areaId);g.area+=LoadRegions83.area(part);
+   const {load,...rect}=part;g.rects.push(rect);for(const slab of model.slabs)if(slab.rects.some(r=>LoadRegions83.intersect(r,rect))){const t=Loading.token('SLAB',slab);if(!g.panels.includes(t))g.panels.push(t);}if(!g.areaIds.includes(v.areaId))g.areaIds.push(v.areaId);g.area+=LoadRegions83.area(part);
   }return groups;
  }
 
@@ -91,8 +91,8 @@ const LoadGroups=(()=>{
  }
 
  function completion(p,result,f){
-  const view=overview(p,result,f),tokens=[...new Set(view.flatMap(g=>g.panels))],total=view.reduce((n,g)=>n+g.area,0);
-  if(!total)return {status:'empty',label:'无楼板',complete:0,total:0};
+  const view=overview(p,result,f),tokens=Engine.floorModel(result,f).slabs.map(s=>Loading.token('SLAB',s)),total=view.reduce((n,g)=>n+g.area,0);
+  if(!total)return {status:'empty',label:'无受荷楼面',complete:0,total:0};
   const valid=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
   const complete=view.reduce((n,g)=>n+(!g.conflict&&[g.sdl,g.ll].every(valid)?g.area:0),0);
   const issues=LoadData.validate(p,f,tokens,Engine.floorModel(result,f)),base=LoadData.floor(p,f),areas=LoadData.areas(p,f);
@@ -102,9 +102,17 @@ const LoadGroups=(()=>{
  }
 
 
+ // Explicit edits remove only the chosen footprint, including beam tops.
+ function removeRegion(p,result,f,rects){
+  if(!result.floors[f-1])throw Error('请选择有效楼层');if(!rects.length)return;
+  const model=Engine.floorModel(result,f),expanded=LoadRegions83.surfaceRegions(p,f,model),ex=LoadData.init(p);
+  ex.areas[f]=LoadData.areas(p,f).map(a=>{const region=expanded.find(r=>r.id===a.id)?.rects||[];if(!region.some(r=>rects.some(q=>LoadRegions83.intersect(r,q))))return a;
+   return {...a,panels:[],rects:LoadRegions83.difference(LoadRegions83.clipSurface(region,model),rects),selectionRects:LoadRegions83.difference(a.selectionRects||region,rects)};
+  }).filter(a=>a.rects?a.rects.length:(a.panels||[]).length);
+ }
  function removePanels(p,result,f,panels){
   if(!result.floors[f-1])throw Error('请选择有效楼层');const m=Engine.floorModel(result,f),chosen=new Set(panels),rs=m.slabs.filter(s=>chosen.has(Loading.token('SLAB',s))).flatMap(s=>s.rects);if(!rs.length)throw Error('请选择 Slab');
   const ex=LoadData.init(p);ex.areas[f]=LoadData.areas(p,f).map(a=>a.rects?{...a,rects:LoadRegions83.difference(a.rects,rs)}:{...a,panels:a.panels.filter(t=>!chosen.has(t))}).filter(a=>a.rects?a.rects.length:a.panels.length);
  }
- return {list,save,remove,pick,overview,completion,legendState,removeLegend,removePanels};
+ return {list,save,remove,pick,overview,completion,legendState,removeLegend,removePanels,removeRegion};
 })();

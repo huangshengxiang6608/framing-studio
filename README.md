@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.127**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.128**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -43,6 +43,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 `compile.ps1` 不负责网页资源打包。修改已标记的 17 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
+
+E2.128 将“重新布置”统一移到梁布置顶部。点击后清空当前 Framing 的梁、墙和板，保留已有柱的位置和尺寸，应用到同类型全部楼层并可撤销。之后可分别自动画主梁、次梁或手动画梁；Section A／B 抄保持原样。
 
 E2.127 移除 Member Check 的通用说明、初次计算提示和勾选说明，以及板设置中的传荷及共用设置说明。计算与操作保持原样，输入变化和支承冲突提示保留；Section A／B 抄不变。
 

@@ -13,6 +13,7 @@ const Drawing=(()=>{
 
  function plan(ctx,w,h,p,m,opt={}){
   if(opt.monochrome)return FramingSymbols98.plan(ctx,w,h,p,m,opt);
+  if(m.columnsOnly)opt={...opt,membersOnly:true};
   if(typeof Loading!=='undefined'&&Engine.floors(p)[(opt.floor||1)-1]?.type===m.key)m=Loading.supportModel(p,m,opt.floor);
   const xx=Engine.axes(p,'x',m.key),yy=Engine.axes(p,'y',m.key),maxX=xx.at(-1).v,maxY=yy.at(-1).v;
   ctx.clearRect(0,0,w,h);ctx.fillStyle='#fbfcfd';ctx.fillRect(0,0,w,h);

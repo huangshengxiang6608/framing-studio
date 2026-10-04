@@ -1,9 +1,10 @@
-// Layout settings belong to a Framing. Existing projects opt in only on Apply.
+// Layout settings belong to a Framing. Apply and Reset are explicit model writes.
 const BeamLayout116=(()=>{
  const clone=x=>JSON.parse(JSON.stringify(x));
  function settings(p,key){const t=p.types[key];return {main:t.autoBeams101!==false,secondary:t.autoBeams101!==false,mainDirection:'XY',secondaryDirection:p.defaults.direction,gap:p.defaults.gap,scope:'all',...t.beamLayout116};}
  function candidate(p,key,step,values,rebuild=false){
   const next=clone(p),t=next.types[key],cfg=settings(p,key);
+  delete cfg.columnsOnly;
   if(step==='main')Object.assign(cfg,{main:true,mainDirection:values.mainDirection});
   else Object.assign(cfg,{secondary:true,secondaryDirection:values.secondaryDirection,gap:values.gap,scope:values.scope});
   t.beamLayout116=cfg;
@@ -14,6 +15,24 @@ const BeamLayout116=(()=>{
    t.suppressed=suppressed.filter(s=>!restore.has(s));
   }
   Engine.validate(next);return {project:next,result:Engine.generate(next)};
+ }
+ function clear(p,key,values){
+  const t=p.types[key],before=Engine.model(p,key).columns,cfg={...settings(p,key),...values};
+  // Keep the actual columns when removing walls, which otherwise changes auto placement.
+  Engine.setColumnMode(p,key,'manual');
+  for(const c of t.columns)if(!before.some(b=>b.id===c.id))c.on=false;
+  Object.assign(t,{autoBeams101:false,beamLayout116:{...cfg,main:false,secondary:false,columnsOnly:true,scope:'all'},beams:[],walls:[],suppressed:[],secondaryAreas:[],slabVoids:[],slabSizes:[],slabDirections116:{},beamWidths83:{}});
+  const after=Engine.model(p,key).columns,remap=new Map();
+  for(const c of before){const n=after.find(n=>n.id===c.id),a=Engine.columnRect(c),b=n&&Engine.columnRect(n);if(!n||['x','y','w','d'].some(k=>Math.abs(a[k]-b[k])>1e-6))throw Error('柱位置未能完整保留，已取消重新布置');remap.set(Loading.token('COL',c),Loading.token('COL',n));}
+  for(const f of Engine.floors(p).filter(f=>f.type===key)){
+   const prefix=f.n+'|';
+   for(const name of ['members','selected','reportA','reportB']){
+    const records=p.explorer?.[name];if(!records)continue;const keep={};
+    for(const [id,value]of Object.entries(records)){if(!id.startsWith(prefix))continue;const token=id.slice(prefix.length);if(token.startsWith('COL|'))keep[prefix+(remap.get(token)||token)]=value;delete records[id];}
+    Object.assign(records,keep);
+   }
+   if(p.foundation?.column?.startsWith(prefix)){const token=p.foundation.column.slice(prefix.length);if(remap.has(token))p.foundation.column=prefix+remap.get(token);}
+  }
  }
  function setDirections(p,key,slabs,direction){
   if(!['X','Y'].includes(direction))throw Error('请选择 X 或 Y 方向');
@@ -27,7 +46,7 @@ const BeamLayout116=(()=>{
   for(const s of m.slabs){const r=[...s.rects].sort((a,b)=>(b.x1-b.x0)*(b.y1-b.y0)-(a.x1-a.x0)*(a.y1-a.y0))[0];if(!r)continue;const dir=Loading.slabDirection(p,f,Loading.token('SLAB',s),s,m),a=xy((r.x0+r.x1)/2,(r.y0+r.y1)/2),len=Math.min(13,(dir==='X'?r.x1-r.x0:r.y1-r.y0)*plot.scale*.25);if(!dir){ctx.font='12px sans-serif';ctx.fillStyle='#a35b17';ctx.textAlign='center';ctx.fillText('X / Y ?',a[0],a[1]);continue;}if(len<3)continue;ctx.strokeStyle='#21709a';ctx.lineWidth=1.7;ctx.beginPath();for(const sign of [-1,1]){const x=a[0]+(dir==='X'?len*sign:0),y=a[1]+(dir==='Y'?len*sign:0);ctx.moveTo(...a);ctx.lineTo(x,y);ctx.moveTo(x-(dir==='X'?4*sign:4),y-(dir==='Y'?4*sign:4));ctx.lineTo(x,y);ctx.lineTo(x-(dir==='X'?4*sign:-4),y-(dir==='Y'?4*sign:-4));}ctx.stroke();arrows.push({id:s.id,dir,rect:r});}
   ctx.restore();return arrows;
  }
- return {settings,candidate,setDirections,drawDirections};
+ return {settings,candidate,clear,setDirections,drawDirections};
 })();
 
 function BeamLayoutUI116(host){
@@ -44,25 +63,27 @@ function BeamLayoutUI116(host){
  function render(){
   for(const el of document.querySelectorAll('[data-bl-fold]'))folds[el.dataset.blFold]=el.open;
   const h=sync(),cfg=BeamLayout116.settings(h.p,h.key),m=Engine.floorModel(h.result,h.floor,h.key),chosen=selectedSlabs(),preview=step=>draft?.step===step?'<p role="status">预览 '+draft.count+' 根自动'+(step==='main'?'主梁':'次梁')+'；虚线显示候选布置。</p><div class="row">'+btn('应用布置','apply')+btn('取消','cancel')+'</div>':'';
-  let html='<section class="beam-layout116"><h2>梁布置</h2><p class="muted">应用到 '+esc(h.key)+' 的所有楼层</p>';
-  html+=fold('main','① 自动画主梁 MB',selectControl('bl116-main-direction','布置方向',cfg.mainDirection,[['XY','X + Y 向'],['X','X 向'],['Y','Y 向']])+'<div class="row">'+btn('自动画主梁','main')+btn('重新布置','rebuild-main')+'</div>'+preview('main'));
-  html+=fold('secondary','② 自动画次梁 SB','<div class="row">'+selectControl('bl116-secondary-direction','布置方向',cfg.secondaryDirection,[['自动','自动'],['X','X 向'],['Y','Y 向']])+'<label class="field">最大间距 m<input id="bl116-gap" type="number" min="0.1" max="20" step="0.1" value="'+cfg.gap/1000+'" data-input-state="default"></label></div>'+selectControl('bl116-scope','布置区域',cfg.scope,[['all','全部区域'],['selected','已绘制分区']])+'<div class="row">'+btn('自动画次梁','secondary')+btn('重新布置','rebuild-secondary')+'</div>'+preview('secondary')+'<details class="beam-layout-zones116"><summary>次梁分区 · '+(h.p.types[h.key].secondaryAreas?.length||0)+' 个</summary>'+host.zones()+'</details>');
+  let html='<section class="beam-layout116"><div class="beam-layout-header128"><h2>梁布置</h2>'+btn('重新布置','reset','title="清空梁、墙和板，仅保留柱子"')+'</div><p class="muted">应用到 '+esc(h.key)+' 的所有楼层</p>';
+  html+=fold('main','① 自动画主梁 MB',selectControl('bl116-main-direction','布置方向',cfg.mainDirection,[['XY','X + Y 向'],['X','X 向'],['Y','Y 向']])+'<div class="row">'+btn('自动画主梁','main')+'</div>'+preview('main'));
+  html+=fold('secondary','② 自动画次梁 SB','<div class="row">'+selectControl('bl116-secondary-direction','布置方向',cfg.secondaryDirection,[['自动','自动'],['X','X 向'],['Y','Y 向']])+'<label class="field">最大间距 m<input id="bl116-gap" type="number" min="0.1" max="20" step="0.1" value="'+cfg.gap/1000+'" data-input-state="default"></label></div>'+selectControl('bl116-scope','布置区域',cfg.scope,[['all','全部区域'],['selected','已绘制分区']])+'<div class="row">'+btn('自动画次梁','secondary')+'</div>'+preview('secondary')+'<details class="beam-layout-zones116"><summary>次梁分区 · '+(h.p.types[h.key].secondaryAreas?.length||0)+' 个</summary>'+host.zones()+'</details>');
   html+=fold('slab','③ 板受力方向','<p>单向板默认沿短跨；点击单块或拖框多选后修改方向。</p><label class="beam-layout-check116"><input id="bl116-show-directions" type="checkbox" '+(showDirections?'checked':'')+'> 显示方向</label><p id="bl116-selection" role="status">'+(chosen.length===1?esc(chosen[0].id):chosen.length?'已选 '+chosen.length+' 块板':'未选择板块')+'</p><div class="row">'+['X','Y'].map(d=>btn('单向 '+d+(d==='X'?' ↔':' ↕'),'way-'+d,(!chosen.length?'disabled ':'')+'aria-pressed="'+(chosen.length>0&&chosen.every(s=>Loading.slabDirection(h.p,h.floor,Loading.token('SLAB',s),s,m)===d))+'"')).join('')+'</div>');
   html+='<details data-bl-fold="manual" '+(folds.manual?'open':'')+'><summary>手动画梁</summary><div class="beam-layout-body116">'+host.manual()+'<p class="muted">连接柱、梁端点、中点或梁中线上的位置。</p></div></details>';
   if(h.selected&&['MB','SB','TB','CB'].includes(h.selected.kind))html+='<div class="beam-layout-selected116">已选 '+esc(h.selected.id)+'<div class="row">'+btn('删除所选梁 · Delete','delete')+'</div></div>';
   return html+'</section>';
  }
- function preview(step,rebuild){const h=host.get();const values={mainDirection:$('bl116-main-direction').value,secondaryDirection:$('bl116-secondary-direction').value,gap:Number($('bl116-gap').value)*1000,scope:$('bl116-scope').value};if(!Number.isFinite(values.gap)||values.gap<100||values.gap>20000)throw Error('次梁间距须为 0.1–20 m');const next=BeamLayout116.candidate(h.p,h.key,step,values,rebuild),m=Engine.floorModel(next.result,h.floor,h.key);draft={...next,key:h.key,step,base:JSON.stringify(h.p),count:m.beams.filter(b=>b.source==='auto'&&(step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101)).length};host.selectMode();host.refresh();}
+ function values(){const v={mainDirection:$('bl116-main-direction').value,secondaryDirection:$('bl116-secondary-direction').value,gap:Number($('bl116-gap').value)*1000,scope:$('bl116-scope').value};if(!Number.isFinite(v.gap)||v.gap<100||v.gap>20000)throw Error('次梁间距须为 0.1–20 m');return v;}
+ function preview(step,rebuild){const h=host.get(),next=BeamLayout116.candidate(h.p,h.key,step,values(),rebuild),m=Engine.floorModel(next.result,h.floor,h.key);draft={...next,key:h.key,step,base:JSON.stringify(h.p),count:m.beams.filter(b=>b.source==='auto'&&(step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101)).length};host.selectMode();host.refresh();}
  function action(a){
   try{
-   if(['main','secondary','rebuild-main','rebuild-secondary'].includes(a)){preview(a.replace('rebuild-',''),a.startsWith('rebuild-'));return;}
+   if(a==='reset'){const h=host.get(),v=values();if(host.transact(()=>BeamLayout116.clear(h.p,h.key,v))){reset();host.clearSelection();host.selectMode();host.refresh();host.toast(h.key+' 已清空梁、墙和板，仅保留柱子；可撤销');}return;}
+   if(['main','secondary'].includes(a)){preview(a,false);return;}
    if(a==='cancel'){draft=null;host.refresh();return;}
    if(a==='delete'){host.deleteSelection();return;}
    if(a==='apply'){const h=host.get();if(!draft||draft.key!==h.key||draft.base!==JSON.stringify(h.p))throw Error('输入已变化，请重新预览');const t=draft.project.types[h.key],step=draft.step;draft=null;if(!host.transact(()=>{h.p.types[h.key].beamLayout116=clone(t.beamLayout116);h.p.types[h.key].suppressed=[...t.suppressed];}))return;host.toast((step==='main'?'主梁':'次梁')+'已应用到 '+h.key+' 所有楼层，可撤销');return;}
    if(a.startsWith('way-')){const h=host.get(),chosen=selectedSlabs();if(!chosen.length)return;const direction=a.slice(-1);if(host.transact(()=>BeamLayout116.setDirections(h.p,h.key,chosen,direction))){selection=chosen.map(s=>Loading.token('SLAB',s));host.refresh();host.toast('已将 '+chosen.length+' 块板改为单向 '+direction+' · '+h.key+' 共用');}}
   }catch(e){host.toast(e.message);}
  }
- // Keep form drafts during ordinary pointer selections; applying is the only model write.
+ // Keep form drafts during ordinary pointer selections; previewing never changes the model.
  let form=null;
  function remember(){if(!$('bl116-gap'))return;form={key:host.get().key,base:JSON.stringify(host.get().p),values:Object.fromEntries(['main-direction','secondary-direction','gap','scope'].map(k=>[k,$('bl116-'+k).value]))};}
  function restore(){if(form?.key===host.get().key&&form.base===JSON.stringify(host.get().p))for(const [k,v]of Object.entries(form.values)){const e=$('bl116-'+k);if(e)e.value=v;}}

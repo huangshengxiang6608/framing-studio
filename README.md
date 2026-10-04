@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.130**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.131**（仓库由 E2.110 导入），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 ## 运行
 
@@ -40,9 +40,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 该命令使用系统 .NET Framework C# 编译器及随附的 WebView2 库重建桌面程序。省略 `-DesktopOnly` 可同时重建 ExcelBridge.exe。
 
-`compile.ps1` 不负责网页资源打包。修改已标记的 17 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
+`compile.ps1` 不负责网页资源打包。修改已标记的 18 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
+
+E2.131 补齐侧窗确认的板 Span 与 Check：自动有效跨度、手动 L／可选 B、自重面积选择、同 Framing 共用和恢复自动。修正柱角切口导致规则板不能验算、Area 柱及 TC→TB 被无关传荷错误阻断、局部结构高度误报；Summary Check 新增可筛选及定位的全楼问题清单。保留真实缺输入、缺支承与 NOT OK。Section A／B 抄及原生 Excel 模板、程序不变。
 
 E2.130 在 Summary Check 的梁 Support 中加入 Span L（m）：默认自动识别，可手动修改及恢复自动。保存后同 Framing 共用，联动荷载图、内力、反力、下传荷载及 A／B 原有验算字段。平面几何不变；自动面荷载按跨度比例换算并保留各段合力，梁自重按计算跨度计取；手动荷载坐标保留，越界提示修正。Section A／B 抄的排版、模板及原生程序保持原样。
 

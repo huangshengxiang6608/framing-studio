@@ -20,7 +20,7 @@ const SlabGeometry120=(()=>{
  }
  function decorate(slabs,legacy){for(const s of slabs){const matches=legacy.filter(old=>Math.abs(s.area-s.rects.reduce((n,r)=>n+old.rects.reduce((v,q)=>v+intersect(r,q),0),0))<1e-6);s.netBoundary120=true;s.legacyTokens120=matches.map(token);s.legacySignatures120=matches.map(signature);}return slabs;}
  // The candidate must touch this very face. Never bridge a gap to a nearby member.
- function face(member,cross,coordinate){const column=!member.a;if(column&&member.status==='上层柱')return null;if(!column&&Math.abs(member.a[cross]-member.z[cross])>eps)return null;const r=box(column?engine().columnRect(member):engine().rect(member)),dim=cross===0?'x':'y',other=cross===0?'y':'x';if(Math.abs(r[dim+'0']-coordinate)>eps&&Math.abs(r[dim+'1']-coordinate)>eps)return null;return [r[other+'0'],r[other+'1']];}
+ function face(member,cross,coordinate){const column=!member.a;if(column&&member.status==='上层柱')return null;const r=box(column?engine().columnRect(member):engine().rect(member)),dim=cross===0?'x':'y',other=cross===0?'y':'x';if(Math.abs(r[dim+'0']-coordinate)>eps&&Math.abs(r[dim+'1']-coordinate)>eps)return null;return [r[other+'0'],r[other+'1']];}
  function record(table,s){if(!table)return;const own=table[token(s)];if(own!==undefined)return own;const values=s.legacyTokens120.map(t=>table[t]).filter(v=>v!==undefined);return values.length===1?values[0]:undefined;}
  // Migrate stored references once. Archive replaced keys, rather than losing user inputs.
  function migrate(p,result){if(p.slabBoundary120===1)return;const archive={members:{},selected:{},reportA:{},reportB:{},areas:{},directions:{},sizes:{}};let count=0;

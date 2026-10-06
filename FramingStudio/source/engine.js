@@ -391,7 +391,19 @@ const Engine=(()=>{
    }
   }
  }
- function generate(p){for(const t of Object.values(p.types)){if(t.alignmentMinSpacing!=null){t.minColumnSpacing=Math.max(t.minColumnSpacing||0,t.alignmentMinSpacing);delete t.alignmentMinSpacing;}}validate(p);for(const [key,t]of Object.entries(p.types))if(t.beamDepth==null){const g=p.groups.find(g=>g.type===key);t.beamDepth=g?structuralHeight(g):600;}const fs=floors(p),models=alignedModels(p,fs),floorModels=typeof FloorColumns101!=='undefined'?FloorColumns101.models(p,fs):{},issues=[];for(const k of Object.keys(p.types))issues.push(...models[k].issues);for(const [n,m]of Object.entries(floorModels))issues.push(...m.issues.map(q=>({...q,floor:+n})));const result={models,floorModels,issues,floors:fs};const final=typeof LocalHeights96!=="undefined"?LocalHeights96.build(p,result,baseModel):result;applyAutoTransferBeams(p,final);
+ function nameTransferBeams(result){
+  for(const f of result.floors){
+   const m=floorModel(result,f.n),reserved=new Set(m.beams.filter(b=>b.kind==='TB'&&/^TB/i.test(b.id)).map(b=>b.id)),used=new Set(reserved);
+   const beams=m.beams.map(b=>{
+    if(b.kind!=='TB')return b;
+    const preferred=/^TB/i.test(b.id)?b.id:/^(MB|SB|CB)/i.test(b.id)?b.id.replace(/^(MB|SB|CB)/i,'TB'):'TB-'+b.id;
+    let name=preferred,n=1;if(!reserved.has(b.id))while(used.has(name))name=preferred+'-'+(++n);
+    used.add(name);return {...b,displayId:name};
+   });
+   result.floorModels[f.n]={...m,beams};
+  }
+ }
+ function generate(p){for(const t of Object.values(p.types)){if(t.alignmentMinSpacing!=null){t.minColumnSpacing=Math.max(t.minColumnSpacing||0,t.alignmentMinSpacing);delete t.alignmentMinSpacing;}}validate(p);for(const [key,t]of Object.entries(p.types))if(t.beamDepth==null){const g=p.groups.find(g=>g.type===key);t.beamDepth=g?structuralHeight(g):600;}const fs=floors(p),models=alignedModels(p,fs),floorModels=typeof FloorColumns101!=='undefined'?FloorColumns101.models(p,fs):{},issues=[];for(const k of Object.keys(p.types))issues.push(...models[k].issues);for(const [n,m]of Object.entries(floorModels))issues.push(...m.issues.map(q=>({...q,floor:+n})));const result={models,floorModels,issues,floors:fs};const final=typeof LocalHeights96!=="undefined"?LocalHeights96.build(p,result,baseModel):result;applyAutoTransferBeams(p,final);nameTransferBeams(final);
   for(let i=1;i<fs.length;i++){
    const up=floorModel(final,fs[i].n),dn=floorModel(final,fs[i-1].n),supports=[...dn.walls,...dn.beams.filter(b=>b.kind==='TB')];
    for(const c of up.columns.filter(c=>c.status!=='上层柱')){const matches=dn.columns.filter(d=>d.status!=='上层柱'&&overlap(columnRect(c),columnRect(d))),point=columnReference(p,up.key,c),beam=transferBeamAt(p,dn,fs[i-1].n,point);if(matches.length!==1&&(matches.length||!dn.walls.some(w=>on(point,w))&&beam?.kind!=='TB'))final.issues.push({type:up.key,floor:fs[i].n,id:c.id,msg:fs[i].n+'/F 上層柱與下層支承關係待確認；請核對柱、牆及 TB'});}

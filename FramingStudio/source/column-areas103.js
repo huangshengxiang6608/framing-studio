@@ -103,7 +103,7 @@ const ColumnAreas103=(()=>{
    if(n===f){const answer={entries:[{column:c,weight:1}],errors:[]};memo.set(k,answer);return answer;}
    const below=Engine.floorModel(result,n-1),matches=active(below).filter(d=>Engine.overlap(Engine.columnRect(c),Engine.columnRect(d)));let landing;
    if(matches.length===1)landing={entries:[{column:matches[0],weight:1}],errors:[]};
-   else{const node=Loading.columnLoadPoint(p,Engine.floorModel(result,n),c),tbs=below.beams.filter(b=>b.kind==='TB'&&Loading.contact(node,b));landing=tbs.length===1?beamLanding(below,n-1,tbs[0],node):{entries:[],errors:[FloorLevels.name(p,n)+' 柱 '+c.id+' 至下层的柱／TB 关系待确认']};}
+   else{const node=Loading.columnLoadPoint(p,Engine.floorModel(result,n),c),target=Engine.transferBeamAt(p,below,n-1,node),tbs=target?.kind==='TB'?[target]:[];landing=tbs.length===1?beamLanding(below,n-1,tbs[0],node):{entries:[],errors:[FloorLevels.name(p,n)+' 柱 '+c.id+' 至下层的柱／TB 关系待确认']};}
    const entries=[],err=[...landing.errors];for(const e of landing.entries){const next=route(n-1,e.column,source);entries.push(...next.entries.map(q=>({...q,weight:q.weight*e.weight})));err.push(...next.errors);}const answer={entries:merge(entries),errors:[...new Set(err)]};memo.set(k,answer);return answer;
   }
   for(let n=f;n<=p.total;n++){

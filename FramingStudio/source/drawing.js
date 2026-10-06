@@ -187,6 +187,7 @@ const Drawing=(()=>{
    note='参考线长度不是净跨或设计计算跨度。仅检查几何支承路径，未核实连接刚度、荷载及承载力。';
    if(b.supportStatus==='unverified')title=b.displayKind==='CB'?(b.kind==='CB'?'悬臂梁 CB · '+b.id:b.displayId):'⚠ 支承未确认 · '+b.id;
    if(b.displayKind==='CB'){const input=rows.find(r=>r[0]==='输入类型');if(input){input[0]='类型';input[1]=b.kind==='CB'?'CB · 悬臂梁（手动指定）':'CB · 悬臂梁（按外伸几何识别）';}}
+   if(b.autoTransfer){rows.push(['TB 識別','自動 · 承托 '+b.transferLandings.map(c=>FloorLevels.name(p,c.floor)+' '+c.id).join('、')]);note+=' 原梁 '+b.id+' 的荷載及勾選保留。';}
    size={b:b.b*1000,d:b.d*1000};
   }else if(hit.kind==='COL'){
    const c=m.columns.find(c=>c.id===hit.id);if(!c)return null;title='柱 · '+c.id;size={b:c.b*1000,d:c.d*1000};rows.push(['B × D',size.b+' × '+size.d+' mm'],['定位参考 X, Y',point([c.x,c.y])],['截面中心 X, Y',point([Engine.columnRect(c).x,Engine.columnRect(c).y])],['状态',c.status]);rows.push(['上下层关系',c.transferReason||c.alignmentNote||'保留当前柱位']);note='Transfer column 保留原位置，不参与上下层对齐。按项目保存的柱位计算。自动识别依据为下方 TB 与柱的几何关系；可手动标记排除。定位坐标及梁参考跨度保留。';

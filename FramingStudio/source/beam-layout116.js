@@ -12,7 +12,7 @@ const BeamLayout116=(()=>{
   if(step==='secondary'&&cfg.scope==='selected'&&!t.secondaryAreas?.length)throw Error('请先拖画次梁分区。');
   if(rebuild){
    const suppressed=[...t.suppressed];t.suppressed=[];
-   Engine.validate(next);const m=Engine.model(next,key),restore=new Set(m.beams.filter(b=>b.source==='auto'&&(step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101)).map(b=>Engine.sig(b.rawA,b.rawZ)));
+   Engine.validate(next);const m=Engine.model(next,key),restore=new Set(m.beams.filter(b=>b.source==='auto'&&(step==='main'?(b.baseKind||b.kind)==='MB':(b.baseKind||b.kind)==='SB'||b.secondaryCantilever101)).map(b=>Engine.sig(b.rawA,b.rawZ)));
    // A former continuous main beam may now be split at shorter supporting beams.
    // Restore its parent signature as well as its newly generated segment signatures.
    if(step==='main'){const parents=new Map();for(const b of m.beams.filter(b=>b.source==='auto'&&b.splitMainParent)){const list=parents.get(b.splitMainParent)||[];list.push(b);parents.set(b.splitMainParent,list);}for(const parts of parents.values()){const points=parts.flatMap(b=>[b.rawA,b.rawZ]);restore.add(Engine.sig([Math.min(...points.map(a=>a[0])),Math.min(...points.map(a=>a[1]))],[Math.max(...points.map(a=>a[0])),Math.max(...points.map(a=>a[1]))]));}}
@@ -79,7 +79,7 @@ function BeamLayoutUI116(host){
   return html+'</section>';
  }
  function values(){const v={mainDirection:$('bl116-main-direction').value,secondaryDirection:$('bl116-secondary-direction').value,gap:Number($('bl116-gap').value)*1000,scope:$('bl116-scope').value};if(!Number.isFinite(v.gap)||v.gap<100||v.gap>20000)throw Error('次梁间距须为 0.1–20 m');return v;}
- function preview(step,rebuild){const h=host.get(),next=BeamLayout116.candidate(h.p,h.key,step,values(),rebuild),m=Engine.floorModel(next.result,h.floor,h.key);draft={...next,key:h.key,step,base:JSON.stringify(h.p),count:m.beams.filter(b=>b.source==='auto'&&(step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101)).length};host.selectMode();host.refresh();}
+ function preview(step,rebuild){const h=host.get(),next=BeamLayout116.candidate(h.p,h.key,step,values(),rebuild),m=Engine.floorModel(next.result,h.floor,h.key);draft={...next,key:h.key,step,base:JSON.stringify(h.p),count:m.beams.filter(b=>b.source==='auto'&&(step==='main'?(b.baseKind||b.kind)==='MB':(b.baseKind||b.kind)==='SB'||b.secondaryCantilever101)).length};host.selectMode();host.refresh();}
  function action(a){
   try{
    if(a==='reset'){const h=host.get(),v=values();if(host.transact(()=>BeamLayout116.clear(h.p,h.key,v))){reset();host.clearSelection();host.selectMode();host.refresh();host.toast(h.key+' 已清空梁及板布置，柱和牆已保留；可撤銷');}return;}
@@ -104,7 +104,7 @@ function BeamLayoutUI116(host){
  function finish(cancel=false){if(!gesture)return false;const g=gesture;gesture=null;if(cancel){host.repaint();return true;}const box={x0:Math.min(g.from[0],g.to[0]),x1:Math.max(g.from[0],g.to[0]),y0:Math.min(g.from[1],g.to[1]),y1:Math.max(g.from[1],g.to[1])},click=Math.hypot(g.to[0]-g.from[0],g.to[1]-g.from[1])<.08;let chosen=panels().filter(s=>(s.rects||[s]).some(r=>click?g.to[0]>r.x0&&g.to[0]<r.x1&&g.to[1]>r.y0&&g.to[1]<r.y1:Math.min(r.x1,box.x1)>Math.max(r.x0,box.x0)&&Math.min(r.y1,box.y1)>Math.max(r.y0,box.y0)));if(click)chosen=chosen.slice(0,1);selection=[...new Set([...(g.append?selection:[]),...chosen.map(s=>Loading.token('SLAB',s))])];activeTab='slab';host.clearSelection();host.refresh();return true;}
  function overlay(ctx,plot){
   const h=sync(),m=Engine.floorModel(h.result,h.floor,h.key),xy=(x,y)=>[plot.ox+x*plot.scale,plot.oy+y*plot.scale];ctx.save();
-  if(draft){ctx.strokeStyle='#16899d';ctx.lineWidth=2.5;ctx.setLineDash([7,4]);for(const b of Engine.floorModel(draft.result,h.floor,h.key).beams.filter(b=>b.source==='auto'&&(draft.step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101))){ctx.beginPath();ctx.moveTo(...xy(...b.a));ctx.lineTo(...xy(...b.z));ctx.stroke();}ctx.setLineDash([]);}
+  if(draft){ctx.strokeStyle='#16899d';ctx.lineWidth=2.5;ctx.setLineDash([7,4]);for(const b of Engine.floorModel(draft.result,h.floor,h.key).beams.filter(b=>b.source==='auto'&&(draft.step==='main'?(b.baseKind||b.kind)==='MB':(b.baseKind||b.kind)==='SB'||b.secondaryCantilever101))){ctx.beginPath();ctx.moveTo(...xy(...b.a));ctx.lineTo(...xy(...b.z));ctx.stroke();}ctx.setLineDash([]);}
   for(const s of m.slabs){if(!host.selectedMembers&&selection.includes(Loading.token('SLAB',s))){ctx.fillStyle='rgba(0,130,210,.20)';ctx.strokeStyle='#0082d2';ctx.lineWidth=2;for(const r of s.rects){const a=xy(r.x0,r.y0),w=(r.x1-r.x0)*plot.scale,h=(r.y1-r.y0)*plot.scale;ctx.fillRect(...a,w,h);ctx.strokeRect(...a,w,h);}}
   }
   plot.slabDirections=host.showDirections()?BeamLayout116.drawDirections(h.p,m,h.floor,ctx,plot):[];

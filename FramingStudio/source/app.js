@@ -411,7 +411,7 @@
  function memberDraft(){return {b:String($('memberb').value),d:String($('memberd').value),kind:$('memberkind').value,transfer:$('membertransfer').checked};}
  function memberStatus(message,error=false){const el=$('memberstatus');el.textContent=message;el.hidden=!message;el.style.color=error?'#ac3f36':'#176477';el.setAttribute('role',error?'alert':'status');}
  function memberPending(){return memberEditor&&JSON.stringify(memberDraft())!==JSON.stringify(memberEditor.baseline);}
- function moveBeamInputs(oldBeam,edited,targetKey){if(oldBeam&&edited&&oldBeam.kind!==edited.kind){const oldToken=Loading.token(oldBeam.kind,oldBeam),newToken=Loading.token(edited.kind,edited);for(const f of result.floors.filter(f=>f.type===targetKey))for(const name of ['members','selected','reportA','reportB']){const map=p.explorer?.[name],a=f.n+'|'+oldToken,b=f.n+'|'+newToken;if(map&&Object.hasOwn(map,a)){if(Object.hasOwn(map,b)&&JSON.stringify(map[b])!==JSON.stringify(map[a]))throw Error('目标类型已有独立输入，请先检查构件 Loading / Check');map[b]=map[a];delete map[a];}}}}
+ function moveBeamInputs(oldBeam,edited,targetKey){if(oldBeam&&edited&&Loading.token(oldBeam.kind,oldBeam)!==Loading.token(edited.kind,edited)){const oldToken=Loading.token(oldBeam.kind,oldBeam),newToken=Loading.token(edited.kind,edited);for(const f of result.floors.filter(f=>f.type===targetKey))for(const name of ['members','selected','reportA','reportB']){const map=p.explorer?.[name],a=f.n+'|'+oldToken,b=f.n+'|'+newToken;if(map&&Object.hasOwn(map,a)){if(Object.hasOwn(map,b)&&JSON.stringify(map[b])!==JSON.stringify(map[a]))throw Error('目标类型已有独立输入，请先检查构件 Loading / Check');map[b]=map[a];delete map[a];}}}}
  function applyMemberEdit(){
   const editor=memberEditor;if(!editor){memberStatus('请重新右键选择要修改的构件。',true);return false;}
   if(FloorColumns101.isReference(editor.hit,floor)){memberStatus('非當層的柱只供參考，請切換至所屬樓層修改。',true);return false;}
@@ -425,7 +425,8 @@
    openMemberCard(hit,position,targetKey);$('memberb').value=draft.b;$('memberd').value=draft.d;$('memberkind').value=draft.kind;$('membertransfer').checked=draft.transfer;
    memberStatus('未应用：'+failure+'。输入已保留，请修改后重试。',true);return false;
   }
-  selected=edited?{id:edited.id,kind:edited.kind,f:hit.f}:hit;
+  const actual=edited?Engine.floorModel(result,hit.f??floor,targetKey).beams.find(b=>b.id===edited.id):null;
+  selected=edited?{id:edited.id,kind:actual?.kind||edited.kind,f:hit.f}:hit;
   openMemberCard(selected,position,targetKey);
   memberStatus('已应用 · '+targetKey+' · '+(edited?.kind||hit.kind)+' · 请点“保存项目”保存文件。');
   toast((isBeam?'梁类型及尺寸':'尺寸')+'已更新，可撤销');return true;

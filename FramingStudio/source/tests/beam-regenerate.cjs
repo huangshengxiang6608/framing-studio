@@ -1,0 +1,38 @@
+const fs=require('fs'),path=require('path'),assert=require('assert'),{pathToFileURL}=require('url'),{chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});try{
+const page=await browser.newPage({viewport:{width:1400,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.stack));page.on('dialog',d=>d.accept());
+await page.goto(pathToFileURL(path.resolve('FramingStudio/assets/index.html')).href);await page.waitForFunction(()=>window.StudioHost);await page.addScriptTag({content:fs.readFileSync('FramingStudio/source/tests/loading115-browser.js','utf8')});
+const fixture=await page.evaluate(()=>{const p=Engine.clone(loading115Tests().projects.slab);p.name='Deleted beam regeneration';p.types.F1.autoBeams101=true;p.types.F1.beams=[];return p;});
+await page.locator('#file').setInputFiles({name:'regenerate.framing.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});
+await page.evaluate(()=>StudioHost.navigate('beamLayout'));
+const state=()=>page.evaluate(()=>JSON.stringify(StudioHost.get().p)),beams=()=>page.evaluate(()=>Engine.floorModel(StudioHost.get().result,1).beams.map(b=>({id:b.id,kind:b.kind,a:b.a,z:b.z})));
+const initial=await beams();assert(initial.some(b=>b.kind==='SB'));const original=await state();
+await page.evaluate(()=>StudioHost.transact(()=>{const h=StudioHost.get(),m=Engine.floorModel(h.result,1);Engine.removeMembers(h.p,h.key,m.beams.map(b=>({id:b.id,kind:b.kind,f:1})),1);}));
+assert.equal((await beams()).length,0);const deleted=await state();
+assert.equal(await page.locator('.member-selection').count(),0);assert.equal(await page.locator('#member-selection-filter').count(),0);
+await page.locator('[data-bl116=main]').click();assert.equal(await state(),deleted,'preview is read-only');
+assert.match(await page.locator('#bl116-panel-main [role=status]').innerText(),/预览 [1-9]\d* 根/);
+await page.locator('#bl116-panel-main [data-bl116=cancel]').click();assert.equal(await state(),deleted,'cancel preserves deleted layout');
+await page.locator('[data-bl116=main]').click();await page.locator('#bl116-panel-main [data-bl116=apply]').click();
+const main=await beams();assert(main.length>0&&main.every(b=>b.kind==='MB'),'main rebuild does not restore deleted SB');
+const rebuilt=await state();assert.deepEqual(JSON.parse(rebuilt).types.F1.columns,JSON.parse(original).types.F1.columns);assert.deepEqual(JSON.parse(rebuilt).types.F1.walls,JSON.parse(original).types.F1.walls);
+await page.locator('#undo').click();assert.equal(await state(),deleted,'one undo restores entire deletion state');
+await page.locator('[data-bl116=main]').click();await page.locator('#bl116-panel-main [data-bl116=apply]').click();
+await page.locator('[data-bl116=main]').click();await page.locator('#bl116-panel-main [data-bl116=apply]').click();assert.deepEqual(await beams(),main,'repeat rebuild does not duplicate beams');
+await page.locator('#bl116-tab-secondary').click();await page.locator('[data-bl116=secondary]').click();assert.match(await page.locator('#bl116-panel-secondary [role=status]').innerText(),/预览 [1-9]\d* 根/);
+await page.locator('#bl116-panel-secondary [data-bl116=apply]').click();assert((await beams()).some(b=>b.kind==='SB'));assert.deepEqual((await beams()).filter(b=>b.kind==='MB'),main);
+const saved=await state();await page.locator('#file').setInputFiles({name:'saved.framing.json',mimeType:'application/json',buffer:Buffer.from(saved)});assert((await beams()).some(b=>b.kind==='SB'));
+const domain=await page.evaluate(fixture=>{
+ const check=(v,s)=>{if(!v)throw Error(s);},p=Engine.clone(fixture),m=Engine.model(p,'F1'),cfg=BeamLayout116.settings(p,'F1'),b=m.beams.find(b=>b.kind==='MB'),sb=m.beams.find(b=>b.kind==='SB');
+ Engine.removeMembers(p,'F1',[{kind:b.kind,id:b.id,f:1},{kind:sb.kind,id:sb.id,f:1}],1);const before=JSON.stringify(p);
+ const draft=BeamLayout116.candidate(p,'F1','main',{...cfg,mainDirection:'X'},true);check(JSON.stringify(p)===before,'domain preview immutable');
+ const after=Engine.model(draft.project,'F1');check(after.beams.filter(b=>b.kind==='MB').every(b=>Math.abs(b.a[1]-b.z[1])<1e-6),'requested direction');
+ check(draft.project.types.F1.suppressed.includes(Engine.sig(sb.rawA,sb.rawZ)),'SB deletion retained');
+ check(!draft.project.types.F1.autoBeamSnapshot?.main,'main freeze released');check(draft.project.types.F1.autoBeamSnapshot?.secondary,'secondary freeze retained');
+ const long=Engine.clone(fixture);long.axes={x:[{id:'1',gap:0},{id:'2',gap:51}],y:[{id:'A',gap:0},{id:'D',gap:50}]};const t=long.types.F1;t.columns=[[20.5,13],[50.5,13],[20.5,37],[50.5,37],[24.5,.5],[24.5,49.5]].map(([x,y],i)=>({id:'C'+i,x,y,b:1000,d:1000,status:'上下贯通',on:true}));t.columnPlacements=[];t.columnAxisPositions=[];t.beamLayout116={...BeamLayout116.settings(long,'F1'),main:true,secondary:false,shortSpanMain:false};
+ const old=Engine.model(long,'F1').beams.find(b=>Math.abs(Math.hypot(b.z[0]-b.a[0],b.z[1]-b.a[1])-49)<1e-6);check(old,'legacy long beam');Engine.removeMembers(long,'F1',[{kind:'MB',id:old.id,f:1}],1);
+ const rebuilt=BeamLayout116.candidate(long,'F1','main',BeamLayout116.settings(long,'F1'),true),parts=Engine.model(rebuilt.project,'F1').beams.filter(b=>Math.abs(b.a[0]-24.5)<1e-6&&Math.abs(b.z[0]-24.5)<1e-6);check(parts.length===3,'deleted continuous parent restores as shorter segments');check(!rebuilt.project.types.F1.suppressed.includes(Engine.sig(old.rawA,old.rawZ)),'legacy parent suppression removed');
+ return true;
+},fixture);assert(domain);assert.deepEqual(errors,[]);fs.mkdirSync('tmp/beam-regenerate',{recursive:true});await page.evaluate(()=>StudioHost.navigate('beamLayout'));await page.screenshot({path:'tmp/beam-regenerate/verified.png'});
+console.log('PASS: deleted/frozen beams regenerate, preview and cancel immutable, main/SB rebuild scoped, one undo, no duplicates, direction respected, columns/walls preserved, saved project retained, beam panel removed.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

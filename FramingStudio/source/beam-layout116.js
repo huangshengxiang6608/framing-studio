@@ -13,6 +13,9 @@ const BeamLayout116=(()=>{
   if(rebuild){
    const suppressed=[...t.suppressed];t.suppressed=[];
    Engine.validate(next);const m=Engine.model(next,key),restore=new Set(m.beams.filter(b=>b.source==='auto'&&(step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101)).map(b=>Engine.sig(b.rawA,b.rawZ)));
+   // A former continuous main beam may now be split at shorter supporting beams.
+   // Restore its parent signature as well as its newly generated segment signatures.
+   if(step==='main'){const parents=new Map();for(const b of m.beams.filter(b=>b.source==='auto'&&b.splitMainParent)){const list=parents.get(b.splitMainParent)||[];list.push(b);parents.set(b.splitMainParent,list);}for(const parts of parents.values()){const points=parts.flatMap(b=>[b.rawA,b.rawZ]);restore.add(Engine.sig([Math.min(...points.map(a=>a[0])),Math.min(...points.map(a=>a[1]))],[Math.max(...points.map(a=>a[0])),Math.max(...points.map(a=>a[1]))]));}}
    t.suppressed=suppressed.filter(s=>!restore.has(s));
   }
   Engine.validate(next);return {project:next,result:Engine.generate(next)};
@@ -68,12 +71,11 @@ function BeamLayoutUI116(host){
   const h=sync(),cfg=BeamLayout116.settings(h.p,h.key),m=Engine.floorModel(h.result,h.floor,h.key),chosen=selectedSlabs(),preview=step=>draft?.step===step?'<p role="status">预览 '+draft.count+' 根自动'+(step==='main'?'主梁':'次梁')+'；虚线显示候选布置。</p><div class="row">'+btn('应用布置','apply')+btn('取消','cancel')+'</div>':'';
   let html='<section class="beam-layout116"><div class="beam-layout-header128"><h2>梁布置</h2>'+btn('重新布置','reset','title="清空梁及板布置，保留柱和牆"')+'</div><p class="muted">应用到 '+esc(h.key)+' 的所有楼层</p>';
   html+='<div class="beam-layout-tabs116" role="tablist" aria-label="梁與板布置">'+[['main','MB'],['secondary','SB'],['slab','Slab']].map(([step,label])=>'<button type="button" id="bl116-tab-'+step+'" role="tab" data-bl-tab="'+step+'" aria-controls="bl116-panel-'+step+'" aria-selected="'+(activeTab===step)+'" tabindex="'+(activeTab===step?'0':'-1')+'">'+label+'</button>').join('')+'</div>';
-  html+=host.selectionPanel?.()||'';
   html+=fold('main','① 自动画主梁 MB',selectControl('bl116-main-direction','布置方向',cfg.mainDirection,[['XY','X + Y 向'],['X','X 向'],['Y','Y 向']])+'<div class="row">'+btn('自动画主梁','main')+'</div>'+preview('main'));
   html+=fold('secondary','② 自动画次梁 SB','<div class="row">'+selectControl('bl116-secondary-direction','布置方向',cfg.secondaryDirection,[['自动','自动'],['X','X 向'],['Y','Y 向']])+'<label class="field">最大间距 m<input id="bl116-gap" type="number" min="0.1" max="20" step="0.1" value="'+cfg.gap/1000+'" data-input-state="default"></label></div>'+selectControl('bl116-scope','布置区域',cfg.scope,[['all','全部区域'],['selected','已儲存的 SB 分區']])+'<div class="row">'+'<button type="button" id="bl116-draw-region" data-action="draw-sb-area">框選 SB 區域</button>'+btn('預覽次梁','secondary')+'</div>'+preview('secondary')+'<details class="beam-layout-zones116" '+(cfg.scope==='selected'?'open':'')+'><summary>次梁分区 · '+(h.p.types[h.key].secondaryAreas?.length||0)+' 个</summary>'+host.zones()+'</details>');
   html+=fold('slab','③ 板受力方向','<p>单向板默认沿短跨；点击单块或拖框多选后修改方向。</p><label class="beam-layout-check116"><input id="bl116-show-directions" type="checkbox" '+(host.showDirections()?'checked':'')+'> 显示方向</label><p id="bl116-selection" role="status">'+(chosen.length===1?esc(chosen[0].id):chosen.length?'已选 '+chosen.length+' 块板':'未选择板块')+'</p><div class="row">'+['X','Y'].map(d=>btn('单向 '+d+(d==='X'?' ↔':' ↕'),'way-'+d,(!chosen.length?'disabled ':'')+'aria-pressed="'+(chosen.length>0&&chosen.every(s=>Loading.slabDirection(h.p,h.floor,Loading.token('SLAB',s),s,m)===d))+'"')).join('')+'</div>');
   html+='<details '+(activeTab==='slab'?'hidden ':'')+'data-bl-fold="manual" '+(folds.manual?'open':'')+'><summary>手动画梁</summary><div class="beam-layout-body116">'+host.manual()+'<p class="muted">连接柱、梁端点、中点或梁中线上的位置。</p></div></details>';
-  if(h.selected&&['MB','SB','TB','CB'].includes(h.selected.kind))html+='<div class="beam-layout-selected116">已选 '+esc(h.selected.id)+'<div class="row">'+btn('删除所选梁 · Delete','delete')+'</div></div>';
+  const selected=host.selectedMembers?.()||[];if(selected.length)html+='<div class="row beam-layout-selected116"><span id="member-selection-count">已選取 '+selected.length+' 個構件</span>'+btn('刪除所選 · Delete','delete')+'</div>';
   return html+'</section>';
  }
  function values(){const v={mainDirection:$('bl116-main-direction').value,secondaryDirection:$('bl116-secondary-direction').value,gap:Number($('bl116-gap').value)*1000,scope:$('bl116-scope').value};if(!Number.isFinite(v.gap)||v.gap<100||v.gap>20000)throw Error('次梁间距须为 0.1–20 m');return v;}
@@ -81,7 +83,7 @@ function BeamLayoutUI116(host){
  function action(a){
   try{
    if(a==='reset'){const h=host.get(),v=values();if(host.transact(()=>BeamLayout116.clear(h.p,h.key,v))){reset();host.clearSelection();host.selectMode();host.refresh();host.toast(h.key+' 已清空梁及板布置，柱和牆已保留；可撤銷');}return;}
-   if(['main','secondary'].includes(a)){preview(a,false);return;}
+   if(['main','secondary'].includes(a)){preview(a,true);return;}
    if(a==='cancel'){draft=null;host.refresh();return;}
    if(a==='delete'){host.deleteSelection();return;}
    if(a==='apply'){const h=host.get();if(!draft||draft.key!==h.key||draft.base!==JSON.stringify(h.p))throw Error('输入已变化，请重新预览');const t=draft.project.types[h.key],step=draft.step;draft=null;if(!host.transact(()=>{h.p.types[h.key].beamLayout116=clone(t.beamLayout116);if(t.autoBeamSnapshot)h.p.types[h.key].autoBeamSnapshot=clone(t.autoBeamSnapshot);else delete h.p.types[h.key].autoBeamSnapshot;h.p.types[h.key].suppressed=[...t.suppressed];}))return;host.toast((step==='main'?'主梁':'次梁')+'已应用到 '+h.key+' 所有楼层，可撤销');return;}

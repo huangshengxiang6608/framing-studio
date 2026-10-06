@@ -5,6 +5,7 @@ const BeamLayout116=(()=>{
  function candidate(p,key,step,values,rebuild=false){
   const next=clone(p),t=next.types[key],cfg=settings(p,key);
   delete cfg.columnsOnly;
+  if(t.autoBeamSnapshot){delete t.autoBeamSnapshot[step];if(!Object.keys(t.autoBeamSnapshot).length)delete t.autoBeamSnapshot;}
   if(step==='main')Object.assign(cfg,{main:true,mainDirection:values.mainDirection});
   else Object.assign(cfg,{secondary:true,secondaryDirection:values.secondaryDirection,gap:values.gap,scope:values.scope});
   t.beamLayout116=cfg;
@@ -20,6 +21,7 @@ const BeamLayout116=(()=>{
   const t=p.types[key],before=Engine.model(p,key).columns,cfg={...settings(p,key),...values};
   // Keep the actual columns when removing walls, which otherwise changes auto placement.
   Engine.setColumnMode(p,key,'manual');
+  delete t.autoBeamSnapshot;
   for(const c of t.columns)if(!before.some(b=>b.id===c.id))c.on=false;
   Object.assign(t,{autoBeams101:false,beamLayout116:{...cfg,main:false,secondary:false,columnsOnly:true,scope:'all'},beams:[],walls:[],suppressed:[],secondaryAreas:[],slabVoids:[],slabSizes:[],slabDirections116:{},beamWidths83:{}});
   const after=Engine.model(p,key).columns,remap=new Map();
@@ -81,7 +83,7 @@ function BeamLayoutUI116(host){
    if(['main','secondary'].includes(a)){preview(a,false);return;}
    if(a==='cancel'){draft=null;host.refresh();return;}
    if(a==='delete'){host.deleteSelection();return;}
-   if(a==='apply'){const h=host.get();if(!draft||draft.key!==h.key||draft.base!==JSON.stringify(h.p))throw Error('输入已变化，请重新预览');const t=draft.project.types[h.key],step=draft.step;draft=null;if(!host.transact(()=>{h.p.types[h.key].beamLayout116=clone(t.beamLayout116);h.p.types[h.key].suppressed=[...t.suppressed];}))return;host.toast((step==='main'?'主梁':'次梁')+'已应用到 '+h.key+' 所有楼层，可撤销');return;}
+   if(a==='apply'){const h=host.get();if(!draft||draft.key!==h.key||draft.base!==JSON.stringify(h.p))throw Error('输入已变化，请重新预览');const t=draft.project.types[h.key],step=draft.step;draft=null;if(!host.transact(()=>{h.p.types[h.key].beamLayout116=clone(t.beamLayout116);if(t.autoBeamSnapshot)h.p.types[h.key].autoBeamSnapshot=clone(t.autoBeamSnapshot);else delete h.p.types[h.key].autoBeamSnapshot;h.p.types[h.key].suppressed=[...t.suppressed];}))return;host.toast((step==='main'?'主梁':'次梁')+'已应用到 '+h.key+' 所有楼层，可撤销');return;}
    if(a.startsWith('way-')){const h=host.get(),chosen=selectedSlabs();if(!chosen.length)return;const direction=a.slice(-1);if(host.transact(()=>BeamLayout116.setDirections(h.p,h.key,chosen,direction))){selection=chosen.map(s=>Loading.token('SLAB',s));host.refresh();host.toast('已将 '+chosen.length+' 块板改为单向 '+direction+' · '+h.key+' 共用');}}
   }catch(e){host.toast(e.message);}
  }

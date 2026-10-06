@@ -97,10 +97,19 @@ const LocalHeightsUI96=(()=>{
  function begin(q,remove){if(!editing||!validContext())return false;drag={a:q,z:q,remove};return true;}
  function move(q){if(!drag)return false;drag.z=q;host.repaint();return true;}
  function finish(cancel){if(!drag)return;const d=drag;drag=null;if(!cancel&&validContext()){const row=entry(),box={x0:Math.min(d.a[0],d.z[0]),x1:Math.max(d.a[0],d.z[0]),y0:Math.min(d.a[1],d.z[1]),y1:Math.max(d.a[1],d.z[1])},map=new Map((draft||[]).map(c=>[LocalHeights96.token(c),c]));const click=Math.hypot(d.a[0]-d.z[0],d.a[1]-d.z[1])<.02;for(const {cell,rect:r}of LocalHeights96.grid(state().p,row.type)){if(click?d.z[0]>=r.x0&&d.z[0]<r.x1&&d.z[1]>=r.y0&&d.z[1]<r.y1:LocalHeights96.overlap(r,box)>1e-8){const k=LocalHeights96.token(cell);d.remove?map.delete(k):map.set(k,cell);}}draft=[...map.values()];host.refresh();}else host.repaint();}
+ function zoneLabel(ctx,z,x,y,w,h){
+  ctx.save();ctx.font='12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  const label=(z.local?z.local+' · ':'')+(z.sh==null?'净高／E&M 待填写':z.sh+' mm'),tw=ctx.measureText(label).width,bw=tw+8,bh=20,pad=4;
+  // Use the actual badge dimensions, preferring horizontal whenever it fits.
+  const rotation=w>=bw+pad&&h>=bh+pad?0:w>=bh+pad&&h>=bw+pad?-Math.PI/2:null;
+  if(rotation===null){ctx.restore();return null;}
+  const cx=x+w/2,cy=y+h/2;ctx.translate(cx,cy);ctx.rotate(rotation);ctx.fillStyle='rgba(255,255,255,.94)';ctx.fillRect(-bw/2,-bh/2,bw,bh);ctx.fillStyle='#254652';ctx.fillText(label,0,0);ctx.restore();
+  return {label,rotation,x:cx-(rotation?bh:bw)/2,y:cy-(rotation?bw:bh)/2,width:rotation?bh:bw,height:rotation?bw:bh,zone:{x,y,width:w,height:h}};
+ }
  function overlay(ctx,plot){
-  const s=state(),e=current();plot.structureZones=[];if(s.tab!=='floors'||s.mode!=='plan')return;
+  const s=state(),e=current();plot.structureZones=[];plot.structureZoneLabels=[];if(s.tab!=='floors'||s.mode!=='plan')return;
   ctx.save();
-  if(showZones){const zones=LocalHeights96.zones(s.p,s.floor,{includeUnassigned:true});plot.structureZones=zones;for(const z of zones){const r=z.rect,x=plot.ox+r.x0*plot.scale,y=plot.oy+r.y0*plot.scale,w=(r.x1-r.x0)*plot.scale,h=(r.y1-r.y0)*plot.scale;ctx.fillStyle=z.local?'rgba(235,171,36,.14)':'rgba(57,143,160,.07)';ctx.fillRect(x,y,w,h);ctx.strokeStyle=z.local?'#be8624':'#7397a4';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(x+2,y+2,w-4,h-4);if(w>44&&h>30){ctx.font='12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';const label=(z.local?z.local+' · ':'')+(z.sh==null?'净高／E&M 待填写':z.sh+' mm'),tw=ctx.measureText(label).width;ctx.fillStyle='rgba(255,255,255,.94)';ctx.fillRect(x+w/2-tw/2-4,y+h/2-10,tw+8,20);ctx.fillStyle='#254652';ctx.fillText(label,x+w/2,y+h/2);}}}
+  if(showZones){const zones=LocalHeights96.zones(s.p,s.floor,{includeUnassigned:true});plot.structureZones=zones;for(const z of zones){const r=z.rect,x=plot.ox+r.x0*plot.scale,y=plot.oy+r.y0*plot.scale,w=(r.x1-r.x0)*plot.scale,h=(r.y1-r.y0)*plot.scale;ctx.fillStyle=z.local?'rgba(235,171,36,.14)':'rgba(57,143,160,.07)';ctx.fillRect(x,y,w,h);ctx.strokeStyle=z.local?'#be8624':'#7397a4';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(x+2,y+2,w-4,h-4);const label=zoneLabel(ctx,z,x,y,w,h);if(label)plot.structureZoneLabels.push(label);}}
   if(e&&s.key===e.type&&s.floor===e.top&&foldOpen){ctx.strokeStyle='#16768d';ctx.fillStyle='rgba(22,118,141,.14)';ctx.lineWidth=2;ctx.setLineDash([6,4]);for(const r of LocalHeights96.rectangles(s.p,{...e,cells:draft||[]})){const x=plot.ox+r.x0*plot.scale,y=plot.oy+r.y0*plot.scale,w=(r.x1-r.x0)*plot.scale,h=(r.y1-r.y0)*plot.scale;ctx.fillRect(x,y,w,h);ctx.strokeRect(x+2,y+2,w-4,h-4);}if(drag){const x=plot.ox+Math.min(drag.a[0],drag.z[0])*plot.scale,y=plot.oy+Math.min(drag.a[1],drag.z[1])*plot.scale;ctx.strokeRect(x,y,Math.abs(drag.a[0]-drag.z[0])*plot.scale,Math.abs(drag.a[1]-drag.z[1])*plot.scale);}}
   ctx.restore();
  }

@@ -154,7 +154,7 @@
    html+='<div class="notice">墙明细就在图旁边。边界墙自动向内／楼板侧贴边，内部墙居中；无需选择贴边方向。端点坐标编辑后转为自由坐标。</div>';
   }else if(tab==='columns'){
    html='<h2>柱 · '+(t.mode==='manual'?'手动点选':'自动布置')+'</h2><div class="muted">点上方“绘图”，可点击交点或柱轴线上的位置放柱；自动模式同样可用。“选择 / 删除”模式点选构件，按 Delete 删除。</div><div class="row"><label class="field">输入模式<select id="colmode"><option value="manual" '+(t.mode==='manual'?'selected':'')+'>手动模式</option><option value="auto" '+(t.mode==='auto'?'selected':'')+'>自动模式</option></select></label><label class="field">默认 B mm '+input(df.cb,'default',0,'cb')+'</label><label class="field">默认 D mm '+input(df.cd,'default',0,'cd')+'</label></div>';
-   html+='<button data-action="reset-columns101">重新自动布柱</button>'+FloorColumns101.panel(p,result,key,floor,inspected||selected);
+   html+='<button data-action="reset-columns101">重新自动布柱</button>'+FloorColumns101.coordinateTable(p,result,key,floor,inspected||selected)+FloorColumns101.panel(p,result,key,floor,inspected||selected);
   }else if(tab==='beamLayout'){
    html=beamLayoutUI.render();
   }else if(tab==='beams'){

@@ -2,8 +2,14 @@
 const BeamLayout116=(()=>{
  const clone=x=>JSON.parse(JSON.stringify(x));
  function settings(p,key){const t=p.types[key];return {main:t.autoBeams101!==false,secondary:t.autoBeams101!==false,mainDirection:'XY',secondaryDirection:p.defaults.direction,gap:p.defaults.gap,scope:'all',...t.beamLayout116};}
+ // A region update owns only complete beam segments contained in its saved rectangles.
+ function inSecondaryAreas(beam,areas){
+  const a=beam.rawA||beam.a,z=beam.rawZ||beam.z,axis=Math.abs(z[0]-a[0])>=Math.abs(z[1]-a[1])?0:1,cross=1-axis,lo=Math.min(a[axis],z[axis]),hi=Math.max(a[axis],z[axis]),eps=1e-6;
+  const cuts=areas.flatMap(area=>area.rects).filter(r=>a[cross]>=r[cross?'y0':'x0']-eps&&a[cross]<=r[cross?'y1':'x1']+eps).map(r=>[Math.max(lo,r[axis?'y0':'x0']),Math.min(hi,r[axis?'y1':'x1'])]).filter(([l,h])=>h-l>eps).sort((x,y)=>x[0]-y[0]);
+  let end=lo;for(const [l,h]of cuts){if(l>end+eps)return false;end=Math.max(end,h);if(end>=hi-eps)return true;}return false;
+ }
  function candidate(p,key,step,values,rebuild=false){
-  const next=clone(p),t=next.types[key],cfg=settings(p,key);
+  const next=clone(p),t=next.types[key],cfg=settings(p,key),regional=step==='secondary'&&values.scope==='selected',before=regional?Engine.model(p,key):null;
   delete cfg.columnsOnly;
   if(t.autoBeamSnapshot){delete t.autoBeamSnapshot[step];if(!Object.keys(t.autoBeamSnapshot).length)delete t.autoBeamSnapshot;}
   if(step==='main')Object.assign(cfg,{main:true,mainDirection:values.mainDirection,shortSpanMain:true});
@@ -17,6 +23,14 @@ const BeamLayout116=(()=>{
    // Restore its parent signature as well as its newly generated segment signatures.
    if(step==='main'){const parents=new Map();for(const b of m.beams.filter(b=>b.source==='auto'&&b.splitMainParent)){const list=parents.get(b.splitMainParent)||[];list.push(b);parents.set(b.splitMainParent,list);}for(const parts of parents.values()){const points=parts.flatMap(b=>[b.rawA,b.rawZ]);restore.add(Engine.sig([Math.min(...points.map(a=>a[0])),Math.min(...points.map(a=>a[1]))],[Math.max(...points.map(a=>a[0])),Math.max(...points.map(a=>a[1]))]));}}
    t.suppressed=suppressed.filter(s=>!restore.has(s));
+  }
+  if(regional){
+   const secondary=b=>b.source==='auto'&&(b.kind==='SB'||b.secondaryCantilever101),areas=t.secondaryAreas,generated=Engine.model(next,key),outside=before.beams.filter(b=>secondary(b)&&!inSecondaryAreas(b,areas)),kept=before.beams.filter(b=>!secondary(b)||outside.includes(b)),used=new Set(kept.map(b=>b.id)),prior=new Map(before.beams.filter(secondary).map(b=>[Engine.sig(b.rawA,b.rawZ),b]));
+   const replacement=generated.beams.filter(secondary).filter(b=>inSecondaryAreas(b,areas)).map(b=>{
+    const old=prior.get(Engine.sig(b.rawA,b.rawZ));let id=old?.id||b.id,n=1;if(used.has(id)){const prefix=b.kind==='CB'?'CB':'SB';while(used.has(prefix+n))n++;id=prefix+n;}used.add(id);return {...b,id};
+   });
+   // Freeze the merged secondary layout; preserve the main snapshot and all manual beams.
+   const frozen=clone(next);Engine.freezeAutoBeams(frozen,key,{beams:[...outside,...replacement]});t.autoBeamSnapshot={...t.autoBeamSnapshot,secondary:frozen.types[key].autoBeamSnapshot.secondary};
   }
   Engine.validate(next);return {project:next,result:Engine.generate(next)};
  }

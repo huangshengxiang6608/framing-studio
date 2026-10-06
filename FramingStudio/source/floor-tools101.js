@@ -35,6 +35,18 @@ const FloorColumns101=(()=>{
   if(copied)p.types[targetKey]=trial.types[targetKey];
   return {copied,skipped,target,message:FloorLevels.name(p,target)+'：已複製 '+copied+' 支柱'+(skipped?'；'+skipped+' 支已存在／共用 Framing，略過':'')+'。'};
  }
+ function removeMany(p,result,key,f,hits){
+  if(!Array.isArray(hits)||!hits.length)throw Error('請先選取當層柱');
+  const model=Engine.floorModel(result,f,key),ids=new Set();
+  const columns=hits.map(hit=>{assertEditable(hit,f);if(hit.kind!=='COL')throw Error('只能刪除當層柱');const c=model.columns.find(c=>c.id===hit.id);if(!c)throw Error('所選柱已不存在');ids.add(c.id);return c;});
+  const keys=new Set(columns.map(Engine.columnPositionKey));
+  mutate(p,key,f,q=>{const t=q.types[key];Engine.freezeAutoBeams(q,key,Engine.model(q,key));
+   const auto=columns.filter(c=>t.mode==='auto'&&c.anchorX!==undefined),manual=new Set(columns.filter(c=>!auto.includes(c)).map(c=>c.id));
+   t.columns=t.columns.filter(c=>!manual.has(c.id));
+   t.suppressedColumns=[...(t.suppressedColumns||[]),...auto.filter((c,i)=>auto.findIndex(a=>a.anchorX===c.anchorX&&a.anchorY===c.anchorY)===i&&!(t.suppressedColumns||[]).some(a=>a.ax===c.anchorX&&a.ay===c.anchorY)).map(c=>({ax:c.anchorX,ay:c.anchorY}))];
+   for(const field of ['columnAxisPositions','columnPlacements'])if(t[field])t[field]=t[field].filter(v=>!keys.has(v.key));
+  });return ids.size;
+ }
  function snap(c){const r=Engine.columnRect(c);return [[r.x,r.y]];}
  function viewport(p){const xs=Object.keys(p.types).flatMap(k=>Engine.axes(p,'x',k).map(a=>a.v)),ys=Object.keys(p.types).flatMap(k=>Engine.axes(p,'y',k).map(a=>a.v));return {x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)};}
  document.addEventListener('change',e=>{const a=e.target,k=a.dataset.c101;if(!k)return;const box=a.closest('[data-column-floor]'),f=+box.dataset.columnFloor,id=box.dataset.columnId;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=box.dataset.columnFraming,c=Engine.floorModel(result,f,key).columns.find(c=>c.id===id);if(!c)throw Error('柱已不存在');const v=k==='position'?a.value:+a.value;if(k==='position')mutate(p,key,f,q=>Engine.setColumnPosition(q,key,Engine.columnPositionKey(c),v));else if(['b','d'].includes(k))mutate(p,key,f,q=>Engine.editSize(q,key,{kind:'COL',id},{b:k==='b'?v:c.b*1000,d:k==='d'?v:c.d*1000}));else{if(a.value.trim()===''||!Number.isFinite(v))throw Error('請填寫有效的柱中心座標');mutate(p,key,f,q=>{const r=Engine.columnRect(c),t=q.types[key],pk=Engine.columnPositionKey(c);t.columnPlacements=(t.columnPlacements||[]).filter(x=>x.key!==pk);t.columnPlacements.push({key:pk,x:k==='x'?v:r.x,y:k==='y'?v:r.y});});}});});
@@ -42,5 +54,5 @@ const FloorColumns101=(()=>{
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-copy]');if(!a||a.disabled)return;const box=a.closest('[data-column-floor]'),f=Number(box.dataset.columnFloor),step=Number(a.dataset.c101Copy),h=StudioHost.get();if(f!==h.floor||box.dataset.columnFraming!==h.key){h&&StudioHost.toast('請先選擇當層柱');return;}const hit={kind:'COL',id:box.dataset.columnId,f};let outcome;if(StudioHost.transact(()=>{const now=StudioHost.get();outcome=copyAdjacent(now.p,now.result,now.key,now.floor,hit,step);}))StudioHost.toast(outcome.message);});
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-delete]');if(!a)return;const b=a.closest('[data-column-floor]'),f=+b.dataset.columnFloor;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=b.dataset.columnFraming;mutate(p,key,f,q=>Engine.removeMember(q,key,{kind:'COL',id:b.dataset.columnId}));});});
  for(const name of ['editSize','removeMember','setTransferColumn']){const original=Engine[name];Engine[name]=function(p,key,hit,...args){if(hit.kind==='COL'&&hit.f){const f=hit.f,k=key||Engine.floors(p)[f-1]?.type;if(!k)throw Error('柱楼层不存在');return mutate(p,k,f,q=>original(q,k,{...hit,f:undefined},...args));}return original(p,key,hit,...args);};}
- return {record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,snap,viewport,isReference,assertEditable};
+ return {record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
 })();

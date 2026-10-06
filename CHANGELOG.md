@@ -1,5 +1,11 @@
 # 版本记录
 
+## E2.142 Preview - 2026-10-06
+
+- Combine TB and CB into the MB tab. MB selection and batch deletion include MB, TB and CB; SB and Slab remain separate.
+- Keep three tabs and clear selections when switching tabs. Keyboard and inspector deletion respect the active tab.
+- Tab-scope and member-multiselect regression tests passed. Section A/B reports and the existing EXE are unchanged; no Windows package generated as requested.
+
 ## E2.141 預覽 — 2026-10-06
 
 - MB／SB／Slab 分頁只選取及刪除自己的構件類型；新增 TB／CB 分頁，維持獨立多選及刪除。

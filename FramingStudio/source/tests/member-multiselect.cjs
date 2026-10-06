@@ -23,7 +23,7 @@ await selectAll();await page.locator('input[data-action=default]').first().press
 
 for(const kind of ['MB','SB','TB','CB']){
  const p=structuredClone(base);p.types.F1.walls=[];p.types.F1.beams[0].kind=kind;p.types.F1.beams[1].kind=kind;
- await load(p);await page.locator('#bl116-tab-'+({MB:'main',SB:'secondary',TB:'transfer',CB:'cantilever'}[kind])).click();assert.equal(await page.locator('.member-selection').count(),0,'no beam selection panel');assert.equal(await page.locator('#member-selection-filter').count(),0);before=await state();const m=await model();assert.equal(m.beams.length,4);
+ await load(p);await page.locator('#bl116-tab-'+({MB:'main',SB:'secondary',TB:'main',CB:'main'}[kind])).click();assert.equal(await page.locator('.member-selection').count(),0,'no beam selection panel');assert.equal(await page.locator('#member-selection-filter').count(),0);before=await state();const m=await model();assert.equal(m.beams.length,4);
  for(const other of ['MB','SB','TB','CB'])await page.locator('[data-kind='+other+']').setChecked(other===kind);await hitClick('B1',kind);await count(1);await hitClick('B2',kind);await count(2);await hitClick('B1',kind);await click(3,2);await count(2);
  await page.locator('#canvas').press('Delete');assert.deepEqual((await model()).beams.map(b=>b.id).sort(),['B3','B4']);await page.locator('#undo').click();assert.equal(await state(),before,'single undo '+kind);
  // Forward/reverse boxes add; hidden members are excluded.

@@ -16,13 +16,13 @@ const FloorColumns101=(()=>{
   const source=Engine.floorModel(result,f,key).columns.find(c=>c.id===hit.id);if(!source)throw Error('柱已不存在');
   const targetKey=fs[target-1].type,label=FloorLevels.name(p,target);
   if(targetKey===key)return {copied:false,message:label+' 與當層共用 '+key+'，此柱已共用，無須重複複製。'};
-  const m=Engine.floorModel(result,target,targetKey),r=Engine.columnRect(source),t=p.types[targetKey];
+  const m=Engine.floorModel(result,target,targetKey),r=Engine.columnRect(source),ref=Engine.columnReference(p,key,source),position=source.axisPosition||'',t=p.types[targetKey];
   const identical=m.columns.find(c=>{const q=Engine.columnRect(c);return ['x','y','w','d'].every(k=>Math.abs(q[k]-r[k])<1e-7);});
   if(identical)return {copied:false,message:label+' 已有相同座標及尺寸的柱 '+identical.id+'，未重複新增。'};
   if(!Engine.rectAllowed(m.ts,r.x,r.y,r.w,r.d,true)||Engine.noColumn(t,r.x,r.y))throw Error('目標層此位置不允許放柱');
   if(m.columns.some(c=>Engine.overlap(r,Engine.columnRect(c)))||m.walls.some(w=>Engine.overlap(r,Engine.rect(w))))throw Error('目標層此位置與現有柱或牆重疊，未複製');
   const used=new Set([...t.columns,...m.columns].map(c=>c.id));let id=source.id,n=1;while(used.has(id))id='C'+n++;
-  mutate(p,targetKey,target,q=>{const to=q.types[targetKey];Engine.freezeAutoBeams(q,targetKey,Engine.model(q,targetKey));to.columns.push({id,x:r.x,y:r.y,b:source.b*1000,d:source.d*1000,status:source.status,on:true,...(to.mode==='auto'?{autoAdded:true}:{})});to.columnPlacements=(to.columnPlacements||[]).filter(v=>v.key!=='id:'+id);to.columnPlacements.push({key:'id:'+id,x:r.x,y:r.y});const built=Engine.model(q,targetKey).columns.find(c=>c.id===id);if(!built||['x','y','w','d'].some(k=>Math.abs(Engine.columnRect(built)[k]-r[k])>1e-7))throw Error('未能保留柱的中心座標及尺寸，已取消複製');});
+  mutate(p,targetKey,target,q=>{const to=q.types[targetKey];Engine.freezeAutoBeams(q,targetKey,Engine.model(q,targetKey));to.columns.push({id,x:ref[0],y:ref[1],b:source.b*1000,d:source.d*1000,status:source.status,on:true,...(to.mode==='auto'?{autoAdded:true}:{})});to.columnAxisPositions=(to.columnAxisPositions||[]).filter(v=>v.key!=='id:'+id);if(position)to.columnAxisPositions.push({key:'id:'+id,position});to.columnPlacements=(to.columnPlacements||[]).filter(v=>v.key!=='id:'+id);const offset=Engine.columnDirections[position];if(!offset||Math.abs(ref[0]+offset[0]*source.b/2-r.x)>1e-7||Math.abs(ref[1]+offset[1]*source.d/2-r.y)>1e-7)to.columnPlacements.push({key:'id:'+id,x:r.x,y:r.y});const built=Engine.model(q,targetKey).columns.find(c=>c.id===id);if(!built||['x','y','w','d'].some(k=>Math.abs(Engine.columnRect(built)[k]-r[k])>1e-7))throw Error('未能保留柱的中心座標及尺寸，已取消複製');});
   return {copied:true,id,target,message:'已複製至 '+label+' · '+id+'（'+targetKey+' 共用），可撤銷。'};
  }
  function copyManyAdjacent(p,result,key,f,hits,step){

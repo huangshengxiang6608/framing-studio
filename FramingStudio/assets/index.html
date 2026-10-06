@@ -4495,7 +4495,18 @@ const BeamRebar116=(()=>{
  });
  $('nav').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;beamLayoutUI?.reset();sbAreaDrawing=false;zoneDrag=null;tab=b.dataset.tab;if(tab==='beamLayout')selectOnly=true;if(tab==='deflection')DeflectionUI.enter(StudioHost);if(tab==='elevation'){mode='plan';panX=panY=0;zoom=1;}if(tab==='regions'&&layer==='sbArea'){layer='building';erase=false;}if(['regions','walls','columns','beams','beamLayout','loading','checks','review'].includes(tab))mode='plan';start=selected=null;refresh();});
  $('type').onchange=e=>setType(e.target.value);
- $('copytype').onclick=()=>{const k=prompt('复制到新 Framing 类型（例如 F06）','F'+String(Object.keys(p.types).length+1).padStart(2,'0'));if(!k)return;if(transact(()=>{if(p.types[k])throw Error('类型已存在，请输入新名称');p.types[k]=Engine.clone(p.types[key]);p.types[k].axes=Engine.clone(Engine.axisData(p,key));}))setType(k);};
+ const copyTypeDialog=document.createElement('dialog');copyTypeDialog.id='copy-type-dialog';copyTypeDialog.setAttribute('aria-labelledby','copy-type-title');copyTypeDialog.style.cssText='width:min(440px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto';
+ copyTypeDialog.innerHTML='<form id="copy-type-form" novalidate><h2 id="copy-type-title">複製 Framing 類型</h2><p>來源：<strong id="copy-type-source"></strong></p><label class="field" for="copy-type-name">新類型名稱<input id="copy-type-name" type="text" maxlength="21" autocomplete="off" spellcheck="false" aria-describedby="copy-type-help copy-type-error" style="width:100%"></label><p id="copy-type-help" class="muted">以 F 開頭，例如 F02。複製後可在「02 樓層」指定使用此類型。</p><p id="copy-type-error" role="alert" style="color:#b42318;min-height:1.4em"></p><div class="row"><button type="button" id="copy-type-cancel">取消</button><button type="submit" class="primary">確認複製</button></div></form>';document.body.append(copyTypeDialog);
+ let copyTypeSource=null;
+ $('copytype').onclick=()=>{copyTypeSource=key;let n=1;while(Object.hasOwn(p.types,'F'+String(n).padStart(2,'0')))n++;$('copy-type-source').textContent=key;$('copy-type-name').value='F'+String(n).padStart(2,'0');$('copy-type-error').textContent='';if(!copyTypeDialog.open)copyTypeDialog.showModal();$('copy-type-name').focus();$('copy-type-name').select();};
+ $('copy-type-cancel').onclick=()=>copyTypeDialog.close();copyTypeDialog.addEventListener('close',()=>{copyTypeSource=null;});$('copy-type-name').oninput=()=>{$('copy-type-error').textContent='';};
+ $('copy-type-form').onsubmit=e=>{e.preventDefault();const k=$('copy-type-name').value.trim(),source=copyTypeSource,fail=s=>{$('copy-type-error').textContent=s;$('copy-type-name').focus();};
+  if(!/^F[0-9A-Za-z_-]{1,20}$/.test(k)){fail('請輸入以 F 開頭的名稱，後接 1–20 個英文字母、數字、底線或連字號。');return;}
+  if(Object.hasOwn(p.types,k)){fail('此類型名稱已存在，請輸入其他名稱。');return;}
+  if(Object.keys(p.types).length>=30){fail('最多可有 30 個 Framing 類型。');return;}
+  if(!Object.hasOwn(p.types,source)){fail('來源類型已不存在，請重新選取。');return;}
+  if(transact(()=>{p.types[k]=Engine.clone(p.types[source]);p.types[k].axes=Engine.clone(Engine.axisData(p,source));},err=>fail(err.message))){copyTypeDialog.close();if(calculationView())tab='axes';setType(k);toast('已將 '+source+' 複製為 '+k+'；可在「02 樓層」指定使用，可撤銷。');}
+ };
  $('deletetype').onclick=()=>{
   const removed=key;
   try{Engine.removeType(Engine.clone(p),removed);}catch(e){toast(e.message);if(p.groups.some(g=>g.type===removed)&&Object.keys(p.types).length>1){tab='floors';refresh();}return;}

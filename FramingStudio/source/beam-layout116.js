@@ -58,7 +58,7 @@ function BeamLayoutUI116(host){
  try{Object.assign(folds,JSON.parse(localStorage.getItem('beam-layout-folds116')||'{}'));}catch{}
  function sync(){const h=host.get(),id=h.key+'|'+JSON.stringify(h.p.types[h.key]);if(context!==id){context=id;selection=[];gesture=null;}if(draft&&(draft.key!==h.key||draft.base!==JSON.stringify(h.p)))draft=null;return h;}
  function panels(){const h=host.get();return Engine.floorModel(h.result,h.floor,h.key).slabs;}
- function selectedSlabs(){return panels().filter(s=>selection.includes(Loading.token('SLAB',s)));}
+ function selectedSlabs(){if(host.selectedMembers){const ids=new Set(host.selectedMembers().filter(h=>h.kind==='SLAB').map(h=>h.slabId));return panels().filter(s=>ids.has(s.id));}return panels().filter(s=>selection.includes(Loading.token('SLAB',s)));}
  function selectControl(id,label,value,choices){return '<label class="field">'+label+'<select id="'+id+'" data-input-state="default">'+choices.map(([v,s])=>'<option value="'+v+'" '+(v===value?'selected':'')+'>'+s+'</option>').join('')+'</select></label>';}
  const btn=(text,action,extra='')=>'<button type="button" data-bl116="'+action+'" '+extra+'>'+text+'</button>';
  function fold(step,title,content){return '<section class="beam-layout-panel116" id="bl116-panel-'+step+'" role="tabpanel" aria-labelledby="bl116-tab-'+step+'" '+(activeTab===step?'':'hidden')+'><h3>'+title.replace(/^[①②③]\s*/,'')+'</h3><div class="beam-layout-body116">'+content+'</div></section>';}
@@ -68,6 +68,7 @@ function BeamLayoutUI116(host){
   const h=sync(),cfg=BeamLayout116.settings(h.p,h.key),m=Engine.floorModel(h.result,h.floor,h.key),chosen=selectedSlabs(),preview=step=>draft?.step===step?'<p role="status">预览 '+draft.count+' 根自动'+(step==='main'?'主梁':'次梁')+'；虚线显示候选布置。</p><div class="row">'+btn('应用布置','apply')+btn('取消','cancel')+'</div>':'';
   let html='<section class="beam-layout116"><div class="beam-layout-header128"><h2>梁布置</h2>'+btn('重新布置','reset','title="清空梁及板布置，保留柱和牆"')+'</div><p class="muted">应用到 '+esc(h.key)+' 的所有楼层</p>';
   html+='<div class="beam-layout-tabs116" role="tablist" aria-label="梁與板布置">'+[['main','MB'],['secondary','SB'],['slab','Slab']].map(([step,label])=>'<button type="button" id="bl116-tab-'+step+'" role="tab" data-bl-tab="'+step+'" aria-controls="bl116-panel-'+step+'" aria-selected="'+(activeTab===step)+'" tabindex="'+(activeTab===step?'0':'-1')+'">'+label+'</button>').join('')+'</div>';
+  html+=host.selectionPanel?.()||'';
   html+=fold('main','① 自动画主梁 MB',selectControl('bl116-main-direction','布置方向',cfg.mainDirection,[['XY','X + Y 向'],['X','X 向'],['Y','Y 向']])+'<div class="row">'+btn('自动画主梁','main')+'</div>'+preview('main'));
   html+=fold('secondary','② 自动画次梁 SB','<div class="row">'+selectControl('bl116-secondary-direction','布置方向',cfg.secondaryDirection,[['自动','自动'],['X','X 向'],['Y','Y 向']])+'<label class="field">最大间距 m<input id="bl116-gap" type="number" min="0.1" max="20" step="0.1" value="'+cfg.gap/1000+'" data-input-state="default"></label></div>'+selectControl('bl116-scope','布置区域',cfg.scope,[['all','全部区域'],['selected','已儲存的 SB 分區']])+'<div class="row">'+'<button type="button" id="bl116-draw-region" data-action="draw-sb-area">框選 SB 區域</button>'+btn('預覽次梁','secondary')+'</div>'+preview('secondary')+'<details class="beam-layout-zones116" '+(cfg.scope==='selected'?'open':'')+'><summary>次梁分区 · '+(h.p.types[h.key].secondaryAreas?.length||0)+' 个</summary>'+host.zones()+'</details>');
   html+=fold('slab','③ 板受力方向','<p>单向板默认沿短跨；点击单块或拖框多选后修改方向。</p><label class="beam-layout-check116"><input id="bl116-show-directions" type="checkbox" '+(host.showDirections()?'checked':'')+'> 显示方向</label><p id="bl116-selection" role="status">'+(chosen.length===1?esc(chosen[0].id):chosen.length?'已选 '+chosen.length+' 块板':'未选择板块')+'</p><div class="row">'+['X','Y'].map(d=>btn('单向 '+d+(d==='X'?' ↔':' ↕'),'way-'+d,(!chosen.length?'disabled ':'')+'aria-pressed="'+(chosen.length>0&&chosen.every(s=>Loading.slabDirection(h.p,h.floor,Loading.token('SLAB',s),s,m)===d))+'"')).join('')+'</div>');
@@ -102,12 +103,12 @@ function BeamLayoutUI116(host){
  function overlay(ctx,plot){
   const h=sync(),m=Engine.floorModel(h.result,h.floor,h.key),xy=(x,y)=>[plot.ox+x*plot.scale,plot.oy+y*plot.scale];ctx.save();
   if(draft){ctx.strokeStyle='#16899d';ctx.lineWidth=2.5;ctx.setLineDash([7,4]);for(const b of Engine.floorModel(draft.result,h.floor,h.key).beams.filter(b=>b.source==='auto'&&(draft.step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101))){ctx.beginPath();ctx.moveTo(...xy(...b.a));ctx.lineTo(...xy(...b.z));ctx.stroke();}ctx.setLineDash([]);}
-  for(const s of m.slabs){if(selection.includes(Loading.token('SLAB',s))){ctx.fillStyle='rgba(0,130,210,.20)';ctx.strokeStyle='#0082d2';ctx.lineWidth=2;for(const r of s.rects){const a=xy(r.x0,r.y0),w=(r.x1-r.x0)*plot.scale,h=(r.y1-r.y0)*plot.scale;ctx.fillRect(...a,w,h);ctx.strokeRect(...a,w,h);}}
+  for(const s of m.slabs){if(!host.selectedMembers&&selection.includes(Loading.token('SLAB',s))){ctx.fillStyle='rgba(0,130,210,.20)';ctx.strokeStyle='#0082d2';ctx.lineWidth=2;for(const r of s.rects){const a=xy(r.x0,r.y0),w=(r.x1-r.x0)*plot.scale,h=(r.y1-r.y0)*plot.scale;ctx.fillRect(...a,w,h);ctx.strokeRect(...a,w,h);}}
   }
   plot.slabDirections=host.showDirections()?BeamLayout116.drawDirections(h.p,m,h.floor,ctx,plot):[];
   if(gesture){ctx.strokeStyle='#0082d2';ctx.fillStyle='rgba(0,130,210,.12)';ctx.setLineDash([5,3]);const a=xy(...gesture.from),b=xy(...gesture.to);ctx.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);ctx.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);}ctx.restore();
  }
  function reset(){draft=null;selection=[];gesture=null;context='';form=null;}
  const clone=BeamLayout116Clone=>JSON.parse(JSON.stringify(BeamLayout116Clone));
- return {render,restore,overlay,begin,move,finish,reset};
+ return {render,restore,overlay,begin,move,finish,reset,remember,isSlabTab:()=>activeTab==='slab'};
 }

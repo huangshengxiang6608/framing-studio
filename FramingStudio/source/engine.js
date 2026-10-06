@@ -442,6 +442,23 @@ const Engine=(()=>{
   if(!row){let n=1;while(t.beams.some(b=>b.id==='EDIT_'+n))n++;const signature=sig(b.rawA,b.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);row={id:'EDIT_'+n,kind:b.kind,a:{x:b.rawA[0],y:b.rawA[1]},z:{x:b.rawZ[0],y:b.rawZ[1]},on:true,original:signature};t.beams.push(row);}
   if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;row.widthMode=nextKind==="MB"&&size.b===null?"column":"manual";row.kind=nextKind;row.b=size.b??p.defaults[nextKind==='SB'?'sb':nextKind==='TB'?'tb':'mb'];row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;return {id:row.id,kind:row.kind,rawA:b.rawA,rawZ:b.rawZ};
  }
+ // Resolve every target before mutation: generated member IDs may change after deletion.
+ function removeMembers(p,key,hits,f){
+  const t=p.types[key];if(!t)throw Error('Framing 不存在');
+  if(!Array.isArray(hits)||!hits.length)return 0;
+  const m=f?floorModel(generate(p),f,key):model(p,key),unique=new Map();
+  for(const hit of hits){
+   if(!hit||hit.f!==undefined&&hit.f!==f)throw Error('只可刪除當層構件');
+   const kind=hit.kind,id=kind==='SLAB'?hit.slabId:hit.id,list=kind==='SLAB'?m.slabs:kind==='WALL'?m.walls:['MB','SB','TB','CB'].includes(kind)?m.beams:null;
+   const target=list?.find(x=>x.id===id&&(kind==='SLAB'||x.kind===kind));if(!target)throw Error('所選構件已不存在：'+(id||kind));
+   unique.set(kind+':'+id,{kind,target});
+  }
+  const targets=[...unique.values()];
+  if(targets.some(h=>h.kind!=='SLAB'))freezeAutoBeams(p,key,m);
+  const manual=new Set(),walls=new Set(),signatures=new Set(t.suppressed||[]),voids=[];
+  for(const {kind,target}of targets){if(kind==='SLAB')voids.push(...clone(target.rects));else if(kind==='WALL')walls.add(target.id);else{if(target.source==='manual')manual.add(kind+':'+target.id);signatures.add(sig(target.rawA,target.rawZ));}}
+  t.beams=t.beams.filter(b=>!manual.has(b.kind+':'+b.id));t.walls=t.walls.filter(w=>!walls.has(w.id));t.suppressed=[...signatures];if(voids.length)t.slabVoids=[...(t.slabVoids||[]),...voids];return targets.length;
+ }
  function removeMember(p,key,hit){
   if(['MB','SB','TB','CB'].includes(hit.kind)){removeBeam(p,key,hit.id,hit.kind,hit.f);return;}
   const t=p.types[key];if(!t)throw Error('Framing 类型不存在');const m=hit.f?floorModel(generate(p),hit.f,key):model(p,key);
@@ -458,6 +475,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {beamSpaceConflict,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,editSize};
+ return {beamSpaceConflict,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

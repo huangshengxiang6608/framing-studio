@@ -39,7 +39,7 @@ const LocalHeights96=(()=>{
  function clearance(p,e){
   const f=Engine.floors(p)[e.top-1];if(!f)throw Error('局部条目当前楼层不存在');
   const headroom=e.headroom??f.headroom??Math.max(0,f.h-f.sh/1000),em=e.em??f.em??0,h=height(p,e);
-  try{return {h,headroom,em,sh:Engine.structuralHeight({h,headroom,em})};}catch(error){return {h,headroom,em,sh:null,error:error.message};}
+  try{return {h,headroom,em,sh:Engine.structuralHeight({h,headroom,em},30000)};}catch(error){return {h,headroom,em,sh:null,error:error.message};}
  }
  function syncGroups(p){
   let start=1;const groups=p.groups.map(g=>{const end=g.end==='顶层'?p.total:g.end,row={start,end,type:g.type};start=end+1;return row;});

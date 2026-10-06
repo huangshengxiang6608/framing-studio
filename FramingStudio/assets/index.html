@@ -881,7 +881,7 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,editSize};
+ return {freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;
 /* studio-source:engine.js:end */
@@ -3489,7 +3489,7 @@ const FloorColumns101=(()=>{
  function view(p,key,f){const t=p.types[key];return {...p,defaults:{...p.defaults,...t.columnDefaults101}};}
  function mutate(p,key,f,fn){record(p,key,f);const q=view(p,key,f),t={...p.types[key]};for(const k of fields)t[k]=Engine.clone(t[k]??(k==='mode'?'manual':[]));q.types={...p.types,[key]:t};if(p.types[key].autoBeamSnapshot===undefined)delete t.autoBeamSnapshot;const out=fn(q);Engine.validate(q);for(const k of fields){if(k==='autoBeamSnapshot'&&t[k]===undefined)delete p.types[key][k];else p.types[key][k]=Engine.clone(t[k]??[]);}return out;}
  function defaults(p,key,f,k,v){if(!['cb','cd'].includes(k)||!Number.isFinite(v)||v<1||v>20000)throw Error('默认柱尺寸须为 1–20000 mm');record(p,key,f).columnDefaults101[k]=v;}
- function mode(p,key,f,value){if(value==='auto'){mutate(p,key,f,q=>{const t=q.types[key];t.mode='auto';for(const k of fields.filter(k=>!['mode','autoBeamSnapshot'].includes(k)))t[k]=[];});p.types[key].autoBeams101=false;}else mutate(p,key,f,q=>Engine.setColumnMode(q,key,value));}
+ function mode(p,key,f,value){const before=Engine.model(p,key);if(value==='auto'){mutate(p,key,f,q=>{Engine.freezeAutoBeams(q,key,before);const t=q.types[key];t.mode='auto';for(const k of fields.filter(k=>!['mode','autoBeamSnapshot'].includes(k)))t[k]=[];});p.types[key].autoBeams101=false;}else mutate(p,key,f,q=>{Engine.freezeAutoBeams(q,key,before);Engine.setColumnMode(q,key,value);});}
  function models(){return {};}
  const isReference=(hit,f)=>hit?.kind==='COL'&&hit.f!=null&&hit.f!==f;
  function assertEditable(hit,f){if(isReference(hit,f))throw Error('非當層的柱只供參考，請切換至所屬樓層修改。');}

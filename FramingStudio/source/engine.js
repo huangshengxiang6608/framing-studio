@@ -418,6 +418,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,editSize};
+ return {freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

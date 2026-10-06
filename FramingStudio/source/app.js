@@ -310,6 +310,7 @@
   const isBeam=['MB','SB','TB','CB'].includes(hit.kind);$('memberkindwrap').hidden=!isBeam;if(isBeam)$('memberkind').value=hit.kind;$('sizeapply').textContent=isBeam?'应用类型及尺寸':'应用尺寸';$('membereditnote').textContent=isBeam?'自动梁修改后转为手动梁；尺寸留空采用所选类型默认值。同一 Framing 共用修改，可撤销。加宽靠边梁时，截面可自动向板内贴边；参考线及长度保留。选择 CB 后，在 Member Check 确认固定端和 cover。':'尺寸留空恢复默认；同一 Framing 共用此修改。';
   $('membercheck').hidden=hit.kind==='WALL';$('membertitle').textContent=data.title;$('memberbody').innerHTML='<dl>'+data.rows.map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+esc(b)+'</dd>').join('')+'</dl><p>'+esc(data.note)+'</p>';
   $('membertransferwrap').hidden=hit.kind!=='COL';$('membertransfer').checked=false;if(hit.kind==='COL'){const c=Engine.floorModel(result,hit.f??floor,targetKey).columns.find(c=>c.id===hit.id);$('membertransfer').checked=!!c?.transferManual;}
+  const reference=FloorColumns101.isReference(hit,floor);for(const id of ['memberb','memberd','memberkind','membertransfer'])$(id).disabled=reference;$('sizeapply').hidden=reference;$('memberdelete').hidden=reference;if(reference){$('membertransferwrap').hidden=true;$('membercheck').hidden=true;$('membereditnote').textContent='非當層的柱只供參考，請切換至 '+FloorLevels.name(p,hit.f)+' 修改。';}
   memberEditor.baseline=memberDraft();memberStatus('');
   const box=$('memberinfo');box.hidden=false;box.style.left='8px';box.style.top='8px';
   MemberPopup87.place(box,$('canvas'),plot,Engine.floorModel(result,floor,key),hit);
@@ -317,6 +318,7 @@
  $('memberclose').onclick=hideInfo;MemberPopup87.bind($('memberinfo'));
  function deleteSelection(){
   const hit=inspected||selected;if(hit?.kind==='ZONE'){if(!['regions','columns'].includes(tab))return false;if(transact(()=>p.types[key].noColumnZones.splice(hit.index,1))){selected=inspected=null;refresh();toast('已删除所选禁柱区，可撤销');}return true;}if(!hit||!['MB','SB','TB','CB','SLAB','COL','WALL'].includes(hit.kind))return false;
+  if(FloorColumns101.isReference(hit,floor)){toast('非當層的柱只供參考，不能在目前樓層刪除。');return true;}
   const targetKey=hit.f?result.floors[hit.f-1].type:key;
   if(transact(()=>Engine.removeMember(p,targetKey,{...hit,f:hit.f??floor}))){start=selected=null;refresh();toast('已删除 '+targetKey+' 中所选构件，可撤销');}return true;
  }
@@ -327,6 +329,7 @@
  function moveBeamInputs(oldBeam,edited,targetKey){if(oldBeam&&edited&&oldBeam.kind!==edited.kind){const oldToken=Loading.token(oldBeam.kind,oldBeam),newToken=Loading.token(edited.kind,edited);for(const f of result.floors.filter(f=>f.type===targetKey))for(const name of ['members','selected','reportA','reportB']){const map=p.explorer?.[name],a=f.n+'|'+oldToken,b=f.n+'|'+newToken;if(map&&Object.hasOwn(map,a)){if(Object.hasOwn(map,b)&&JSON.stringify(map[b])!==JSON.stringify(map[a]))throw Error('目标类型已有独立输入，请先检查构件 Loading / Check');map[b]=map[a];delete map[a];}}}}
  function applyMemberEdit(){
   const editor=memberEditor;if(!editor){memberStatus('请重新右键选择要修改的构件。',true);return false;}
+  if(FloorColumns101.isReference(editor.hit,floor)){memberStatus('非當層的柱只供參考，請切換至所屬樓層修改。',true);return false;}
   const {hit,targetKey,position}=editor,isBeam=['MB','SB','TB','CB'].includes(hit.kind),draft=memberDraft();
   const size={b:draft.b.trim()===''?null:Number(draft.b),d:$('memberdwrap').hidden||draft.d.trim()===''?null:Number(draft.d),...(isBeam?{kind:draft.kind}:{})};
   let edited,failure;

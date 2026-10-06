@@ -1,5 +1,10 @@
 # 版本记录
 
+## E2.142 Windows - 2026-10-06
+
+- Package the verified E2.142 preview as the Windows app, including combined MB/TB/CB selection and independent SB/Slab selection.
+- Section A/B reports, workbook templates and Excel bridge are unchanged.
+
 ## E2.142 Preview - 2026-10-06
 
 - Combine TB and CB into the MB tab. MB selection and batch deletion include MB, TB and CB; SB and Slab remain separate.

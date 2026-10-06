@@ -207,7 +207,7 @@ const Engine=(()=>{
   }
   for(const b of beams)if(b.kind==='SB'&&b.displayKind==='CB')b.d=sh;
   const slabVoids=(t.slabVoids||[]).flatMap(r=>ts.filter(t=>t.state===1).map(t=>({x0:Math.max(t.x0,r.x0),x1:Math.min(t.x1,r.x1),y0:Math.max(t.y0,r.y0),y1:Math.min(t.y1,r.y1)})).filter(r=>r.x1>r.x0&&r.y1>r.y0));
-  const columnsOnly=layout?.columnsOnly===true&&!beams.length&&!walls.length;
+  const columnsOnly=layout?.columnsOnly===true&&!beams.length;
   const slabs=columnsOnly?[]:slabPanels(ts,beams,walls,slabVoids,columns);if(slabs===null)issue('SLAB','板块分隔过于复杂，未显示板块信息；请减少自由坐标分段');
   for(const s of slabs||[]){const zone=(t.secondaryAreas||[]).find(a=>a.cantilever101&&a.rects.some(r=>s.x0>=r.x0-eps&&s.x1<=r.x1+eps&&s.y0>=r.y0-eps&&s.y1<=r.y1+eps));if(zone)s.direction101=zone.direction==='X'?'Y':'X';}for(const s of slabs||[]){s.thickness=t.slabSizes?.find(o=>o.signature===slabSignature(s))?.value??t.slabSizes?.find(o=>s.legacySignatures120.includes(o.signature))?.value??df.slab;if(t.slabDirections116&&typeof Loading!=='undefined')s.direction116=slabGeometry.record(t.slabDirections116,s);if(layout)s.shortSpan116=true;}
   const uncovered=(slabs||[]).flatMap(s=>s.rects).reduce((sum,t)=>{let coveredArea=0;for(const [a,b,c,d]of panels)coveredArea+=Math.max(0,Math.min(b,t.x1)-Math.max(a,t.x0))*Math.max(0,Math.min(d,t.y1)-Math.max(c,t.y0));return sum+Math.max(0,(t.x1-t.x0)*(t.y1-t.y0)-coveredArea);},0);

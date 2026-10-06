@@ -19,18 +19,18 @@ const BeamLayout116=(()=>{
  }
  function clear(p,key,values){
   const t=p.types[key],before=Engine.model(p,key).columns,cfg={...settings(p,key),...values};
-  // Keep the actual columns when removing walls, which otherwise changes auto placement.
+  // Keep physical columns fixed while clearing the beam layout; walls are retained.
   Engine.setColumnMode(p,key,'manual');
   delete t.autoBeamSnapshot;
   for(const c of t.columns)if(!before.some(b=>b.id===c.id))c.on=false;
-  Object.assign(t,{autoBeams101:false,beamLayout116:{...cfg,main:false,secondary:false,columnsOnly:true,scope:'all'},beams:[],walls:[],suppressed:[],secondaryAreas:[],slabVoids:[],slabSizes:[],slabDirections116:{},beamWidths83:{}});
+  Object.assign(t,{autoBeams101:false,beamLayout116:{...cfg,main:false,secondary:false,columnsOnly:true,scope:'all'},beams:[],suppressed:[],secondaryAreas:[],slabVoids:[],slabSizes:[],slabDirections116:{},beamWidths83:{}});
   const after=Engine.model(p,key).columns,remap=new Map();
   for(const c of before){const n=after.find(n=>n.id===c.id),a=Engine.columnRect(c),b=n&&Engine.columnRect(n);if(!n||['x','y','w','d'].some(k=>Math.abs(a[k]-b[k])>1e-6))throw Error('柱位置未能完整保留，已取消重新布置');remap.set(Loading.token('COL',c),Loading.token('COL',n));}
   for(const f of Engine.floors(p).filter(f=>f.type===key)){
    const prefix=f.n+'|';
    for(const name of ['members','selected','reportA','reportB']){
     const records=p.explorer?.[name];if(!records)continue;const keep={};
-    for(const [id,value]of Object.entries(records)){if(!id.startsWith(prefix))continue;const token=id.slice(prefix.length);if(token.startsWith('COL|'))keep[prefix+(remap.get(token)||token)]=value;delete records[id];}
+    for(const [id,value]of Object.entries(records)){if(!id.startsWith(prefix))continue;const token=id.slice(prefix.length);if(token.startsWith('COL|')||token.startsWith('WALL|'))keep[prefix+(remap.get(token)||token)]=value;delete records[id];}
     Object.assign(records,keep);
    }
    if(p.foundation?.column?.startsWith(prefix)){const token=p.foundation.column.slice(prefix.length);if(remap.has(token))p.foundation.column=prefix+remap.get(token);}
@@ -66,7 +66,7 @@ function BeamLayoutUI116(host){
  function render(){
   for(const el of document.querySelectorAll('[data-bl-fold]'))folds[el.dataset.blFold]=el.open;
   const h=sync(),cfg=BeamLayout116.settings(h.p,h.key),m=Engine.floorModel(h.result,h.floor,h.key),chosen=selectedSlabs(),preview=step=>draft?.step===step?'<p role="status">预览 '+draft.count+' 根自动'+(step==='main'?'主梁':'次梁')+'；虚线显示候选布置。</p><div class="row">'+btn('应用布置','apply')+btn('取消','cancel')+'</div>':'';
-  let html='<section class="beam-layout116"><div class="beam-layout-header128"><h2>梁布置</h2>'+btn('重新布置','reset','title="清空梁、墙和板，仅保留柱子"')+'</div><p class="muted">应用到 '+esc(h.key)+' 的所有楼层</p>';
+  let html='<section class="beam-layout116"><div class="beam-layout-header128"><h2>梁布置</h2>'+btn('重新布置','reset','title="清空梁及板布置，保留柱和牆"')+'</div><p class="muted">应用到 '+esc(h.key)+' 的所有楼层</p>';
   html+='<div class="beam-layout-tabs116" role="tablist" aria-label="梁與板布置">'+[['main','MB'],['secondary','SB'],['slab','Slab']].map(([step,label])=>'<button type="button" id="bl116-tab-'+step+'" role="tab" data-bl-tab="'+step+'" aria-controls="bl116-panel-'+step+'" aria-selected="'+(activeTab===step)+'" tabindex="'+(activeTab===step?'0':'-1')+'">'+label+'</button>').join('')+'</div>';
   html+=fold('main','① 自动画主梁 MB',selectControl('bl116-main-direction','布置方向',cfg.mainDirection,[['XY','X + Y 向'],['X','X 向'],['Y','Y 向']])+'<div class="row">'+btn('自动画主梁','main')+'</div>'+preview('main'));
   html+=fold('secondary','② 自动画次梁 SB','<div class="row">'+selectControl('bl116-secondary-direction','布置方向',cfg.secondaryDirection,[['自动','自动'],['X','X 向'],['Y','Y 向']])+'<label class="field">最大间距 m<input id="bl116-gap" type="number" min="0.1" max="20" step="0.1" value="'+cfg.gap/1000+'" data-input-state="default"></label></div>'+selectControl('bl116-scope','布置区域',cfg.scope,[['all','全部区域'],['selected','已儲存的 SB 分區']])+'<div class="row">'+'<button type="button" id="bl116-draw-region" data-action="draw-sb-area">框選 SB 區域</button>'+btn('預覽次梁','secondary')+'</div>'+preview('secondary')+'<details class="beam-layout-zones116" '+(cfg.scope==='selected'?'open':'')+'><summary>次梁分区 · '+(h.p.types[h.key].secondaryAreas?.length||0)+' 个</summary>'+host.zones()+'</details>');
@@ -79,7 +79,7 @@ function BeamLayoutUI116(host){
  function preview(step,rebuild){const h=host.get(),next=BeamLayout116.candidate(h.p,h.key,step,values(),rebuild),m=Engine.floorModel(next.result,h.floor,h.key);draft={...next,key:h.key,step,base:JSON.stringify(h.p),count:m.beams.filter(b=>b.source==='auto'&&(step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101)).length};host.selectMode();host.refresh();}
  function action(a){
   try{
-   if(a==='reset'){const h=host.get(),v=values();if(host.transact(()=>BeamLayout116.clear(h.p,h.key,v))){reset();host.clearSelection();host.selectMode();host.refresh();host.toast(h.key+' 已清空梁、墙和板，仅保留柱子；可撤销');}return;}
+   if(a==='reset'){const h=host.get(),v=values();if(host.transact(()=>BeamLayout116.clear(h.p,h.key,v))){reset();host.clearSelection();host.selectMode();host.refresh();host.toast(h.key+' 已清空梁及板布置，柱和牆已保留；可撤銷');}return;}
    if(['main','secondary'].includes(a)){preview(a,false);return;}
    if(a==='cancel'){draft=null;host.refresh();return;}
    if(a==='delete'){host.deleteSelection();return;}

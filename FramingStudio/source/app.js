@@ -312,8 +312,8 @@
  function openMemberCard(hit,e,targetKey=hit.f?result.floors[hit.f-1].type:key){
   const data=Drawing.info(p,result,targetKey,hit.f??floor,{...hit,f:undefined});if(!data)return false;
   inspected={...hit,f:hit.f??floor};memberEditor={hit:{...inspected},targetKey,position:{clientX:e.clientX,clientY:e.clientY}};draw(true);
-  $('memberdelete').hidden=false;$('memberdelete').textContent='删除所选'+({COL:'柱',WALL:'墙',SLAB:'板块'}[hit.kind]||'梁')+' · Delete';$('memberblabel').textContent=hit.kind==='SLAB'?'板厚 mm':hit.kind==='WALL'?'墙厚 mm':'B mm';$('memberb').value=+data.size.b.toFixed(6);$('memberd').value=data.size.d===null?'':+data.size.d.toFixed(6);$('memberdwrap').hidden=data.size.d===null;$('memberd').readOnly=['MB','SB'].includes(hit.kind);$('memberd').title=['MB','SB'].includes(hit.kind)?'按梁深规则自动计算':'';
-  const isBeam=['MB','SB','TB','CB'].includes(hit.kind);$('memberkindwrap').hidden=!isBeam;if(isBeam)$('memberkind').value=hit.kind;$('sizeapply').textContent=isBeam?'应用类型及尺寸':'应用尺寸';$('membereditnote').textContent=isBeam?'自动梁修改后转为手动梁；尺寸留空采用所选类型默认值。同一 Framing 共用修改，可撤销。加宽靠边梁时，截面可自动向板内贴边；参考线及长度保留。选择 CB 后，在 Member Check 确认固定端和 cover。':'尺寸留空恢复默认；同一 Framing 共用此修改。';
+  $('memberdelete').hidden=false;$('memberdelete').textContent='删除所选'+({COL:'柱',WALL:'墙',SLAB:'板块'}[hit.kind]||'梁')+' · Delete';$('memberblabel').textContent=hit.kind==='SLAB'?'板厚 mm':hit.kind==='WALL'?'墙厚 mm':'B mm';$('memberb').value=+data.size.b.toFixed(6);$('memberd').value=data.size.d===null?'':+data.size.d.toFixed(6);$('memberdwrap').hidden=data.size.d===null;$('memberd').readOnly=['MB','SB','TB','CB'].includes(hit.kind);$('memberd').title=['MB','TB','CB'].includes(hit.kind)?'梁深採用當層／局部可用結構高度':hit.kind==='SB'?'按梁深规则自动计算':'';
+  const isBeam=['MB','SB','TB','CB'].includes(hit.kind);$('memberkindwrap').hidden=!isBeam;if(isBeam)$('memberkind').value=hit.kind;$('sizeapply').textContent=isBeam?'应用类型及尺寸':'应用尺寸';$('membereditnote').textContent=isBeam?'MB／TB／CB 梁深採用當層／局部結構高度；跨區取較小值。自动梁修改后转为手动梁；宽度留空采用默认值。同一 Framing 共用修改，可撤销。加宽靠边梁时，截面可自动向板内贴边；参考线及长度保留。选择 CB 后，在 Member Check 确认固定端和 cover。':'尺寸留空恢复默认；同一 Framing 共用此修改。';
   $('membercheck').hidden=hit.kind==='WALL';$('membertitle').textContent=data.title;$('memberbody').innerHTML='<dl>'+data.rows.map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+esc(b)+'</dd>').join('')+'</dl><p>'+esc(data.note)+'</p>';
   $('membertransferwrap').hidden=hit.kind!=='COL';$('membertransfer').checked=false;if(hit.kind==='COL'){const c=Engine.floorModel(result,hit.f??floor,targetKey).columns.find(c=>c.id===hit.id);$('membertransfer').checked=!!c?.transferManual;}
   const reference=FloorColumns101.isReference(hit,floor);for(const id of ['memberb','memberd','memberkind','membertransfer'])$(id).disabled=reference;$('sizeapply').hidden=reference;$('memberdelete').hidden=reference;if(reference){$('membertransferwrap').hidden=true;$('membercheck').hidden=true;$('membereditnote').textContent='非當層的柱只供參考，請切換至 '+FloorLevels.name(p,hit.f)+' 修改。';}
@@ -351,7 +351,7 @@
   memberStatus('已应用 · '+targetKey+' · '+(edited?.kind||hit.kind)+' · 请点“保存项目”保存文件。');
   toast((isBeam?'梁类型及尺寸':'尺寸')+'已更新，可撤销');return true;
  }
- $('sizeapply').onclick=applyMemberEdit;$('memberkind').addEventListener('change',()=>{$('memberd').readOnly=['MB','SB'].includes($('memberkind').value);});
+ $('sizeapply').onclick=applyMemberEdit;$('memberkind').addEventListener('change',()=>{$('memberd').readOnly=['MB','SB','TB','CB'].includes($('memberkind').value);});
  for(const id of ['memberb','memberd','memberkind','membertransfer']){
   $(id).addEventListener('input',()=>memberStatus('有未应用修改，请点“应用”或“保存项目”。'));
   $(id).addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();applyMemberEdit();}});

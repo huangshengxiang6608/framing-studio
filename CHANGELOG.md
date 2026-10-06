@@ -1,5 +1,82 @@
 # 版本记录
 
+## E2.143 — 2026-10-06
+
+- Import the supplied E2.142 Windows baseline and add only the transfer-truss feature from PR #1. Existing E2.142 layout and member-selection behavior are retained.
+- Add same-floor and multi-storey S460 trusses, axial-member checks, reaction propagation and a standalone Excel workbook.
+- Preserve original Section A/B report layouts, VBA and workbook templates. Truss-affected columns use physical reactions for checking; Section A area-table export is explicitly blocked for those columns rather than reformatted.
+- Verified: 55 existing loading assertions; 11 core, 12 integration and 11 downstream groups; four no-truss models match E2.142; native Excel 451 comparisons with zero differences. UI inputs and undo checked.
+
+
+## E2.142 Windows - 2026-10-06
+
+- Package the verified E2.142 preview as the Windows app, including combined MB/TB/CB selection and independent SB/Slab selection.
+- Section A/B reports, workbook templates and Excel bridge are unchanged.
+
+## E2.142 Preview - 2026-10-06
+
+- Combine TB and CB into the MB tab. MB selection and batch deletion include MB, TB and CB; SB and Slab remain separate.
+- Keep three tabs and clear selections when switching tabs. Keyboard and inspector deletion respect the active tab.
+- Tab-scope and member-multiselect regression tests passed. Section A/B reports and the existing EXE are unchanged; no Windows package generated as requested.
+
+## E2.141 預覽 — 2026-10-06
+
+- MB／SB／Slab 分頁只選取及刪除自己的構件類型；新增 TB／CB 分頁，維持獨立多選及刪除。
+- 切換分頁清除選取與右鍵視窗；鍵盤 Delete、批次刪除及構件視窗刪除都遵守目前分頁範圍。
+- 已驗證不同種類同時可見、框選、切頁、右鍵、鍵盤及撤銷。報表與 EXE 未更改；依使用者要求暫不重建 Windows 包。
+
+## E2.140 — 2026-10-06
+
+- 修正「已儲存的 SB 分區」套用時清除分區外次梁的問題。區域布置僅替換分區內完整的自動次梁，合併保留區外原有梁與編號。
+- 保留主梁、手動梁、區外刪除記錄、荷載及報表勾選；重複套用、預覽取消、一次撤銷及存檔重開已驗證。
+- 「全部區域」仍可重新布置整個 Framing。Section A／B 報表及原生 Excel 模板保持原樣。
+
+## E2.139 — 2026-10-06
+
+- 轉換梁顯示名稱統一以 TB 開頭，例如 MB20 顯示為 TB20；承托標籤、構件資料及 Check 名稱一致，原有荷載識別保留。名稱碰撞時加入後綴。
+- TC 圓圈交叉標記對齊上層柱實際截面中心，包括柱相對軸線偏移的情況。
+- 保留現有傳荷計算、Section A／B 報表格式、Excel／VBA 及模板。
+
+## E2.138 — 2026-10-06
+
+- 按每層上層柱落點及實際支承路徑，自動把唯一承托的 MB／SB 識別為 TB；已有直接下層柱或牆支承時保留原類型。
+- 多梁交點沿連續承托梁及分段梁的傳荷路徑判定；有歧義、無可靠支承或手動支承衝突時保留待確認提示。
+- TB 標示、上層柱點荷載及下層柱受荷面積採用同一判定；保留梁荷載、Check 及 Section A／B 勾選。移動或刪除上層柱後重新判定。
+- 維持 TB 尺寸編輯、批次刪除、自動布置及共用 Framing 的分層判定；梁深使用當層結構高度。
+- Section A／B 報表內容、格式、Excel／VBA 及模板未改動。
+
+## E2.137 — 2026-10-06
+
+- 柱支援累加框選、全選當層、批量刪除及複製至上下層；複製保留柱基準點、截面位置與尺寸，非當層柱僅作參考。
+- 牆、MB／SB／TB／CB 及樓板支援累加多選、Delete 批量刪除及一次撤銷。梁分頁移除大型多選面板。
+- 自動主梁優先由較短且已有可靠支承的梁承托長梁，並分段長梁；明確重新自動布梁可恢復已刪梁，重複操作不產生重疊副本。
+- 修復 Framing 類型複製介面；窄結構區的高度標籤可旋轉顯示。
+- Section A／B 抄的內容、格式、圖示、分頁、Excel 模板及原生 Excel 程式保持原樣。
+
+## E2.136 — 2026-10-06
+
+- 柱 tributary area 優先分配由相鄰柱、牆及外邊界界定的規整長方形；較大的跨缺柱範圍取得餘下區域。同等條件保留等距分界，分配不依賴柱的編號或儲存次序。
+- 完整矩形合併為單一範圍；Opening 及樓板缺口仍扣除，畫面、柱荷載及現有報表欄位使用同一面積。
+- 驗證規整區、餘下區、面積守恆、不重疊、柱次序、分區荷載和 Section A/B 計算一致。報表格式、Excel/VBA 與模板保持原樣。
+
+
+## E2.135 — 2026-10-06
+
+- 梁布置以實際截面闊度檢查重疊，不再只比較中心線端點。
+- MB／柱已佔用的邊界帶不再自動生成無效短 SB／CB；正常垂直接駁及端對端接駁保留。
+- 手動畫梁遇到重疊會拒絕新增。舊手動重疊梁保留輸入並提示未生成，避免重複計算；無效自動梁快照不再顯示。
+- 梁落在牆上的正常承托保留。Section A／B 報告格式、Excel 模板及原生計算程式未改。
+
+## E2.134 — 2026-10-06
+
+- 局部層高 Area 整合到各項設定；局部結構高度上限為 30 m，樓層頁在未劃建築區域前亦顯示結構區。
+- 梁布置分為 MB／SB／Slab 分頁；SB 支援框選區域、預覽及套用。「重新布置」保留柱和牆。
+- 自動主梁對齊柱中心；加柱、切換柱輸入模式不會自動重排梁。柱分頁顯示梁中點並支援吸附加柱。
+- 加入柱座標表、複製至上層／下層；非當層柱只供參考。
+- 上方圖例可切換板受力方向；Loading 名稱自動避開 Opening，必要時分行。
+- MB／TB／CB 梁深採用當層及局部可用結構高度，跨區採較小值；尺寸、自重、傳荷及 Check 同步。普通 SB 保留現有梁深規則。
+- Section A／B 報告文字、版面、模板及原生 Excel 程式保留；核准的計算修改只更新既有欄位數值。
+
 ## E2.133 — 2026-10-04
 
 - 将已确认的 Horizontal Load Path 预览接入正式“双剖面 Section”及 Section A。蓝色为实际构件，红色为水平作用方向，绿色为侧向作用引起的 Push–Pull 轴力增量示意，不标作求解后的轴力或受力分配。

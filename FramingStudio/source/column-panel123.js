@@ -11,6 +11,7 @@ const ColumnPanel123=(()=>{
   p.explorer={...(p.explorer||{}),selected:{[key]:true}};
   const row=Loading.run(p,h.result,'B').rows.find(r=>r.floor===h.floor&&r.token===h.selected.token);
   if(!row)throw Error('当前楼层没有这根承重柱，请重新选择');
+  if(row.truss109?.length)return {row,schedule:null};
   const auto=!String(h.data.sectionAAreas||'').trim()||h.data.sectionAAreaMode==='auto';
   const schedule=ColumnLoads101.schedule(p,h.result,h.floor,h.selected.token,auto);
   return {row,schedule};
@@ -28,6 +29,10 @@ const ColumnPanel123=(()=>{
    finally{if(pending===id)pending='';if(active?.id===id)host.refresh();}
   },25);}
   const value=cache.get(key),rr=value?.row,d=value?.schedule,current=d?.rows.find(r=>r.floor===h.floor),cfg=Loading.settings(h.p),c=m.member,v={...rr?.result?.inputs,...rr?.result?.values},errors=[...new Set([...(d?.errors||[]),...(rr?.loadErrors||[]),...(value?.error?[value.error]:[])])];
+  if(rr?.truss109?.length){
+   const g=rr.loading.dead,q=rr.loading.live,fail=[...new Set([...(rr.loadErrors||[]),...(rr.result.fail||[])])];
+   return wrap(section('loads','① 柱受力 · Truss G / Q','<div class="cp-current"><b>'+esc(FloorLevels.name(h.p,h.floor))+' · 桁架反力及向下累计</b><div class="cp-grid"><div><small>恒载 G · kN</small><strong>'+num(g)+'</strong></div><div><small>活载 Q · kN</small><strong>'+num(q)+'</strong></div></div></div><p class="cp-meta">来源：'+rr.truss109.map(esc).join('、')+'。包括本层及上部实际传荷。</p><div class="cp-total">1.4G + 1.6Q = '+num(1.4*g+1.6*q)+' kN<br>验算轴力 N = '+num(v.C28)+' kN</div>'+(fail.length?'<p class="cp-pending">'+fail.map(esc).join('；')+'</p>':''))+'<div class="cp-actions"><button type="button" data-cp-member>打开此柱 Member Check</button></div>');
+  }
   const G=d?.totalG,Q=d?.totalQ,combination=Number.isFinite(G)&&Number.isFinite(Q)?1.4*G+1.6*Q:null;
   const floorLabel=esc(FloorLevels.name(h.p,h.floor)),currentCard='<div class="cp-current"><b>当前层 '+floorLabel+' · 本层荷载</b><div class="cp-grid"><div><small>恒载 G · kN</small><strong>'+num(current?.G)+'</strong></div><div><small>活载 Q · kN</small><strong>'+num(current?.Q)+'</strong></div></div></div>';
   const loads=currentCard+'<p class="cp-meta">面积法累计 · G / Q 单位 kN · DL 已含自重</p>'+diagram(current,m.id)+'<div class="cp-total"><small>本层柱累计 · '+floorLabel+' · 本层＋上部</small><br><b>总计 G '+num(G)+' / Q '+num(Q)+' kN</b><br>荷载组合 1.4G + 1.6Q = '+num(combination)+' kN<br>柱项目系数 '+num(cfg.columnProject)+' · 验算轴力 N = <b>'+num(v.C28)+' kN</b></div>'+(errors.length?'<p class="cp-pending">'+(value?.error?'计算待确认':'荷载／传荷待确认')+'：'+errors.map(esc).join('；')+'</p>':'')+'<p class="cp-meta">本层荷载加上部累计得到本柱总荷载；验算轴力再采用原柱项目系数。</p>';

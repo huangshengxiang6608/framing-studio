@@ -1,0 +1,310 @@
+{
+  "format": "framing-app",
+  "version": 1,
+  "name": "S460 两层转换桁架示例",
+  "total": 4,
+  "groups": [
+    {
+      "end": 1,
+      "h": 4,
+      "type": "F01",
+      "sh": 600,
+      "min": 0
+    },
+    {
+      "end": 2,
+      "h": 3,
+      "type": "F02",
+      "sh": 600,
+      "min": 0
+    },
+    {
+      "end": 3,
+      "h": 3,
+      "type": "F03",
+      "sh": 600,
+      "min": 0
+    },
+    {
+      "end": 4,
+      "h": 3,
+      "type": "F04",
+      "sh": 600,
+      "min": 0
+    }
+  ],
+  "axes": {
+    "x": [
+      {
+        "id": "A",
+        "gap": 0
+      },
+      {
+        "id": "B",
+        "gap": 14
+      }
+    ],
+    "y": [
+      {
+        "id": "1",
+        "gap": 0
+      },
+      {
+        "id": "2",
+        "gap": 6
+      }
+    ]
+  },
+  "types": {
+    "F01": {
+      "mode": "manual",
+      "building": {
+        "0,0": true
+      },
+      "opening": {},
+      "columns": [
+        {
+          "id": "L",
+          "x": 1,
+          "y": 3,
+          "b": 1000,
+          "d": 1000,
+          "on": true,
+          "status": "上下贯通"
+        },
+        {
+          "id": "R",
+          "x": 13,
+          "y": 3,
+          "b": 1000,
+          "d": 1000,
+          "on": true,
+          "status": "上下贯通"
+        }
+      ],
+      "walls": [],
+      "beams": [],
+      "suppressed": [],
+      "autoBeams101": false,
+      "beamDepth": 600,
+      "slabVoids": [
+        {
+          "x0": 0,
+          "x1": 14,
+          "y0": 0,
+          "y1": 6
+        }
+      ]
+    },
+    "F02": {
+      "mode": "manual",
+      "building": {
+        "0,0": true
+      },
+      "opening": {},
+      "columns": [
+        {
+          "id": "L",
+          "x": 1,
+          "y": 3,
+          "b": 1000,
+          "d": 1000,
+          "on": true,
+          "status": "上下贯通"
+        },
+        {
+          "id": "R",
+          "x": 13,
+          "y": 3,
+          "b": 1000,
+          "d": 1000,
+          "on": true,
+          "status": "上下贯通"
+        }
+      ],
+      "walls": [],
+      "beams": [],
+      "suppressed": [],
+      "autoBeams101": false,
+      "beamDepth": 600,
+      "slabVoids": [
+        {
+          "x0": 0,
+          "x1": 14,
+          "y0": 0,
+          "y1": 6
+        }
+      ]
+    },
+    "F03": {
+      "mode": "manual",
+      "building": {
+        "0,0": true
+      },
+      "opening": {},
+      "columns": [
+        {
+          "id": "L",
+          "x": 1,
+          "y": 3,
+          "b": 1000,
+          "d": 1000,
+          "on": true,
+          "status": "上下贯通"
+        },
+        {
+          "id": "R",
+          "x": 13,
+          "y": 3,
+          "b": 1000,
+          "d": 1000,
+          "on": true,
+          "status": "上下贯通"
+        }
+      ],
+      "walls": [],
+      "beams": [
+        {
+          "id": "TB1",
+          "kind": "TB",
+          "a": {
+            "x": 1,
+            "y": 3
+          },
+          "z": {
+            "x": 13,
+            "y": 3
+          },
+          "b": 600,
+          "d": 1200,
+          "on": true
+        }
+      ],
+      "suppressed": [],
+      "autoBeams101": false,
+      "beamDepth": 600,
+      "slabVoids": [
+        {
+          "x0": 0,
+          "x1": 14,
+          "y0": 0,
+          "y1": 6
+        }
+      ]
+    },
+    "F04": {
+      "mode": "manual",
+      "building": {
+        "0,0": true
+      },
+      "opening": {},
+      "columns": [
+        {
+          "id": "U1",
+          "x": 4,
+          "y": 3,
+          "b": 1000,
+          "d": 1000,
+          "on": true,
+          "status": "上下贯通"
+        },
+        {
+          "id": "U2",
+          "x": 10,
+          "y": 3,
+          "b": 1000,
+          "d": 1000,
+          "on": true,
+          "status": "上下贯通"
+        }
+      ],
+      "walls": [],
+      "beams": [],
+      "suppressed": [],
+      "autoBeams101": false,
+      "beamDepth": 600,
+      "slabVoids": [
+        {
+          "x0": 0,
+          "x1": 14,
+          "y0": 0,
+          "y1": 6
+        }
+      ]
+    }
+  },
+  "defaults": {
+    "cb": 1000,
+    "cd": 1000,
+    "gap": 3000,
+    "direction": "自动",
+    "mb": 300,
+    "sb": 250,
+    "tb": 600,
+    "tbd": 1200,
+    "slab": 200,
+    "wall": 300
+  },
+  "explorer": {
+    "settings": {},
+    "members": {
+      "4|COL|4,3": {
+        "mode": "manual",
+        "dead": 1200,
+        "live": 300
+      },
+      "4|COL|10,3": {
+        "mode": "manual",
+        "dead": 600,
+        "live": 900
+      }
+    },
+    "floors": {},
+    "selected": {
+      "1|COL|1,3": true,
+      "1|COL|13,3": true
+    },
+    "reportA": {},
+    "reportB": {}
+  },
+  "transferTrusses": [
+    {
+      "id": "TT1",
+      "name": "TT1",
+      "enabled": true,
+      "bottomFloor": 1,
+      "topFloor": 3,
+      "supportA": "L",
+      "supportB": "R",
+      "sourceIds": [
+        "U1",
+        "U2"
+      ],
+      "panels": 4,
+      "sections": {},
+      "restraints": {
+        "top": 3,
+        "bottom": 3
+      },
+      "limits": {
+        "total": 20,
+        "live": 12,
+        "differential": 8
+      },
+      "jointVolumes": {
+        "left": 0.2,
+        "right": 0.2,
+        "U1": 0.4,
+        "U2": 0.4
+      },
+      "noHeadroom": true,
+      "bracingConfirmed": true,
+      "reportA": true,
+      "reportB": true,
+      "replaces": {
+        "floor": 3,
+        "token": "TB|1,3|13,3"
+      }
+    }
+  ]
+}

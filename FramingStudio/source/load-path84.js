@@ -24,7 +24,7 @@ const LoadPath84=(()=>{
    if(settings84.heights){text(FloorLevels.name(p,f.n),0,py-7,48,6);text(f.h.toFixed(1)+' m',29,(py+bottom)/2-4,28,6);}
    const solids=LocalHeights96.solids(p,model,f.n,m,settings84.hi).filter(s=>{const r=s.r,q=s.member,ref=s.kind==='COL'?(index?q.y:q.x):q.rawA&&q.rawA[index]===q.rawZ[index]?q.rawA[index]:NaN;return q.on!==false&&(Math.abs((index?r.y:r.x)-cut)<=(index?r.d:r.w)/2+.001||Math.abs(ref-cut)<.001);});
    const floors=new Map(),drawn=new Set();let transferLabel=false;
-   for(const s of solids){const r=s.r,q=s.member,a=(along?r.y:r.x)-(along?r.d:r.w)/2,b=a+(along?r.d:r.w),yt=Y(s.z1-offset),yb=Y(s.z0-offset),k=s.kind;
+   for(const s of solids){if(typeof TrussModel109!=='undefined'&&s.kind==='TB'&&TrussModel109.replacement(p,f.n,s.member))continue;const r=s.r,q=s.member,a=(along?r.y:r.x)-(along?r.d:r.w)/2,b=a+(along?r.d:r.w),yt=Y(s.z1-offset),yb=Y(s.z0-offset),k=s.kind;
     if(k==='COL'&&q.status==='上层柱'&&f.n>=settings84.hi)continue;
     if(k==='COL'||k==='WALL'){
      // One centre line per structural support, irrespective of its real B / D.
@@ -58,6 +58,7 @@ const LoadPath84=(()=>{
    }
   }
 
+  if(typeof TrussModel109!=='undefined')for(const v of TrussModel109.visuals(p,model,settings84.lo,settings84.hi)){if(v.nodes.some(n=>Math.abs(n[index]-cut)>.001))continue;for(const m of v.mesh.members){const a=v.nodes[m.i],b=v.nodes[m.j];line(X(a[along]),Y(a[2]-offset),X(b[along]),Y(b[2]-offset),C.red,1.1);}members.push(['TT',v.t.topFloor,v.t.name,v.g.a[along],v.g.z[along]]);text(v.t.name+' · transfer truss',X(v.g.a[along])+3,Y(v.g.zTop-offset)-12,130,7,C.red);}
   if(settings84.lo===1){rect(X(lo),Y(0),X(hi)-X(lo),18,C.blue,1.2);shapes[shapes.length-1].schematic112='FOUNDATION';text('FOUNDATION',X(lo),Y(0)+1,X(hi)-X(lo),8,C.blue);shapes[shapes.length-1].center=true;}else{line(X(lo),Y(0)+3,X(hi),Y(0)+3,C.blue,1.2);text('Section bottom',X(lo),Y(0)+14,160,8,C.blue);}
   if(!members.length)text('No members intersect this section.',60,160,265,9,C.red);
   fixed=true;text('Load Transfer Mechanism',354,7,175,9,C.blue);
@@ -66,7 +67,7 @@ const LoadPath84=(()=>{
    for(const [label,y]of labels)text(label,355,y,115,8,C.blue);
    for(const [a,b]of [[59,83],[105,129],[151,175],[198,272],[295,319]])line(390,a,390,b,C.red,1,true);
    text('#',407,111,18,11,C.red);text('#',407,156,18,11,C.red);text('△',404,220,20,12,C.red);text('△',405,302,20,12,C.red);
-   line(430,188,488,213,C.red,1,true);text('△',462,189,20,12,C.red);text('Transfer beam',455,225,85,8,C.blue);line(487,242,429,273,C.red,1,true);text('#',481,256,18,11,C.red);
+   line(430,188,488,213,C.red,1,true);text('△',462,189,20,12,C.red);text(TrussModel109.active(p).length?'Transfer truss':'Transfer beam',455,225,85,8,C.blue);line(487,242,429,273,C.red,1,true);text('#',481,256,18,11,C.red);
    text('# Bending + Shear',450,35,90,8,C.red);text('△ Axial',450,51,90,8,C.red);
   }else {const mechanism=['Horizontal load','External surface','Rigid floor diaphragm','Column / core wall','Foundation'];mechanism.forEach((t,i)=>{text(t,355,43+i*38,175,8,C.blue);shapes[shapes.length-1].center=true;if(i<mechanism.length-1)line(442.5,62+i*38,442.5,77+i*38,C.red,1,true);});}
   fixed=false;if(kind==='horizontal'){

@@ -17,7 +17,7 @@ const ColumnLoads101=(()=>{
  function highlights(p,result,f){if(!target)return [];const col=Loading.members(p,result,target.floor).find(x=>x.token===target.token);if(!col||col.kind!=='COL'){clear();return [];}const o=Loading.input(p,target.floor,target.token),auto=!String(o.sectionAAreas||'').trim()||o.sectionAAreaMode==='auto';let d;try{d=schedule(p,result,target.floor,target.token,auto);}catch{return [];}const r=d.rows.find(r=>r.floor===f);if(!r)return [];return r.parts.flatMap(x=>x.weighted?x.rects.map((rect,i)=>({colour:'#0096a7',fraction:rect.fraction,active:true,name:i===0?col.id+' · '+num(r.area)+' m² · 几何面积经 TB 分配':' ',rects:[rect]})):[{colour:'#0096a7',active:true,name:col.id+' · '+num(r.area)+' m²',rects:x.rects}]);}
  document.addEventListener('click',e=>{const b=e.target.closest('[data-column-source101]');if(!b||!target)return;sourceView=true;StudioHost.viewFloor(+b.dataset.columnSource101);});
  // Geometric footprints are independent of force-solver errors.
- function viewData(p,result,f){
+ function viewData(p,result,f){if(target&&p.transferTrusses?.length&&TrussUI109.results(p,result).rows.some(r=>r.floor===target.floor&&r.token===target.token&&r.truss109?.length))return null;
   if(!target)return null;
   const col=Loading.members(p,result,target.floor).find(x=>x.token===target.token);
   if(!col||col.kind!=='COL'){clear();return null;}
@@ -78,7 +78,7 @@ const ColumnLoads101=(()=>{
   const same=data.floor===data.targetFloor,title=same?data.id+' · '+data.floorName:data.id+' · 目标柱 '+data.targetName;
   write(title+(data.compact&&!data.auto?' · 手动面积':''),data.compact?14:19,data.compact?11:13,true);write(Number.isFinite(data.area)?'受荷面积 '+num(data.area)+' m²':'受荷面积待确认',data.compact?35:46,data.compact?18:21,true,colour,true);
   if(!data.compact)write('来源楼层：'+data.floorName,66,12,false,'#36586d');
-  const caption=issueCaption(data)||(!data.rects.length&&!data.polygons?.length?(data.auto?'所选范围没有楼板面积':'手动面积，暂无对应几何范围'):data.weighted?'斜线：几何面积经转换梁分配':data.partitioned?'半跨按等距线分界 · Opening 已扣除':'几何半跨范围 · Opening 已扣除');
+  const caption=issueCaption(data)||(!data.rects.length&&!data.polygons?.length?(data.auto?'所选范围没有楼板面积':'手动面积，暂无对应几何范围'):data.weighted?'斜线：几何面积经转换梁分配':data.partitioned?'矩形優先分配 · Opening 已扣除':'几何半跨范围 · Opening 已扣除');
   if(!data.compact)write(caption,87,12,false,'#36586d',true);ctx.restore();
   return {...box,title,caption,area:data.area,floor:data.floor,targetFloor:data.targetFloor,overlayOverlap:overlays.reduce((n,t)=>n+overlap(box,t),0)};
  }

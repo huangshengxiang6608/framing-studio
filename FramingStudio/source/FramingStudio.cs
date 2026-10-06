@@ -14,8 +14,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8",FrameworkDisplayName=".NET Framework 4.8")]
 
 [assembly: System.Reflection.AssemblyTitle("Framing Studio")]
-[assembly: System.Reflection.AssemblyVersion("2.133.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.133.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.143.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.143.0.0")]
 
 static class Program {
     [STAThread] static int Main(string[] args) {
@@ -56,7 +56,7 @@ sealed class Studio : Form {
         Data = TestDir == null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FramingStudio") : Path.Combine(TestDir, "isolated-user-data");
         Profile = Path.Combine(Data, "WebView2"); Directory.CreateDirectory(Data);
         if (TestDir != null) { Directory.CreateDirectory(TestDir); Opacity = .01; ShowInTaskbar = false; }
-        Text = "Framing Studio · E2.133 Desktop"; Width = 1500; Height = 950;
+        Text = "Framing Studio · E2.143 Desktop"; Width = 1500; Height = 950;
         MinimumSize = new Size(900, 650); StartPosition = FormStartPosition.CenterScreen;
         if (File.Exists(Path.Combine(Root,"FramingStudio.ico"))) Icon = new Icon(Path.Combine(Root,"FramingStudio.ico"));
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("项目");
@@ -118,7 +118,7 @@ sealed class Studio : Form {
             await web.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(Path.Combine(Root,"desktop-bridge.js")));
             web.NavigationCompleted += async delegate(object s, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { Log("Navigation: " + e.WebErrorStatus); Status.Text = "页面加载失败：" + e.WebErrorStatus; return; }
-                Ready = true; Status.Text = "离线模式 · E2.133 · 项目请保存为 .framing.json";
+                Ready = true; Status.Text = "离线模式 · E2.143 · 项目请保存为 .framing.json";
                 if (TestDir != null && TestNavigation++ == 0) await SelfTest();
             };
             if (TestDir != null) web.ScriptDialogOpening += delegate(object s, CoreWebView2ScriptDialogOpeningEventArgs e) { e.Accept(); };
@@ -184,7 +184,7 @@ sealed class Studio : Form {
                       var job=new Dictionary<string,object>(source);job.Remove("_reportSection");string runId=DateTime.Now.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N").Substring(0,8);
                       string directory=Path.Combine(Data,"ExcelRuns",runId);Directory.CreateDirectory(directory);ExcelRuns.Add(runId,directory);
                       object extraPages=null;
-                      if(section!=null&&job.TryGetValue("reportPages",out extraPages)){job.Remove("reportPages");File.WriteAllText(Path.Combine(directory,"report-pages.json"),Json.Serialize(extraPages),new UTF8Encoding(false));}
+                      if((section!=null||Convert.ToString(job["type"])=="Truss")&&job.TryGetValue("reportPages",out extraPages)){job.Remove("reportPages");File.WriteAllText(Path.Combine(directory,"report-pages.json"),Json.Serialize(extraPages),new UTF8Encoding(false));}
                       string path=Path.Combine(directory,"job.json");File.WriteAllText(path,Json.Serialize(job),new UTF8Encoding(false));
                     await ExcelNotify(new {progress=(section==null?"":"Section "+section+" · ")+"Excel 正在计算 "+index+" / "+total+" · "+Convert.ToString(job["label"])});
                     var start=new ProcessStartInfo(Path.Combine(Root,"Excel","ExcelBridge.exe"),"\""+Path.Combine(Root,"Excel")+"\" \""+path+"\"") { UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden };
@@ -413,7 +413,7 @@ sealed class Studio : Form {
             using(var stream=File.Create(Path.Combine(TestDir,"plan.png")))await View.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream);
             await JS("StudioHost.navigate('excel')");await Task.Delay(200);
             using(var stream=File.Create(Path.Combine(TestDir,"excel-page.png")))await View.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream);
-            await Check("Excel actions remain available","document.querySelectorAll('[data-wp=generate]').length===3");
+            await Check("Excel actions remain available","!!document.querySelector('[data-wp=generate-report][data-section=A]:not(:disabled)') && !!document.querySelector('[data-wp=generate-both]:not(:disabled)') && !!document.querySelector('[data-wp=print][data-section=A]')");
             var pdfFrames=new List<object>();
             if(File.Exists(Path.Combine(TestDir,"sample.pdf"))) {
                 string pdf=Convert.ToBase64String(File.ReadAllBytes(Path.Combine(TestDir,"sample.pdf")));

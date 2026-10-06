@@ -9,9 +9,9 @@ const ColumnAreas103=(()=>{
   if(t.columnPlacements?.some(v=>v.key===Engine.columnPositionKey(c)))return [c.x,c.y];
   return Engine.columnReference(p,m.key,c);
  }
- // Half-bay candidates retain wall bounds and holes. Only shared parts are
- // divided by the exact equal-distance line between column reference points.
- // No force-derived area, raster approximation, or column-order tie breaker.
+ // Resolve well-bounded rectangular half-bays first; less constrained columns
+ // receive the remaining area. Equal-priority candidates retain an exact
+ // equal-distance split, never a column-order or identifier tie breaker.
  const rectangle=r=>[[r.x0,r.y0],[r.x1,r.y0],[r.x1,r.y1],[r.x0,r.y1]];
  const polygonArea=ps=>Math.abs(ps.reduce((s,q,i)=>{const r=ps[(i+1)%ps.length];return s+q[0]*r[1]-r[0]*q[1];},0))/2;
  const bounds=ps=>({x0:Math.min(...ps.map(q=>q[0])),x1:Math.max(...ps.map(q=>q[0])),y0:Math.min(...ps.map(q=>q[1])),y1:Math.max(...ps.map(q=>q[1]))});
@@ -31,7 +31,7 @@ const ColumnAreas103=(()=>{
  function format(ps){
   const rects=[],polygons=[];let total=0;for(const q of ps){const aa=polygonArea(q);if(aa<eps)continue;total+=aa;const b=bounds(q);if(Math.abs(aa-area(b))<eps)rects.push(b);else polygons.push({points:q});}
   const all=ps.flat(),box=all.length?bounds(all):null,rectangular=box&&Math.abs(total-area(box))<eps;
-  return {rects:R.union(rects),polygons,area:total,b:rectangular?box.x1-box.x0:null,d:rectangular?box.y1-box.y0:null};
+  return {rects:rectangular?[box]:R.union(rects),polygons:rectangular?[]:polygons,area:total,b:rectangular?box.x1-box.x0:null,d:rectangular?box.y1-box.y0:null};
  }
  let partitions=new WeakMap();
  function rawFootprint(p,m,c,solid,buildingBounds){
@@ -40,7 +40,16 @@ const ColumnAreas103=(()=>{
   for(const w of m.walls){const u=a(w),v=z(w);if(Math.abs(u[0]-v[0])<eps&&y>=Math.min(u[1],v[1])-eps&&y<=Math.max(u[1],v[1])+eps)xs.push(u[0]);if(Math.abs(u[1]-v[1])<eps&&x>=Math.min(u[0],v[0])-eps&&x<=Math.max(u[0],v[0])+eps)ys.push(u[1]);}
   const low=(vs,v,fallback)=>{const q=vs.filter(q=>q<v-eps);return q.length?(Math.max(...q)+v)/2:fallback;},high=(vs,v,fallback)=>{const q=vs.filter(q=>q>v+eps);return q.length?(Math.min(...q)+v)/2:fallback;};
   const box={x0:low(xs,x,buildingBounds.x0),x1:high(xs,x,buildingBounds.x1),y0:low(ys,y,buildingBounds.y0),y1:high(ys,y,buildingBounds.y1)};
-  return {column:c,point:[x,y],box,rects:R.union(solid.map(r=>R.intersect(r,box)).filter(Boolean))};
+  const rects=R.union(solid.map(r=>R.intersect(r,box)).filter(Boolean)),physical=Engine.columnRect(c);
+  // A real neighbour/wall or a column face at the perimeter closes a side.
+  // Falling back to a distant site edge does not make an offset column a
+  // well-defined bay. This distinguishes the regular bays (1) from residuals (2).
+  const closed=[xs.some(v=>v<x-eps)||physical.x-physical.w/2<=buildingBounds.x0+eps,
+   xs.some(v=>v>x+eps)||physical.x+physical.w/2>=buildingBounds.x1-eps,
+   ys.some(v=>v<y-eps)||physical.y-physical.d/2<=buildingBounds.y0+eps,
+   ys.some(v=>v>y+eps)||physical.y+physical.d/2>=buildingBounds.y1-eps].filter(Boolean).length;
+  const rectangular=rects.length>0&&Math.abs(rects.reduce((n,r)=>n+area(r),0)-area(bounds(rects.flatMap(rectangle))))<eps;
+  return {column:c,point:[x,y],box,rects,priority:closed*2+Number(rectangular)};
  }
  function partition(p,m){
   if(partitions.has(m))return partitions.get(m);
@@ -51,7 +60,11 @@ const ColumnAreas103=(()=>{
    let ps=c.rects.map(rectangle);const errors=[];
    for(const q of raw){if(q===c||!q.rects.length||!R.intersect(c.box,q.box))continue;
     const dx=q.point[0]-c.point[0],dy=q.point[1]-c.point[1],coincident=Math.hypot(dx,dy)<eps,k=(q.point[0]**2+q.point[1]**2-c.point[0]**2-c.point[1]**2)/2;
-    let shared=false;ps=ps.flatMap(poly=>{const hit=clipPolygon(poly,q.box);if(!hit.length)return [poly];shared=true;const out=subtractPolygon(poly,q.box),keep=coincident?[]:half(hit,dx,dy,k);if(keep.length)out.push(keep);return out;});
+    // Among equally well-bounded candidates, settle the smaller bay first.
+    // A long bay spanning missing intermediate columns receives its residual.
+    const order=q.priority-c.priority||area(c.box)-area(q.box);
+    if(!coincident&&order<-eps)continue;
+    let shared=false;ps=ps.flatMap(poly=>{const hit=clipPolygon(poly,q.box);if(!hit.length)return [poly];shared=true;const out=subtractPolygon(poly,q.box),keep=coincident||order>eps?[]:half(hit,dx,dy,k);if(keep.length)out.push(keep);return out;});
     if(coincident&&shared)errors.push('柱 '+c.column.id+' 与 '+q.column.id+' 的参考点重合；重合范围未分配，请核对柱位置');
    }
    const s=format(ps),oldArea=c.rects.reduce((n,r)=>n+area(r),0);map.set(c.column,{...s,box:c.box,partitioned:oldArea-s.area>eps,errors,method:'geometric-half-bay'});
@@ -90,7 +103,7 @@ const ColumnAreas103=(()=>{
    if(n===f){const answer={entries:[{column:c,weight:1}],errors:[]};memo.set(k,answer);return answer;}
    const below=Engine.floorModel(result,n-1),matches=active(below).filter(d=>Engine.overlap(Engine.columnRect(c),Engine.columnRect(d)));let landing;
    if(matches.length===1)landing={entries:[{column:matches[0],weight:1}],errors:[]};
-   else{const node=Loading.columnLoadPoint(p,Engine.floorModel(result,n),c),tbs=below.beams.filter(b=>b.kind==='TB'&&Loading.contact(node,b));landing=tbs.length===1?beamLanding(below,n-1,tbs[0],node):{entries:[],errors:[FloorLevels.name(p,n)+' 柱 '+c.id+' 至下层的柱／TB 关系待确认']};}
+   else{const node=Loading.columnLoadPoint(p,Engine.floorModel(result,n),c),target=Engine.transferBeamAt(p,below,n-1,node),tbs=target?.kind==='TB'?[target]:[];landing=tbs.length===1?beamLanding(below,n-1,tbs[0],node):{entries:[],errors:[FloorLevels.name(p,n)+' 柱 '+c.id+' 至下层的柱／TB 关系待确认']};}
    const entries=[],err=[...landing.errors];for(const e of landing.entries){const next=route(n-1,e.column,source);entries.push(...next.entries.map(q=>({...q,weight:q.weight*e.weight})));err.push(...next.errors);}const answer={entries:merge(entries),errors:[...new Set(err)]};memo.set(k,answer);return answer;
   }
   for(let n=f;n<=p.total;n++){

@@ -54,7 +54,7 @@ const BeamLayout116=(()=>{
 function BeamLayoutUI116(host){
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const $=id=>document.getElementById(id),folds={main:true,secondary:true,slab:true};
- let draft=null,selection=[],context='',gesture=null,showDirections=true,activeTab='main';
+ let draft=null,selection=[],context='',gesture=null,activeTab='main';
  try{Object.assign(folds,JSON.parse(localStorage.getItem('beam-layout-folds116')||'{}'));}catch{}
  function sync(){const h=host.get(),id=h.key+'|'+JSON.stringify(h.p.types[h.key]);if(context!==id){context=id;selection=[];gesture=null;}if(draft&&(draft.key!==h.key||draft.base!==JSON.stringify(h.p)))draft=null;return h;}
  function panels(){const h=host.get();return Engine.floorModel(h.result,h.floor,h.key).slabs;}
@@ -70,7 +70,7 @@ function BeamLayoutUI116(host){
   html+='<div class="beam-layout-tabs116" role="tablist" aria-label="梁與板布置">'+[['main','MB'],['secondary','SB'],['slab','Slab']].map(([step,label])=>'<button type="button" id="bl116-tab-'+step+'" role="tab" data-bl-tab="'+step+'" aria-controls="bl116-panel-'+step+'" aria-selected="'+(activeTab===step)+'" tabindex="'+(activeTab===step?'0':'-1')+'">'+label+'</button>').join('')+'</div>';
   html+=fold('main','① 自动画主梁 MB',selectControl('bl116-main-direction','布置方向',cfg.mainDirection,[['XY','X + Y 向'],['X','X 向'],['Y','Y 向']])+'<div class="row">'+btn('自动画主梁','main')+'</div>'+preview('main'));
   html+=fold('secondary','② 自动画次梁 SB','<div class="row">'+selectControl('bl116-secondary-direction','布置方向',cfg.secondaryDirection,[['自动','自动'],['X','X 向'],['Y','Y 向']])+'<label class="field">最大间距 m<input id="bl116-gap" type="number" min="0.1" max="20" step="0.1" value="'+cfg.gap/1000+'" data-input-state="default"></label></div>'+selectControl('bl116-scope','布置区域',cfg.scope,[['all','全部区域'],['selected','已儲存的 SB 分區']])+'<div class="row">'+'<button type="button" id="bl116-draw-region" data-action="draw-sb-area">框選 SB 區域</button>'+btn('預覽次梁','secondary')+'</div>'+preview('secondary')+'<details class="beam-layout-zones116" '+(cfg.scope==='selected'?'open':'')+'><summary>次梁分区 · '+(h.p.types[h.key].secondaryAreas?.length||0)+' 个</summary>'+host.zones()+'</details>');
-  html+=fold('slab','③ 板受力方向','<p>单向板默认沿短跨；点击单块或拖框多选后修改方向。</p><label class="beam-layout-check116"><input id="bl116-show-directions" type="checkbox" '+(showDirections?'checked':'')+'> 显示方向</label><p id="bl116-selection" role="status">'+(chosen.length===1?esc(chosen[0].id):chosen.length?'已选 '+chosen.length+' 块板':'未选择板块')+'</p><div class="row">'+['X','Y'].map(d=>btn('单向 '+d+(d==='X'?' ↔':' ↕'),'way-'+d,(!chosen.length?'disabled ':'')+'aria-pressed="'+(chosen.length>0&&chosen.every(s=>Loading.slabDirection(h.p,h.floor,Loading.token('SLAB',s),s,m)===d))+'"')).join('')+'</div>');
+  html+=fold('slab','③ 板受力方向','<p>单向板默认沿短跨；点击单块或拖框多选后修改方向。</p><label class="beam-layout-check116"><input id="bl116-show-directions" type="checkbox" '+(host.showDirections()?'checked':'')+'> 显示方向</label><p id="bl116-selection" role="status">'+(chosen.length===1?esc(chosen[0].id):chosen.length?'已选 '+chosen.length+' 块板':'未选择板块')+'</p><div class="row">'+['X','Y'].map(d=>btn('单向 '+d+(d==='X'?' ↔':' ↕'),'way-'+d,(!chosen.length?'disabled ':'')+'aria-pressed="'+(chosen.length>0&&chosen.every(s=>Loading.slabDirection(h.p,h.floor,Loading.token('SLAB',s),s,m)===d))+'"')).join('')+'</div>');
   html+='<details '+(activeTab==='slab'?'hidden ':'')+'data-bl-fold="manual" '+(folds.manual?'open':'')+'><summary>手动画梁</summary><div class="beam-layout-body116">'+host.manual()+'<p class="muted">连接柱、梁端点、中点或梁中线上的位置。</p></div></details>';
   if(h.selected&&['MB','SB','TB','CB'].includes(h.selected.kind))html+='<div class="beam-layout-selected116">已选 '+esc(h.selected.id)+'<div class="row">'+btn('删除所选梁 · Delete','delete')+'</div></div>';
   return html+'</section>';
@@ -94,7 +94,7 @@ function BeamLayoutUI116(host){
  function restore(){if(form?.key===host.get().key&&form.base===JSON.stringify(host.get().p))for(const [k,v]of Object.entries(form.values)){const e=$('bl116-'+k);if(e)e.value=v;}showRegions();}
  document.addEventListener('click',e=>{const tab=e.target.closest('[data-bl-tab]');if(tab){switchTab(tab.dataset.blTab,true);return;}const b=e.target.closest('[data-bl116]');if(!b)return;remember();action(b.dataset.bl116);});
  document.addEventListener('keydown',e=>{const tab=e.target.closest?.('[data-bl-tab]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=['main','secondary','slab'],i=tabs.indexOf(activeTab),next=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;switchTab(tabs[next],true);});
- document.addEventListener('change',e=>{if(e.target.id==='bl116-show-directions'){showDirections=e.target.checked;host.repaint();}else if(e.target.id?.startsWith('bl116-')){remember();draft=null;showRegions();host.repaint();}});
+ document.addEventListener('change',e=>{if(e.target.id==='bl116-show-directions'){host.setShowDirections(e.target.checked);}else if(e.target.id?.startsWith('bl116-')){remember();draft=null;showRegions();host.repaint();}});
  document.addEventListener('toggle',e=>{if(!e.target.isConnected||!e.target.matches?.('[data-bl-fold]'))return;folds[e.target.dataset.blFold]=e.target.open;try{localStorage.setItem('beam-layout-folds116',JSON.stringify(folds));}catch{}},true);
  function begin(point,hit,append){remember();if(hit&&hit.kind!=='SLAB'){selection=[];return false;}draft=null;gesture={from:point,to:point,append};return true;}
  function move(point){if(!gesture)return false;gesture.to=point;host.repaint();return true;}
@@ -104,7 +104,7 @@ function BeamLayoutUI116(host){
   if(draft){ctx.strokeStyle='#16899d';ctx.lineWidth=2.5;ctx.setLineDash([7,4]);for(const b of Engine.floorModel(draft.result,h.floor,h.key).beams.filter(b=>b.source==='auto'&&(draft.step==='main'?b.kind==='MB':b.kind==='SB'||b.secondaryCantilever101))){ctx.beginPath();ctx.moveTo(...xy(...b.a));ctx.lineTo(...xy(...b.z));ctx.stroke();}ctx.setLineDash([]);}
   for(const s of m.slabs){if(selection.includes(Loading.token('SLAB',s))){ctx.fillStyle='rgba(0,130,210,.20)';ctx.strokeStyle='#0082d2';ctx.lineWidth=2;for(const r of s.rects){const a=xy(r.x0,r.y0),w=(r.x1-r.x0)*plot.scale,h=(r.y1-r.y0)*plot.scale;ctx.fillRect(...a,w,h);ctx.strokeRect(...a,w,h);}}
   }
-  plot.slabDirections=showDirections?BeamLayout116.drawDirections(h.p,m,h.floor,ctx,plot):[];
+  plot.slabDirections=host.showDirections()?BeamLayout116.drawDirections(h.p,m,h.floor,ctx,plot):[];
   if(gesture){ctx.strokeStyle='#0082d2';ctx.fillStyle='rgba(0,130,210,.12)';ctx.setLineDash([5,3]);const a=xy(...gesture.from),b=xy(...gesture.to);ctx.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);ctx.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);}ctx.restore();
  }
  function reset(){draft=null;selection=[];gesture=null;context='';form=null;}

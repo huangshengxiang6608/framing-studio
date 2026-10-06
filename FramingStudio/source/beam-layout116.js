@@ -6,7 +6,7 @@ const BeamLayout116=(()=>{
   const next=clone(p),t=next.types[key],cfg=settings(p,key);
   delete cfg.columnsOnly;
   if(t.autoBeamSnapshot){delete t.autoBeamSnapshot[step];if(!Object.keys(t.autoBeamSnapshot).length)delete t.autoBeamSnapshot;}
-  if(step==='main')Object.assign(cfg,{main:true,mainDirection:values.mainDirection});
+  if(step==='main')Object.assign(cfg,{main:true,mainDirection:values.mainDirection,shortSpanMain:true});
   else Object.assign(cfg,{secondary:true,secondaryDirection:values.secondaryDirection,gap:values.gap,scope:values.scope});
   t.beamLayout116=cfg;
   if(step==='secondary'&&cfg.scope==='selected'&&!t.secondaryAreas?.length)throw Error('请先拖画次梁分区。');

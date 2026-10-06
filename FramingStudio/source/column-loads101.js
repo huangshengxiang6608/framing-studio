@@ -78,7 +78,7 @@ const ColumnLoads101=(()=>{
   const same=data.floor===data.targetFloor,title=same?data.id+' · '+data.floorName:data.id+' · 目标柱 '+data.targetName;
   write(title+(data.compact&&!data.auto?' · 手动面积':''),data.compact?14:19,data.compact?11:13,true);write(Number.isFinite(data.area)?'受荷面积 '+num(data.area)+' m²':'受荷面积待确认',data.compact?35:46,data.compact?18:21,true,colour,true);
   if(!data.compact)write('来源楼层：'+data.floorName,66,12,false,'#36586d');
-  const caption=issueCaption(data)||(!data.rects.length&&!data.polygons?.length?(data.auto?'所选范围没有楼板面积':'手动面积，暂无对应几何范围'):data.weighted?'斜线：几何面积经转换梁分配':data.partitioned?'半跨按等距线分界 · Opening 已扣除':'几何半跨范围 · Opening 已扣除');
+  const caption=issueCaption(data)||(!data.rects.length&&!data.polygons?.length?(data.auto?'所选范围没有楼板面积':'手动面积，暂无对应几何范围'):data.weighted?'斜线：几何面积经转换梁分配':data.partitioned?'矩形優先分配 · Opening 已扣除':'几何半跨范围 · Opening 已扣除');
   if(!data.compact)write(caption,87,12,false,'#36586d',true);ctx.restore();
   return {...box,title,caption,area:data.area,floor:data.floor,targetFloor:data.targetFloor,overlayOverlap:overlays.reduce((n,t)=>n+overlap(box,t),0)};
  }

@@ -51,3 +51,11 @@ does not change report rendering or the workbook.
 These regressions verify program behavior; a project still needs an explicit
 full-building Check after geometry changes. Existing engineering failures are
 not converted to passing results by this update.
+
+## E2.166 follow-up
+
+`source/tests/column-resize166.cjs` passes for manual and automatic columns,
+shared floors, legacy enlarged centres, grow/shrink after reload, B-only resizing,
+explicit positioning, custom offsets and atomic rejection. Column parameter
+table, deferred Check/boundary, beam-centres164 and beam-network165 regressions
+also pass. E2.166 changes no report, workbook or native executable files.

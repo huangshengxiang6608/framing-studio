@@ -65,6 +65,14 @@ const FloorColumns101=(()=>{
  function applySizePlan(p,result,plan){
   const trial=Engine.clone(p),keys=[...new Set(plan.map(x=>x.key))],before=new Map(keys.map(k=>[k,Engine.model(p,k).columns.map(Engine.columnPositionKey)]));
   for(const key of keys)Engine.bindMainColumns164(trial,key,Engine.model(p,key));
+  // A saved centre that matches the original axis/position rule is derived,
+  // not a new anchor. Re-evaluate that rule at the new size in both directions.
+  // Retain genuinely displaced centres (for example a manually entered offset).
+  for(const key of keys){const targets=plan.filter(x=>x.key===key),ids=new Set(targets.map(x=>x.columnKey)),t=trial.types[key];if(!t.columnPlacements?.some(v=>ids.has(v.key)))continue;
+   const natural=Engine.clone(trial);natural.types[key].columnPlacements=(natural.types[key].columnPlacements||[]).filter(v=>!ids.has(v.key));
+   const columns=new Map(Engine.model(natural,key).columns.map(c=>[Engine.columnPositionKey(c),c]));
+   for(const x of targets){const c=columns.get(x.columnKey);if(!c)continue;const a=Engine.columnRect(c),b=Engine.columnRect(x.column);if(Math.abs(a.x-b.x)<1e-6&&Math.abs(a.y-b.y)<1e-6)t.columnPlacements=(t.columnPlacements||[]).filter(v=>v.key!==x.columnKey);}
+  }
   for(const x of plan){const t=trial.types[x.key],c=x.column;
    if(t.mode==='auto'&&c.anchorX!==undefined){t.columnSizes=(t.columnSizes||[]).filter(v=>v.ax!==c.anchorX||v.ay!==c.anchorY);t.columnSizes.push({ax:c.anchorX,ay:c.anchorY,b:x.b,d:x.d});}
    else{const row=t.columns.find(v=>v.id===c.id);if(!row)throw Error('柱已不存在，請重新驗算');row.b=x.b;row.d=x.d;}

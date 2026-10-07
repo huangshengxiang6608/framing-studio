@@ -1,12 +1,186 @@
+## E2.171 — CB 跟柱闊及 SB 按主梁 bay 分間
+
+- 現有 CB 一次性轉為跟柱闊，新畫 CB 亦預設跟柱；之後明確輸入的手動梁闊仍保留，留空可恢復跟柱。
+- MB／CB／TB 均屬主梁，SB 在各主梁圍成的 bay 內獨立等分。梁端接入另一主梁截面時，以接收梁中心補足 bay 邊界，不因端點小幅偏差把相鄰 bay 合併。
+- 修復受 bay 邊界變化影響的舊自動 SB 布置，保存 SB 所屬 bay；未受影響布置及有構件輸入的原 SB 不靜默重排。自動 CB 與 SB 分開保存，重排 SB 不會刪走 CB。
+- 項目副本：CB_1／CB_2 由 1000 跟柱變為 1500 mm；右側三個 bay 分別有 4／7／4 條 SB，間距 2.45／3.00／2.45 m，無新增模型提示。
+- 新增 bays171 回歸，涵蓋舊布置、主梁分類、共用 Framing、柱改尺寸、手動覆寫、重載及構件輸入保留。Section A／B 格式、Excel 模板及 EXE 不變。
+
+## E2.170 — 新增中間柱後 MB 自動分跨
+
+- 生成模型時按當層承重柱重新分割既有 MB，涵蓋保存的自動梁布置及手動畫梁；新柱位於梁中間時自動形成獨立跨度。
+- 保留截面、方向及原跨度覆蓋範圍，分段梁使用獨立梁號及支承關聯；支援共用 Framing、多支中間柱，以及分段後的尺寸修改和單支／批量刪除。
+- 不以僅上層柱或梁外的柱分段；有原跨構件輸入時先保留原梁並提示核對，不靜默丟失手動跨度、荷載或配筋設定。
+- 項目副本核對：MB21 在 Y=25 m 分為 MB21-1／MB21-2，各 12 m；兩跨皆有計算結果，38 條次梁保留，未新增模型提示。
+- column-split170、短跨主梁、主次梁連接、55 項荷載斷言、12 項桁架整合及 11 項下游传荷測試通過。Section A／B 格式、Excel 模板及 EXE 保持不變。
+
+## E2.169 — 修正檢查完成後表格空白
+
+- 修正舊 MODEL／構件篩選已不在新結果中，畫面顯示「全部」但內部仍按舊值篩選，造成有結果卻沒有資料列的問題。
+- 篩選選項及篩選條件使用同一份列表；已失效的選擇自動回到「全部」，仍有效的選擇保留。返回的新狀態也會列入選單。
+- audit-filters169 先在舊版重現 119 項結果但 0 列，再驗證修正後顯示全部 119 列；同時核對有效篩選、零交集、新狀態及空結果。
+- 本機及含 Transfer Truss 的 PR 版均通過；柱建議連續套用／手動更新 Check 回歸通過。Section A／B、計算、模型及 EXE 不變。
+
+## E2.168 — 不再提示未生成的舊自動梁
+
+- 舊自動梁快照因越界、Opening 或與現有梁衝突而未生成時，不再列出模型提示，也不再出現在 Summary Check。
+- 保存原記錄，生成的梁及尺寸保持不變；現有構件的 Check／傳荷問題、手動畫梁的模型錯誤仍照常顯示。
+- dormant-beams168 測試核對未生成記錄、重疊記錄、實體梁不變、原記錄保留及現有錯誤仍可見；本機與 PR 整合版本均通過，主次梁連接回歸亦通過。
+- Section A／B 報告、Excel 模板、計算及 EXE 保持不變。
+
+## E2.167 — 構件 Mark & Size 圖例開關
+
+- 新增柱、MB、SB、TB、CB、牆及 Slab 的獨立 Mark & Size 開關；平面圖以兩行顯示，上行標記、下行尺寸，尺寸單位為 mm。
+- 直向梁及牆的標註隨構件旋轉 90°；使用實際顯示梁號，柱標註對應當層柱，隱藏構件時一併隱藏其標註。
+- 保留原有圖注開關，避免同類構件重複標記；新控制只影響螢幕平面圖，不修改模型、工程計算或 Section A／B 報告。
+- 新增 member-labels167 回歸：七個獨立開關、梁號與尺寸、上下行次序、直梁旋轉、可見性及項目資料不變；本機版及含 Transfer Truss 的 PR 版均通過，並核對畫面。
+
+## E2.166 — 柱縮小時恢復原軸線定位
+
+- 修正放大後保存的柱中心被當成永久基準，導致由大改細仍留在大柱中心的問題。
+- 保存中心與原軸線／柱定位規則一致時，改尺寸前解除衍生中心，按新尺寸重新定位；真正另行偏移的中心仍保留。
+- 支援舊項目已有的大柱中心、單改 B／D、批量修改及共用 Framing；不改延後全樓 Check 的操作。
+- 新增 column-resize166 回歸：手動／自動柱、放大縮小及重載、舊資料修復、定位與偏移保留、無效尺寸整批回滾。
+- 柱參數表、柱界線／延後 Check、主梁中心及主次梁連接回歸通過；Section A／B、Excel 模板及 EXE 未改。
+
+## E2.165 — 主梁及相連次梁一起跟隨柱中心
+
+- 修正一端接柱、另一端接轉換梁的自動主梁，以及同一直線的分段主梁，沒有跟隨柱中心的問題。
+- 次梁端點跟隨已接受的新主梁位置；保留次梁間距、牆面連接、梁號及原荷載參考線。
+- 整組驗證主梁範圍及重疊；調整被拒絕時，次梁不會連到無效的新位置。不強制改動手動畫梁或不一致的柱中心線。
+- 新增可獨立執行的 beam-network165 回歸測試，並用 F03 項目副本核對 MB26 分段及 SB28–SB34。
+- 按使用者要求，每次完成修改均建立或更新 PR，列明改動與測試結果。此次只更新網頁程式及源碼，未重新生成 EXE。
+
+## E2.165 PR integration — 2026-10-07
+
+- Integrate E2.144–E2.165 framing, loading and column updates with the existing Transfer Truss implementation on main.
+- Keep the current main desktop host and Excel bridge; update the bundled web app and source without rebuilding executables.
+
+## E2.164 — 自動主梁中線跟隨柱中心（預覽）
+
+- 修正保存的自動 MB 只跟柱更新梁闊、仍沿用舊中線的問題；兩端柱中心可形成有效正交梁時，優先更新實體梁端點。
+- 保存支承柱關聯以供後續移動／加大使用，保留梁號、原荷載參考線及輸入；不強制移動會越界、穿 Opening 或重疊的梁。
+- 以 F03 MB19 重現並驗證 X 20.50 → 20.25 m，同列 MB21／MB23 同步對齊，108 根梁及既有荷載設定保留。
+- 驗證柱加大、重新載入、延後全樓 Check、牆受荷、同 bay 板方向及重複梁合併；Section A／B 報告與 Excel 模板保持不變。
+
+## E2.163 — 合併柱尺寸更新後的重複梁記錄（預覽）
+
+- 僅合併各共用樓層均確認重複、同尺寸及同位置的跟柱寬 MB；端點差異須完全位於支承柱內。
+- 保留現有有效梁和完整舊記錄備份，轉移相容的選取／報告選項；獨立荷載、支承參照或設定衝突仍保留供核對。
+- 不按底線或梁號格式刪除。以最新項目副本驗證 F02 保持 81 根有效梁，各層梁／柱／板幾何不變。
+- 保留手動更新全樓 Check 的操作及 Section A／B 報告、Excel 模板。
+
+## E2.162 — 跟柱梁寬更新及最終模型提示（預覽）
+
+- 跟柱寬的 MB 加寬後可向內調整實體截面，保留梁號及傳荷參考線；仍檢查完整樓面／Opening 範圍及重疊。
+- 優先保留已有效放置的梁；調整後與現有梁衝突時列明對應梁號，保留原始記錄，不生成重複構件。
+- 模型提示依各樓層完成局部樓層處理後的模型收集，移除中途 Framing 模型造成的矛盾提示。
+- 已以項目副本及柱加大測試驗證，並通過柱界線／延後 Check、牆受荷及同 bay 板方向回歸；Section A／B 報告與 Excel 模板不變。
+
+## E2.161 — 等跨板沿用同 bay 方向（預覽）
+
+- 未指定方向的等跨板，沿用同一主梁／牆 bay 內其他板的一致已知方向；不跨 bay、不循環推斷。
+- 保留手動方向及懸挑板固定邊；無參考或方向衝突仍提示選擇。圖上箭嘴、板計算與傳荷共用判斷。
+- 已驗證等跨板傳荷與手動指定相同方向一致；保留 Section A／B 報告及 Excel 模板。
+
+## E2.160 — 當層柱選取框（預覽）
+
+- 選取框沿當層柱完整截面繪製，避免只框住與上層柱重疊的局部；標示柱號及樓層。
+- 已驗證當層 1500、上層 1000 的重疊情況；不改受荷面積、荷載計算或 Section A／B 報告。
+
+## E2.159 — 修正偏心柱的零受荷面積（預覽）
+
+- 幾何 tributary area 統一使用實際柱截面中心，避免已對齊／複製柱與有基準位置偏移的柱混用中心和軸線參考座標。
+- 以 F04／AC12 的已觀察座標重現舊版 0 面積，驗證修正後為 28.6875 m²；柱＋牆面積守恆、無重疊，G／Q 及原報告數值一致。
+- 不修改構件座標、尺寸、手動面積或 Section A／B 報告格式；不自動觸發全樓 Check。
+
+## E2.158 — 牆組受荷面積與自動 MB 梁闊（預覽）
+
+- 牆組按相鄰支承半跨取得獨立 tributary area，扣除 OP／刪除樓板；柱面積扣除牆組範圍，避免重疊。
+- Summary Check 點牆可查看牆組面積、逐層 DL／SDL／LL 荷載合計及平面範圍；連續牆組逐層累計，相連牆肢不重複。
+- 已保存的自動 MB 布置仍隨柱更新梁闊；手動指定梁闊保留，更新時檢查邊界／梁衝突。
+- Section A／B 報告與 Excel 模板格式保持不變；只更新相關計算結果。本次為本機預覽。
+
+## E2.157 — 延後驗算與柱邊界（預覽）
+
+- 套用建議後保留上次清單及其餘套用按鈕，標示待更新；只有手動按更新才重新 Check。
+- 柱放大越界時嘗試最小幅度向內調整，無法放下則整批拒絕；單柱及批次尺寸編輯共用檢查。
+
+## E2.156 — 所選柱參數表（預覽）
+
+- 多選柱顯示所選柱的 B、D、中心座標及基準位置；B／D 可逐行或批次修改，留空保留原值。
+- 共用 Framing 同步，保留選取，整批可一次撤銷。
+
+## E2.155 — 套用柱尺寸建議（預覽）
+
+- Summary Check 增加逐柱套用欄及套用全部樓層按鈕；共用 Framing 取各層最大建議尺寸。
+- 整批可撤銷，拒絕過期建議及導致柱無法生成的尺寸；套用後提示重新驗算。
+
+## E2.154 — 柱尺寸建議（預覽）
+
+- Summary Check／Member Check 的柱失敗提示改為 500 mm 遞增尺寸建議，按設定目標鋼筋率優先選尺寸，實配仍受 4% 上限限制。
+- 建議不自動修改構件；原始驗算及 Section A／B 報告保持不變。
+
 # 版本记录
 
-## E2.143 — 2026-10-06
+## E2.153 Preview - 2026-10-07
 
-- Import the supplied E2.142 Windows baseline and add only the transfer-truss feature from PR #1. Existing E2.142 layout and member-selection behavior are retained.
-- Add same-floor and multi-storey S460 trusses, axial-member checks, reaction propagation and a standalone Excel workbook.
-- Preserve original Section A/B report layouts, VBA and workbook templates. Truss-affected columns use physical reactions for checking; Section A area-table export is explicitly blocked for those columns rather than reformatted.
-- Verified: 55 existing loading assertions; 11 core, 12 integration and 11 downstream groups; four no-truss models match E2.142; native Excel 451 comparisons with zero differences. UI inputs and undo checked.
+- Set the RC column reinforcement ratio maximum to 4% for automatic selection, manual checks, shared input validation and the active v109 Excel template.
+- Preserve Section A/B report content, layout, native VBA and prior template/release versions. No EXE build or GitHub upload.
 
+## E2.152 Preview - 2026-10-07
+
+- Restore rotation and panning in the beam-layout 3D view by restricting slab pointer handling to the plan view.
+- Apply the Loading beam-reference switch to 3D beams as well as plan reference lines.
+- Preview only; calculations, Section A/B reports, Excel templates and EXE are unchanged, with no GitHub upload.
+
+## E2.151 Preview - 2026-10-07
+
+- Place non-default slab thickness numbers beside each slab direction symbol. Keep numbers inside the slab, rotate in narrow panels and remove external leader labels.
+- Preview only; calculations, reports, Excel templates and EXE are unchanged, with no GitHub upload.
+
+## E2.150 Preview - 2026-10-07
+
+- Use numbers only for non-default slab thickness labels. Prefer labels inside slabs and rotate 90 degrees when horizontal space is insufficient; retain readable callouts for very small panels.
+- UI-only preview update; no changes to calculations, reports, Excel templates or EXE, and no GitHub upload.
+
+## E2.149 Preview - 2026-10-07
+
+- Add the default 200 mm note beside slab direction controls. Annotate non-200 mm slabs in the beam-layout plan independently of direction visibility; use leader labels when panels are too small.
+- Keep calculations, reports, Excel templates and the Windows package unchanged. Preview only; no EXE build or GitHub upload.
+
+## E2.148 Preview - 2026-10-07
+
+- Add MB (including TB/CB) and SB parameter tables for selected beams only. Edit beam type and width per row or apply to selected beams, while displaying span and the existing automatic depth.
+- Synchronize shared Framing floors, preserve Loading/Check inputs when changing type, retain selection after automatic-beam edits, reject conflicting geometry atomically and support undo.
+- Beam-table, slab-table and selection-scope browser tests pass. Reports, Excel templates and the Windows package remain unchanged; no EXE build or GitHub upload.
+
+## E2.147 Preview - 2026-10-07
+
+- Show only selected slabs in the thickness table. Remove apply-all, select-all, clear-selection and table-save buttons; commit individual thickness edits on blur or Enter and retain apply-to-selected.
+- Preserve shared Framing synchronization, undo and existing reports. Preview only; no EXE package or GitHub upload.
+
+## E2.146 Preview - 2026-10-07
+
+- Add a Slab thickness table with individual row edits, plan/table selection, apply-to-selected and apply-to-all actions. Thickness changes synchronize all floors sharing the Framing.
+- Preserve pending table edits during selection; validate the complete update before applying it and support one-step undo. Reuse existing slab thickness storage and self-weight calculations.
+- Verified partial/all edits, shared and unrelated Framings, saving/reopening, self-weight, invalid inputs and selection regressions. Section A/B reports, Excel templates and EXE remain unchanged; no package or GitHub upload.
+
+## E2.145 Preview - 2026-10-07
+
+- Move saved Loading group editing into the matching legend rows and remove the duplicate saved-group table. Preserve the original floor range, merged-source selection, covered settings and group deletion inside the editor.
+- Verified edit/save/undo, current-floor legend deletion and multi-floor group deletion. Reports, calculations and EXE are unchanged; no package or GitHub upload.
+
+## E2.144 Preview - 2026-10-07
+
+- Loading area includes column footprints. Apply their surface loads directly to the corresponding columns once; retain net slab concrete and existing beam-top allocation.
+- Recover column holes within saved selection rectangles for both the legend and geometric column load regions. Keep openings, slab voids, walls and exact-coordinate boundaries.
+- Verified load conservation, regional inputs, reopening, multi-floor accumulation and existing geometry regressions. Report rendering, Excel templates and EXE remain unchanged. No Windows package or GitHub upload, as requested.
+
+## E2.143 - 2026-10-07
+
+- Rotate Loading area names 90 degrees when a complete horizontal label does not fit; restore horizontal labels when space permits. Keep badges inside visible loading surfaces and away from openings.
+- Verify narrow Shop labels, resizing, fallback labels, opening avoidance and actual canvas rendering without modifying project data. Preserve Section A/B reports and native Excel templates.
 
 ## E2.142 Windows - 2026-10-06
 
@@ -288,3 +462,13 @@
 当前项目 A 18 页 / B 6 页、多楼层测试模型 A 23 页 / B 9 页均已渲染检查；正文与计算字符比对通过。此次仅调整排版，未重新进行工程计算。
 
 仓库导入时保持 App 运行文件及源码与 E2.110 发布文件逐字节一致。历史发布包、个人项目、测试 PDF 及本机备份没有上传。
+
+
+## Transfer Truss release history (main)
+
+## E2.143 — 2026-10-06
+
+- Import the supplied E2.142 Windows baseline and add only the transfer-truss feature from PR #1. Existing E2.142 layout and member-selection behavior are retained.
+- Add same-floor and multi-storey S460 trusses, axial-member checks, reaction propagation and a standalone Excel workbook.
+- Preserve original Section A/B report layouts, VBA and workbook templates. Truss-affected columns use physical reactions for checking; Section A area-table export is explicitly blocked for those columns rather than reformatted.
+- Verified: 55 existing loading assertions; 11 core, 12 integration and 11 downstream groups; four no-truss models match E2.142; native Excel 451 comparisons with zero differences. UI inputs and undo checked.

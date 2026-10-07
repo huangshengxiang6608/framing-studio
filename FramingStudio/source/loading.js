@@ -163,6 +163,13 @@ const Loading=(()=>{
    }
   }
  }
+ // Loads over a column footprint enter that column directly, once. They do
+ // not add slab concrete or duplicate the beam-top strips at column joints.
+ function addColumnSurface(p,f,model,columns,autoSW,areaTracing){
+  for(const {column,rects,parts,errors}of LoadRegions83.columnSurface(p,f,model)){const c=columns.find(c=>c.member===column);if(!c)continue;c.errors.push(...errors);c.surfaceArea=rects.reduce((n,r)=>n+LoadRegions83.area(r),0);
+   for(const r of parts){const load=r.load,A=LoadRegions83.area(r),dl=autoSW?0:load.dl;if(![dl,load.sdl,load.ll].every(available)||!autoSW&&load.basis!=='total'){c.errors.push('柱位 '+load.areaName+'：請填寫 DL / SDL / LL');continue;}c.g+=(dl+load.sdl)*A;c.q+=load.ll*A;if(areaTracing&&load.ll>tol)(c.sources101??=[]).push({floor:f,slab:'柱位 '+column.id,rect:{...r,load:undefined},area:load.ll*A});}
+  }
+ }
  function run(...args){const steps=runSteps(...args);let next;do{next=steps.next();}while(!next.done);return next.value;}
  function* runSteps(p,r,section="B",areaTracing=false,inspectionFloor=null){const autoSW=section!=="A",cfg=settings(p),rows=[],memo=new Map(),columnAbove=[],wallAbove=[],issues=[],rootMoments=[],tt=typeof TrussModel109!=='undefined'?TrussModel109.manager(p,r):null;
   function design(method,o){const stamp=JSON.stringify([method,o]);if(!memo.has(stamp)){try{memo.set(stamp,S[method](o));}catch(e){memo.set(stamp,{status:'INPUT REQUIRED',fail:[e.message],description:'—'});}}return memo.get(stamp);}
@@ -218,6 +225,7 @@ const Loading=(()=>{
     if(new Set(pieces.map(r=>JSON.stringify(autoSW?[r.load.sdl,r.load.ll]:[r.load.dl,r.load.sdl,r.load.ll]))).size>1&&!areaTracing)errors.push('此板含局部或不同区域荷载：已按实际范围传荷；原 Excel 均布荷载板验算不适用，需单独验算');rr.result=errors.length?{status:'INPUT REQUIRED',fail:[...new Set(errors)],description:'—'}:queue('slab',{kind:cs?'CS':'SLAB',id:c.id,L:calculation.L,h:c.thickness,fcu:cfg.fcu,fire:cfg.fire,dl:load.dl,sdl:load.sdl,ll:load.ll,steel:o.steel,dlIncludesSelfWeight:!autoSW});
    }
    addBeamSurface(p,f,model,beams,autoSW,areaTracing);
+   addColumnSurface(p,f,model,columns,autoSW,areaTracing);
    function solve(b,path=new Set()){if(b.done)return;if(path.has(b)){for(const item of path)item.errors.push('梁之间形成相互支承，简支传荷顺序不明确');b.errors.push('梁之间形成相互支承，简支传荷顺序不明确');return;}path=new Set(path);path.add(b);for(const child of beams.filter(x=>x.sinks.some(s=>s?.target===b)))solve(child,path);if(b.done)return;const c=b.member,rr=addRow(b.kind,c),o=resolvedInput(p,r,f,c),span=beamSpan(c,o),len=span.value,scaled=beamSpanLoads(span,b.lines,b.points),manual=o.mode==='manual'&&!b.truss109?.length,isCB=c.displayKind==='CB',table=Array.isArray(o.beamLoads)?BeamLoads.resolve(o,len):null;let gd=0,ql=0,points=scaled.points.map(x=>({...x})),error=[...b.errors];b.lines=scaled.lines;b.points=scaled.points;b.row=rr;inheritTruss(b,b.truss109);if(b.truss109?.length&&o.mode==='manual')error.push('此梁承接桁架反力，须恢复自动传荷模式，避免覆盖反力或掩盖上游不完整输入');
     const replacement=tt?.replaced(f,b);if(replacement){tt.rejectDirect(replacement,b,o);b.done=true;rr.replacedByTruss=replacement.t.id;rr.result={status:'REPLACED',fail:[],description:replacement.t.name+' 独立桁架设计'};if(replacement.errors.length)traceProblem(b,replacement.errors.join('；'));return;}
     if(manual){error=[...b.supportErrors,...b.errors.filter(x=>x.includes('相互支承'))];if(isCB&&!['a','z'].includes(o.fixedEnd))error.push('CB：'+cbRoot(p,r,f,c).message);if(table){error.push(...table.errors);}else if(!available(o.udlDead)||!available(o.udlLive))error.push('请填写手动线荷载 G、Q（含结构自重）');else {gd+=o.udlDead;ql=o.udlLive;}points=[];if(areaTracing)error.push('使用手动总荷载，无法对应自动承载面积');}
@@ -239,7 +247,7 @@ const Loading=(()=>{
    }
    for(const b of beams){yield {phase:'传荷',floor:f,id:b.member.id};solve(b);}
    tt?.solveFloor(f);tt?.receive(f,columns);const failedSources=beams.filter(b=>!b.row?.actions&&!b.row?.replacedByTruss);for(const b of failedSources)traceProblem(b,FloorLevels.name(p,f)+' '+(b.member.displayId||b.member.id)+'：'+[...new Set(b.row?.result.fail||b.errors)].join('；'));
-   for(const c of columns){const rr=addRow('COL',c.member,{sources101:c.sources101||[],...(c.truss109?.length?{truss109:c.truss109}:{})}),o=rr.input,manual=o.mode==='manual'&&!c.truss109?.length,areaMode=o.mode==='area'&&!c.truss109?.length;let areaCalc=null,gd=c.g,ql=c.q,err=[...c.errors];if(c.truss109?.length&&['manual','area'].includes(o.mode))err.push('此柱承接桁架反力，须恢复自动累计模式，避免覆盖反力');if(manual){err=[];gd=o.dead;ql=o.live;if(!available(gd)||!available(ql))err.push('请填写柱累计 G、Q（含自重）');}if(areaMode){try{areaCalc=columnAreaLoads(p,r,f,o,section);gd=areaCalc.dead;ql=areaCalc.live;err=areaCalc.errors;}catch(e){err=[e.message];gd=ql=0;}}rr.loading={dead:gd,live:ql,selfWeight:0,areaCalculation:areaCalc,mode:c.truss109?.length?'TT 反力＋逐层累计 G/Q':areaMode?'手动面积备用':manual?'手动累计荷载':'逐层自动累积'};rr.result=err.length?{status:'INPUT REQUIRED',fail:[...new Set(err)],description:'—'}:queue('column',{id:c.member.id,b:c.member.b*1000,h:c.member.d*1000,height:LocalHeights96.columnHeight(p,r,f,c.member),factor:o.factor??cfg.columnFactor,fcu:cfg.columnFcu,ratio:cfg.columnRatio,projectFactor:cfg.columnProject,dead:gd,live:ql,system:o.system||'Braced',steel:o.steel});columnAbove.push({...c,g:available(gd)?gd:0,q:available(ql)?ql:0,errors:err});}
+   for(const c of columns){const rr=addRow('COL',c.member,{sources101:c.sources101||[],...(c.truss109?.length?{truss109:c.truss109}:{})}),o=rr.input,manual=o.mode==='manual'&&!c.truss109?.length,areaMode=o.mode==='area'&&!c.truss109?.length;let areaCalc=null,gd=c.g,ql=c.q,err=[...c.errors];if(c.truss109?.length&&['manual','area'].includes(o.mode))err.push('此柱承接桁架反力，须恢复自动累计模式，避免覆盖反力');if(manual){err=[];gd=o.dead;ql=o.live;if(!available(gd)||!available(ql))err.push('请填写柱累计 G、Q（含自重）');}if(areaMode){try{areaCalc=columnAreaLoads(p,r,f,o,section);gd=areaCalc.dead;ql=areaCalc.live;err=areaCalc.errors;}catch(e){err=[e.message];gd=ql=0;}}rr.loading={dead:gd,live:ql,selfWeight:0,surfaceArea:c.surfaceArea||0,areaCalculation:areaCalc,mode:c.truss109?.length?'TT 反力＋逐层累计 G/Q':areaMode?'手动面积备用':manual?'手动累计荷载':'逐层自动累积'};rr.result=err.length?{status:'INPUT REQUIRED',fail:[...new Set(err)],description:'—'}:queue('column',{id:c.member.id,b:c.member.b*1000,h:c.member.d*1000,height:LocalHeights96.columnHeight(p,r,f,c.member),factor:o.factor??cfg.columnFactor,fcu:cfg.columnFcu,ratio:cfg.columnRatio,projectFactor:cfg.columnProject,dead:gd,live:ql,system:o.system||'Braced',steel:o.steel});columnAbove.push({...c,g:available(gd)?gd:0,q:available(ql)?ql:0,errors:err});}
    for(const w of wallGroups)wallAbove.push({...w,g:w.g});rows.push(...local.filter(x=>!x.replacedByTruss));
   }
   for(const rr of rows){yield {phase:'验算',floor:rr.floor,id:rr.id};rr.checked=p.explorer?.selected?.[rr.floor+'|'+rr.token]===true;
@@ -281,7 +289,25 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
    for(let i=1;i<cuts.length;i++){if(cuts[i]-cuts[i-1]<tol)continue;const q=[];q[axis]=(cuts[i]+cuts[i-1])/2;q[cross]=coordinate;if(!slabWinner(c,members,cross,q))return false;}return true;});
  }
 
- function slabDirection(p,f,t,c,model){if(c.direction101&&!c.direction116&&!c.shortSpan116&&!input(p,f,t).direction)return c.direction101;const o=input(p,f,t);if(o.slabType==='CS'){if(['left','right'].includes(o.csFixedEdge))return 'X';if(['top','bottom'].includes(o.csFixedEdge))return 'Y';return null;}if(['X','Y'].includes(c.direction116))return c.direction116;if(c.netBoundary120&&['X','Y'].includes(o.direction))return o.direction;if(c.netBoundary120&&Math.abs((c.x1-c.x0)-(c.y1-c.y0))<tol)return null;const short=c.x1-c.x0<=c.y1-c.y0?'X':'Y',other=short==='X'?'Y':'X';if(c.shortSpan116||c.netBoundary120)return short;model??=E.floorModel(E.generate(p),f);return oppositeSupports(model,c,short)?short:oppositeSupports(model,c,other)?other:short;}
+ // Resolve an equal-span panel only from independently known directions in its
+ // enclosing primary-beam/wall bay. Never use inferred peers as new evidence.
+ function slabDirection(p,f,t,c,model){
+  const own=slabOwnDirection161(p,f,t,c,model);
+  if(own||!c.netBoundary120||input(p,f,t).slabType==='CS'||Math.abs((c.x1-c.x0)-(c.y1-c.y0))>=tol)return own;
+  model??=E.floorModel(E.generate(p),f);
+  const inside=(s,b)=>s.x0>=b[0]-tol&&s.x1<=b[1]+tol&&s.y0>=b[2]-tol&&s.y1<=b[3]+tol;
+  const bays=[...new Map((model.panels||[]).filter(b=>inside(c,b)).map(b=>[b.map(nice).join(','),b])).values()];
+  if(bays.length!==1)return null;
+  const known=new Set();
+  for(const peer of model.slabs||[]){
+   if(peer===c||!inside(peer,bays[0]))continue;
+   const pt=token('SLAB',peer);if(input(p,f,pt).slabType==='CS')continue;
+   const dir=slabOwnDirection161(p,f,pt,peer,model);if(dir)known.add(dir);
+   if(known.size>1)return null;
+  }
+  return known.size===1?[...known][0]:null;
+ }
+ function slabOwnDirection161(p,f,t,c,model){if(c.direction101&&!c.direction116&&!c.shortSpan116&&!input(p,f,t).direction)return c.direction101;const o=input(p,f,t);if(o.slabType==='CS'){if(['left','right'].includes(o.csFixedEdge))return 'X';if(['top','bottom'].includes(o.csFixedEdge))return 'Y';return null;}if(['X','Y'].includes(c.direction116))return c.direction116;if(c.netBoundary120&&['X','Y'].includes(o.direction))return o.direction;if(c.netBoundary120&&Math.abs((c.x1-c.x0)-(c.y1-c.y0))<tol)return null;const short=c.x1-c.x0<=c.y1-c.y0?'X':'Y',other=short==='X'?'Y':'X';if(c.shortSpan116||c.netBoundary120)return short;model??=E.floorModel(E.generate(p),f);return oppositeSupports(model,c,short)?short:oppositeSupports(model,c,other)?other:short;}
  // Slab inspection has no upper-floor dependencies; only expose its slab row,
  // never the partial column/beam accumulation from this single-floor preview.
  // Inspect every current member without changing the user's Check/report selections.
@@ -289,8 +315,8 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
  function* auditSteps(p,r){
   const q=E.clone(p),ex=init(q);ex.selected={};for(const f of r.floors)for(const m of members(q,r,f.n))if(m.kind!=='COL'||m.member.status!=='上层柱')ex.selected[f.n+'|'+m.token]=true;
   const out=yield* runSteps(q,r,'B'),items=[],zones=new Map();
-  const add=(row,status,reasons,path)=>{if(!reasons.length)return;items.push({floor:row.floor,framing:row.framing||r.floors[row.floor-1]?.type,id:row.id,token:row.token,kind:row.displayType||row.member?.displayKind||row.kind,status,path,reasons:[...new Set(reasons)]});};
-  for(const row of out.rows){yield {phase:'汇总',floor:row.floor,id:row.id};if(!row.checked)continue;const s=row.result.status||'ERROR';if(!/^OK(?:$|[ (])/.test(s))add(row,s,row.result.fail?.length?row.result.fail:[row.result.description||s],'Check');
+  const add=(row,status,reasons,path,recommendation)=>{if(!reasons.length)return;items.push({floor:row.floor,framing:row.framing||r.floors[row.floor-1]?.type,id:row.id,token:row.token,kind:row.displayType||row.member?.displayKind||row.kind,status,path,reasons:[...new Set(reasons)],...(recommendation?{recommendation,columnKey:E.columnPositionKey(row.member)}:{})});};
+  for(const row of out.rows){yield {phase:'汇总',floor:row.floor,id:row.id};if(!row.checked)continue;const s=row.result.status||'ERROR';if(!/^OK(?:$|[ (])/.test(s)){const advice=row.kind==='COL'?S.columnAdvice(row.result):null;add(row,s,advice?.reasons||(row.result.fail?.length?row.result.fail:[row.result.description||s]),'Check',advice?.recommendation);}
    const transfer=row.kind==='COL'?row.loading.transferErrors:row.transferErrors;if(transfer?.length)add(row,'TRANSFER PENDING',transfer,'传荷');
    if(['MB','SB','TB','CB'].includes(row.kind)){if(!zones.has(row.floor))zones.set(row.floor,LocalHeights96.zones(q,row.floor));const box=slabGeometry.box(E.rect(row.member)),hits=zones.get(row.floor).filter(z=>LocalHeights96.overlap(z.rect,box)>1e-7),limit=hits.length?Math.min(...hits.map(z=>z.sh??0)):r.floors[row.floor-1].sh,depth=row.member.d*1000;if(Number.isFinite(limit)&&depth>limit+tol)add(row,'HEIGHT',[`梁深 ${depth.toFixed(0)} mm 超过本构件所在区域结构高度 ${limit.toFixed(0)} mm`],'结构高度');}
   }

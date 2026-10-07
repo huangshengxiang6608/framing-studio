@@ -17,8 +17,14 @@ const ColumnLoads101=(()=>{
  function highlights(p,result,f){if(!target)return [];const col=Loading.members(p,result,target.floor).find(x=>x.token===target.token);if(!col||col.kind!=='COL'){clear();return [];}const o=Loading.input(p,target.floor,target.token),auto=!String(o.sectionAAreas||'').trim()||o.sectionAAreaMode==='auto';let d;try{d=schedule(p,result,target.floor,target.token,auto);}catch{return [];}const r=d.rows.find(r=>r.floor===f);if(!r)return [];return r.parts.flatMap(x=>x.weighted?x.rects.map((rect,i)=>({colour:'#0096a7',fraction:rect.fraction,active:true,name:i===0?col.id+' · '+num(r.area)+' m² · 几何面积经 TB 分配':' ',rects:[rect]})):[{colour:'#0096a7',active:true,name:col.id+' · '+num(r.area)+' m²',rects:x.rects}]);}
  document.addEventListener('click',e=>{const b=e.target.closest('[data-column-source101]');if(!b||!target)return;sourceView=true;StudioHost.viewFloor(+b.dataset.columnSource101);});
  // Geometric footprints are independent of force-solver errors.
+ function wallTable(h){
+  const id=h.selected.member.id;selectSame(h.floor,h.selected.token);target.kind='WALL';target.id=id;
+  const d=ColumnAreas103.wallSchedule(h.p,h.result,h.floor,id);
+  return '<section class="wall-area158"><h3>牆組受荷面積 · '+d.members.map(esc).join(' / ')+'</h3><p>按相鄰柱／牆半跨分界；相連牆共同承托，扣除 OP 洞口及已刪樓板。</p>'+(d.errors.length?'<div class="issue">'+d.errors.map(esc).join('<br>')+'</div>':'')+'<div class="table-wrap"><table><thead><tr><th>樓層</th><th>面積 m²</th><th>本層 G kN</th><th>本層 Q kN</th></tr></thead><tbody>'+d.rows.map(r=>'<tr><td>'+esc(FloorLevels.name(h.p,r.floor))+'</td><td>'+num(r.area)+'</td><td>'+num(r.G)+'</td><td>'+num(r.Q)+'</td></tr>').join('')+'</tbody></table></div><p>牆組累計 G = <b>'+num(d.totalG)+'</b> kN；Q = <b>'+num(d.totalQ)+'</b> kN。</p><p class="muted">G = 面積 × (DL + SDL)，Q = 面積 × LL；DL 已含自重。這是牆組的幾何面積荷載，與柱面積互不重複；梁端反力另按支承模型傳遞，不再疊加到此表。牆承載力未在此驗算。</p></section>';
+ }
  function viewData(p,result,f){if(target&&p.transferTrusses?.length&&TrussUI109.results(p,result).rows.some(r=>r.floor===target.floor&&r.token===target.token&&r.truss109?.length))return null;
   if(!target)return null;
+  if(target.kind==='WALL'){const d=ColumnAreas103.wallSchedule(p,result,target.floor,target.id),row=d.rows.find(r=>r.floor===f);if(!row)return null;return {id:d.members.join(' / '),kind:'WALL',token:target.token,targetFloor:target.floor,targetName:FloorLevels.name(p,target.floor),floor:f,floorName:FloorLevels.name(p,f),area:row.area,rects:row.rects,polygons:row.polygons,partitioned:true,weighted:false,auto:true,errors:d.errors};}
   const col=Loading.members(p,result,target.floor).find(x=>x.token===target.token);
   if(!col||col.kind!=='COL'){clear();return null;}
   const o=Loading.input(p,target.floor,target.token),auto=!String(o.sectionAAreas||'').trim()||o.sectionAAreaMode==='auto';
@@ -83,5 +89,5 @@ const ColumnLoads101=(()=>{
   return {...box,title,caption,area:data.area,floor:data.floor,targetFloor:data.targetFloor,overlayOverlap:overlays.reduce((n,t)=>n+overlap(box,t),0)};
  }
 
- return {select,clear,table,schedule,highlights,viewData,region,badge,outline,issueCaption,browsing:()=>sourceView,matches:(t,f)=>target?.floor===f&&target?.token===t};
+ return {select,clear,table,wallTable,schedule,highlights,viewData,region,badge,outline,issueCaption,browsing:()=>sourceView,matches:(t,f)=>target?.floor===f&&target?.token===t};
 })();

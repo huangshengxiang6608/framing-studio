@@ -1,10 +1,10 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前网页版本为 **E2.171**（整合 E2.144–E2.171 更新及 main 现有 Transfer Truss 功能），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前版本为 **E2.172**（完整保留 E2.171 及 Transfer Truss，仅增加已确认的四项界面小修），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 
-桌面宿主及 ExcelBridge 沿用 main 中的既有程序；本次 PR 未重新编译 EXE。新增参数表、柱尺寸建议及主梁随柱中心更新的说明见 `CHANGELOG.md`。
+E2.172 统一网页与桌面版本、更新帮助、清理显示数字的浮点尾数，并为事务校验失败的输入保留错误值和就近提示。布局与计算不变。桌面宿主仅更新版本标识并重建；ExcelBridge、Excel 模板及 Section A/B 抄保持 E2.171 原样。完整更新见 `CHANGELOG.md`。
 
 ## 运行
 

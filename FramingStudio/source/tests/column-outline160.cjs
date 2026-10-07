@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path'),assert=require('assert'),{pathToFileURL}=require('url'),{chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});try{
+ const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(path.resolve('FramingStudio/assets/index.html')).href);await page.waitForFunction(()=>window.StudioHost);await page.addScriptTag({content:fs.readFileSync('tmp/column-outline160/drawing.js','utf8').replace('const Drawing=','window.LegacyDrawing160=')});
+ const fixture=JSON.parse(fs.readFileSync('tmp/column-centres159/results.json','utf8')).p;
+ const out=await page.evaluate(p=>{
+  const ok=(v,msg)=>{if(!v)throw Error(msg)},near=(a,b,msg)=>ok(Math.abs(a-b)<1e-7,msg),passed=[];
+  p.total=2;p.types.F2=Engine.clone(p.types.F1);p.groups=[{...p.groups[0],end:1},{...p.groups[0],type:'F2',end:'顶层'}];
+  for(const [key,size]of [['F1',1500],['F2',1000]]){const t=p.types[key];t.columns=[{id:'AC1',x:0,y:0,b:size,d:size,on:true,status:'上下贯通'}];t.columnPlacements=[{key:'id:AC1',x:size/2000,y:size/2000}];delete t.columnAxisPositions;t.walls=[];t.beams=[];t.opening={};}
+  const result=Engine.generate(p),m=Engine.floorModel(result,1),entries=ColumnPlan87.items(result,1);ok(entries.filter(e=>e.floor===1&&e.column.id==='AC1').length>1,'Column glyph has multiple fragments');
+  const before=JSON.stringify(p),opt={floor:1,columnPlan:entries,visible:{COL:true,WALL:true,MB:true,SB:true,SLAB:false},highlightScope:'none',selected:{kind:'COL',id:'AC1',f:1},zoom:1,panX:0,panY:0};
+  function draw(renderer,opt){const canvas=document.createElement('canvas');canvas.width=900;canvas.height=900;const ctx=canvas.getContext('2d'),strokes=[],texts=[],stroke=ctx.strokeRect.bind(ctx),text=ctx.fillText.bind(ctx);ctx.strokeRect=(...a)=>{if(ctx.strokeStyle==='#008cdb')strokes.push(a);stroke(...a)};ctx.fillText=(...a)=>{texts.push(a[0]);text(...a)};const plot=renderer.plan(ctx,900,900,p,m,opt);return {plot,strokes,texts,image:canvas.toDataURL()};}
+  const old=draw(LegacyDrawing160,opt),now=draw(Drawing,opt),r=Engine.columnRect(m.columns[0]);near(old.strokes.at(-1)[2],old.plot.scale+6,'Reproduces old outline only upper overlap width');const box=now.strokes.at(-1);near(box[0],now.plot.ox+(r.x-r.w/2)*now.plot.scale-3,'Full current column left');near(box[1],now.plot.oy+(r.y-r.d/2)*now.plot.scale-3,'Full current column top');near(box[2],r.w*now.plot.scale+6,'Full 1500 mm width');near(box[3],r.d*now.plot.scale+6,'Full 1500 mm depth');ok(now.texts.includes('选中 AC1 · 1/F'),'Floor label shown');passed.push('1500 current / 1000 upper: old frame covers 1000 overlap, new frame covers full 1500 current section with floor label');
+  const reversed=draw(Drawing,{...opt,columnPlan:[...entries].reverse()});ok(JSON.stringify(reversed.strokes)===JSON.stringify(now.strokes),'Outline independent of fragment order');
+  const none={...opt,selected:null};ok(draw(Drawing,none).image===draw(LegacyDrawing160,none).image,'Unselected drawing unchanged pixel-for-pixel');ok(JSON.stringify(p)===before,'Drawing does not mutate geometry or loads');passed.push('Reordering display fragments cannot change selection bounds; unselected rendering is pixel-identical; project unchanged');
+  return {passed,image:now.image};
+ },fixture);
+ fs.writeFileSync('tmp/column-outline160/verified.png',Buffer.from(out.image.split(',')[1],'base64'));fs.writeFileSync('tmp/column-outline160/results.json',JSON.stringify({passed:out.passed},null,2));assert.deepEqual(errors,[]);console.log(out.passed.join('\n'));
+ }finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});

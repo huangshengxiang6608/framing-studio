@@ -56,6 +56,27 @@ const SectionB=(()=>{
   const steel=Object.fromEntries(Object.entries(m.v).filter(([k])=>/^[CD](4[0-7]|11[0-7])$/.test(k)||['E58','G58','H58','E76','G76','H76'].includes(k)));return {kind,autoFailed:!o.steel&&!!stopped,status:fail.length?'NOT OK':'OK',fail,values:vals,inputs:m.v,steel,description:`${kind==='CB'?'下部受压':'上部'} ${desc(faces[0])}；${kind==='CB'?'上部受拉':'下部'} ${desc(faces[1])}；箍筋 ${g('E58')}肢 T${g('G58')}@${g('H58')}`,source:F[kind].sheet};
  }
  function column(o){positive(o,['b','h','height','factor','fcu','ratio','projectFactor']);nonnegative(o,['dead','live']);const values={C3:o.height*1000,C4:o.system||'Braced',C6:o.factor,C13:o.id||'C',C14:o.b,C15:o.h,C16:o.height*1000,C20:o.fcu,C21:500,C22:o.ratio,C23:1.4,C24:1.6,C25:o.projectFactor,C26:o.dead,C27:o.live,C28:(1.4*o.dead+1.6*o.live)*o.projectFactor,C39:'OK',C42:'OK'},m=machine('COL',values);if(o.steel){m.set('C5',o.steel.C5);m.set('C32',o.steel.C32);}const v=m.all(),fail=[];if(v.C40!=='OKAY (AREA ONLY)')fail.push(v.C40);if(v.C38!=='SHORT / BRACED')fail.push(v.C38);if(v.C41!=='OKAY (AXIAL ONLY)')fail.push(v.C41);return {kind:'COL',status:fail.length?'NOT OK':'OK (AXIAL ONLY)',fail,values:v,inputs:m.v,steel:{C5:v.C31,C32:v.C32},description:`${v.C32}T${v.C31}；As ${round(v.C33,0)} mm²；${round(v.C34,2)}%`,source:F.COL.sheet};}
- return {slab,beam,column,machine,round,cover};
+ // Display-only advice: reuse the checked inputs; never alter report results or geometry.
+ function columnAdvice(result){
+  const reasons=[...(result.fail||[])],v=result.inputs||{};
+  if(result.kind!=='COL'||result.status!=='NOT OK')return {reasons};
+  const explain=x=>x==='NO BAR OPTION'||x==='NOT OKAY: STEEL AREA / RATIO'?'現有柱截面／配筋不足':x==='STEEL / MATERIAL REVIEW'?'需覆核柱截面及配筋':x;
+  const fallback=message=>({reasons:[...new Set(reasons.map(explain)),...(message?[message]:[])]});
+  const target=v.C22,N=v.C28,fcu=v.C20,b=v.C14,h=v.C15;
+  if(![target,N,fcu,b,h,v.C3,v.C6,v.C25,v.C26,v.C27].every(Number.isFinite)||target<=0||target>4||N<0||b<=0||h<=0||![25,30,35,40,45,50,55,60].includes(fcu))return fallback('請先核對荷載、材料及目標鋼筋率（上限 4%）');
+  if(v.C4!=='Braced')return fallback('非支撐柱須另行設計，不能只按軸力建議尺寸');
+  const rho=Math.max(.008,target/100),strength=.35*fcu*(1-rho)+.67*500*rho;
+  for(let step=0;step<40;step++){
+   const B=Math.ceil(b/500)*500+step*500,H=Math.ceil(h/500)*500+step*500;
+   if(B<=b&&H<=h)continue;
+   if(B*H*strength+1e-6<N*1000)continue;
+   const candidate=column({id:v.C13,b:B,h:H,height:v.C3/1000,factor:v.C6,fcu,ratio:target,projectFactor:v.C25,dead:v.C26,live:v.C27,system:v.C4});
+   if(candidate.status!=='OK (AXIAL ONLY)'||candidate.values.C34>4)continue;
+   const recommendation={b:B,h:H,targetRatio:target,providedRatio:candidate.values.C34,description:candidate.description};
+   return {recommendation,reasons:[`建議柱尺寸 ${B} × ${H} mm（目標鋼筋率 ${target}%；每 500 mm 遞增）`,`按現有荷載及自動選筋通過軸力檢查；實配 ${round(candidate.values.C34,2)}% ≤ 4%。修改尺寸後須重新驗算。`]};
+  }
+  return fallback('500 mm 遞增搜尋未找到符合目標鋼筋率的尺寸，須另行覆核');
+ }
+ return {slab,beam,column,columnAdvice,machine,round,cover};
 })();
 if(typeof module!=='undefined')module.exports=SectionB;

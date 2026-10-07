@@ -24,7 +24,7 @@ function loading126Tests(){
  const base=copy(fixtures.slab),t=base.types.F1;t.beams.push({id:'MID',kind:'SB',a:{x:0,y:2},z:{x:6,y:2},b:250,d:400,on:true});LoadData.setFloor(base,1,{dl:10,sdl:1.5,ll:5});
  let checked=checkSurface(base,'secondary intersections');
  const all=checked.out.rows.filter(r=>r.kind==='COL');assert(all.every(r=>!r.loadErrors.length),'Complete transfer path remains valid');
- const Q=all.reduce((n,r)=>n+r.loading.live,0);assert(Q>=checked.expected.surface*5-1e-6&&Q-checked.expected.surface*5<.3,'Total base reactions conserve occupied-floor Q');
+ const Q=all.reduce((n,r)=>n+r.loading.live,0),gross=LoadRegions83.surface(checked.m).reduce((n,r)=>n+LoadRegions83.area(r),0);assert(Q>=gross*5-1e-6&&Q-gross*5<.3,'Total base reactions conserve occupied-floor Q');
  const flipped=copy(base);flipped.types.F1.beams.reverse();flipped.types.F1.beams.forEach(b=>[b.a,b.z]=[b.z,b.a]);let other=Loading.run(flipped,Engine.generate(flipped));for(const row of all)near(other.rows.find(r=>r.id===row.id).loading.live,row.loading.live,'Stable ownership on reorder/reverse '+row.id);
  passed.push('Secondary-to-main intersections counted once; total reactions, member reordering and reversal');
  for(const kind of ['void','opening','wall','offset','upper']){

@@ -20,9 +20,19 @@ const LoadRegions83=(()=>{
   return difference(s.rects,cuts).map(r=>({...r,load:{dl:0,sdl:0,ll:0}}));
  }
  const box=r=>({x0:r.x-r.w/2,x1:r.x+r.w/2,y0:r.y-r.d/2,y1:r.y+r.d/2}),eps=1e-6;
- // Floor surface is independent of net slab concrete. Openings, removed slabs,
- // solid walls and lower columns are not occupied floor surface.
- function surface(model){return difference(union((model.ts||[]).filter(t=>t.state===1).map(({x0,x1,y0,y1})=>({x0,x1,y0,y1}))),[...(model.slabVoids||[]),...model.walls.map(w=>box(Engine.rect(w))),...model.columns.filter(c=>c.status!=='上层柱').map(c=>box(Engine.columnRect(c)))]);}
+ // Loading includes column footprints; physical slab concrete stays net.
+ const columnBoxes=model=>(model.columns||[]).filter(c=>c.status!=='上层柱').map(c=>box(Engine.columnRect(c)));
+ function surface(model){return difference(union((model.ts||[]).filter(t=>t.state===1).map(({x0,x1,y0,y1})=>({x0,x1,y0,y1}))),[...(model.slabVoids||[]),...model.walls.map(w=>box(Engine.rect(w)))]);}
+ // Restore only column holes inside the user's saved selection. Explicit cuts
+ // owned by another region stay with that region; coordinates are never guessed.
+ function effectiveAreas(p,f,model){const assigned=LoadData.areas(p,f),occupied=assigned.flatMap(a=>a.rects||[]),columns=columnBoxes(model);return assigned.map(a=>{if(!a.rects||!a.selectionRects?.length)return a;const selected=clipSurface(a.selectionRects,model),extra=difference(selected.flatMap(r=>columns.map(c=>intersect(r,c)).filter(Boolean)),occupied);return extra.length?{...a,rects:union([...a.rects,...extra])}:a;});}
+ function columnSurface(p,f,model){let free=surface(model);const assigned=surfaceRegions(p,f,model),out=[],columns=model.columns.filter(c=>c.status!=='上层柱').sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+  for(const c of columns){const footprint=box(Engine.columnRect(c)),rects=free.map(r=>intersect(r,footprint)).filter(Boolean),errors=[];if(!rects.length)continue;
+   if(columns.some(q=>q!==c&&intersect(footprint,box(Engine.columnRect(q)))))errors.push('柱截面重疊，請核對柱位');
+   for(let i=0;i<assigned.length;i++)for(let j=0;j<i;j++)if(region(assigned[i]).some(a=>region(assigned[j]).some(b=>{const hit=intersect(a,b);return hit&&rects.some(r=>intersect(hit,r));})))errors.push('柱位荷載區域重疊，請核對 Loading');
+   out.push({column:c,rects,parts:pieces(p,f,{rects},assigned),errors});free=difference(free,[footprint]);
+  }return out;
+ }
  function clipSurface(rs,model){const floor=surface(model);return union(rs.flatMap(r=>floor.map(q=>intersect(r,q)).filter(Boolean)));}
  // Panel selections include their half of an adjoining beam top. At an outer
  // edge the sole adjoining panel covers the remaining beam width. Explicit
@@ -44,14 +54,14 @@ const LoadRegions83=(()=>{
     }rs.push(next);
    }return rs;
   }
-  for(const a of LoadData.areas(p,f))out.push(a.rects?a:{...a,rects:union(model.slabs.filter(s=>(a.panels||[]).includes(Loading.token('SLAB',s))).flatMap(s=>s.rects.flatMap(expand)))});
+  for(const a of effectiveAreas(p,f,model))out.push(a.rects?a:{...a,rects:union(model.slabs.filter(s=>(a.panels||[]).includes(Loading.token('SLAB',s))).flatMap(s=>s.rects.flatMap(expand)))});
   return out;
  }
  // Partition beam footprints once. Receiving beams own intersections before
  // supported beams; independent crossings use depth, kind and stable geometry.
  // This is surface-load bookkeeping, not a new frame/joint analysis.
  function beamSurface(p,f,model,beams){
-  let free=difference(surface(model),model.slabs.flatMap(s=>s.rects));const assigned=surfaceRegions(p,f,model),out=[],ordered=[],seen=new Set();
+  let free=difference(surface(model),[...model.slabs.flatMap(s=>s.rects),...columnBoxes(model)]);const assigned=surfaceRegions(p,f,model),out=[],ordered=[],seen=new Set();
   const rank={TB:0,MB:1,CB:2,SB:3},sorted=[...beams].sort((a,b)=>b.member.d-a.member.d||(rank[a.member.displayKind||a.kind]??4)-(rank[b.member.displayKind||b.kind]??4)||a.token.localeCompare(b.token));
   function visit(b){if(seen.has(b))return;seen.add(b);for(const s of b.sinks||[])if(s?.type==='BEAM')visit(s.target);ordered.push(b);}sorted.forEach(visit);
   for(const b of ordered){const footprint=box(Engine.rect(b.member)),rs=free.map(r=>intersect(r,footprint)).filter(Boolean);if(!rs.length)continue;const errors=[];
@@ -73,6 +83,6 @@ const LoadRegions83=(()=>{
  }
  // Reaction per metre along the support, integrated across the original span.
  function reaction(parts,dir,mid,lo,span,right,cs,sw,autoSW){const axis=dir==='X'?'y':'x',cross=dir==='X'?'x':'y';let out={g:0,q:0,sw:0,dl:0,sdl:0,mG:0,mQ:0,good:true};for(const r of parts){if(mid<=r[axis+'0']||mid>=r[axis+'1'])continue;const u=r[cross+'0']-lo,v=r[cross+'1']-lo,len=v-u,moment=right?span*len-(v*v-u*u)/2:(v*v-u*u)/2,weight=cs?len:right?(v*v-u*u)/(2*span):len-(v*v-u*u)/(2*span),load=r.load,dl=autoSW?0:load.dl;if(![dl,load.sdl,load.ll].every(x=>typeof x==='number'&&Number.isFinite(x)&&x>=0)){out.good=false;continue;}out.sw+=sw*weight;out.dl+=dl*weight;out.sdl+=load.sdl*weight;out.g+=(sw+dl+load.sdl)*weight;out.q+=load.ll*weight;out.mG+=(sw+dl+load.sdl)*moment;out.mQ+=load.ll*moment;}return out;}
- return {area,valid,intersect,subtract,difference,union,region,clip,pieces,summary,reaction,netSelfWeight,surface,clipSurface,surfaceRegions,beamSurface,axisBox,boundary};
+ return {area,valid,intersect,subtract,difference,union,region,clip,pieces,summary,reaction,netSelfWeight,surface,clipSurface,effectiveAreas,surfaceRegions,columnSurface,beamSurface,axisBox,boundary};
 })();
 if(typeof module!=='undefined')module.exports=LoadRegions83;

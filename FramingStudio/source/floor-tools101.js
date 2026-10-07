@@ -3,7 +3,7 @@ const FloorColumns101=(()=>{
  const fields=['mode','columns','columnSizes','columnAxisPositions','columnPlacements','suppressedColumns','transferColumns','autoBeamSnapshot'];
  function record(p,key,f){if(!p.types[key])throw Error('Framing 已不存在');const t=p.types[key];t.columnDefaults101??={cb:p.defaults.cb,cd:p.defaults.cd};return t;}
  function view(p,key,f){const t=p.types[key];return {...p,defaults:{...p.defaults,...t.columnDefaults101}};}
- function mutate(p,key,f,fn){record(p,key,f);const q=view(p,key,f),t={...p.types[key]};for(const k of fields)t[k]=Engine.clone(t[k]??(k==='mode'?'manual':[]));q.types={...p.types,[key]:t};if(p.types[key].autoBeamSnapshot===undefined)delete t.autoBeamSnapshot;const out=fn(q);Engine.validate(q);for(const k of fields){if(k==='autoBeamSnapshot'&&t[k]===undefined)delete p.types[key][k];else p.types[key][k]=Engine.clone(t[k]??[]);}return out;}
+ function mutate(p,key,f,fn){record(p,key,f);const q=view(p,key,f),t={...p.types[key]};for(const k of fields)t[k]=Engine.clone(t[k]??(k==='mode'?'manual':[]));q.types={...p.types,[key]:t};if(p.types[key].autoBeamSnapshot===undefined)delete t.autoBeamSnapshot;Engine.bindMainColumns164(q,key,Engine.model(p,key));const out=fn(q);Engine.validate(q);for(const k of fields){if(k==='autoBeamSnapshot'&&t[k]===undefined)delete p.types[key][k];else p.types[key][k]=Engine.clone(t[k]??[]);}return out;}
  function defaults(p,key,f,k,v){if(!['cb','cd'].includes(k)||!Number.isFinite(v)||v<1||v>20000)throw Error('默认柱尺寸须为 1–20000 mm');record(p,key,f).columnDefaults101[k]=v;}
  function mode(p,key,f,value){const before=Engine.model(p,key);if(value==='auto'){mutate(p,key,f,q=>{Engine.freezeAutoBeams(q,key,before);const t=q.types[key];t.mode='auto';for(const k of fields.filter(k=>!['mode','autoBeamSnapshot'].includes(k)))t[k]=[];});p.types[key].autoBeams101=false;}else mutate(p,key,f,q=>{Engine.freezeAutoBeams(q,key,before);Engine.setColumnMode(q,key,value);});}
  function models(){return {};}
@@ -47,12 +47,69 @@ const FloorColumns101=(()=>{
    for(const field of ['columnAxisPositions','columnPlacements'])if(t[field])t[field]=t[field].filter(v=>!keys.has(v.key));
   });return ids.size;
  }
+ // Resolve all shared-Framing targets before editing; generated IDs may change.
+ function recommendationPlan(p,result,items,only=null){
+  const groups=new Map();
+  for(const i of items){if(!i.recommendation||!i.columnKey)continue;const identity=JSON.stringify([i.framing,i.columnKey]);if(only&&identity!==only)continue;
+   const model=Engine.floorModel(result,i.floor,i.framing),c=model.columns.find(c=>c.status!=='上层柱'&&Engine.columnPositionKey(c)===i.columnKey);
+   if(!c||result.floors[i.floor-1]?.type!==i.framing)throw Error('柱資料已改變，請重新更新全樓 Check');
+   const b=i.recommendation.b,d=i.recommendation.h;if(![b,d].every(v=>Number.isFinite(v)&&v>=1&&v<=20000&&v%500===0))throw Error('建議柱尺寸無效，請重新驗算');
+   const prev=groups.get(identity);if(prev){prev.b=Math.max(prev.b,b);prev.d=Math.max(prev.d,d);}else groups.set(identity,{key:i.framing,columnKey:i.columnKey,column:Engine.clone(c),floor:i.floor,b:Math.max(b,c.b*1000),d:Math.max(d,c.d*1000)});
+  }
+  return [...groups.values()];
+ }
+ function applyRecommendations(p,result,items,only=null){
+  const plan=recommendationPlan(p,result,items,only);if(!plan.length)throw Error('目前沒有可套用的柱尺寸建議');
+  return applySizePlan(p,result,plan);
+ }
+ function applySizePlan(p,result,plan){
+  const trial=Engine.clone(p),keys=[...new Set(plan.map(x=>x.key))],before=new Map(keys.map(k=>[k,Engine.model(p,k).columns.map(Engine.columnPositionKey)]));
+  for(const key of keys)Engine.bindMainColumns164(trial,key,Engine.model(p,key));
+  for(const x of plan){const t=trial.types[x.key],c=x.column;
+   if(t.mode==='auto'&&c.anchorX!==undefined){t.columnSizes=(t.columnSizes||[]).filter(v=>v.ax!==c.anchorX||v.ay!==c.anchorY);t.columnSizes.push({ax:c.anchorX,ay:c.anchorY,b:x.b,d:x.d});}
+   else{const row=t.columns.find(v=>v.id===c.id);if(!row)throw Error('柱已不存在，請重新驗算');row.b=x.b;row.d=x.d;}
+  }
+  // Pinned/copied centres must move inward when a larger section crosses the site edge.
+  for(const x of plan){const model=Engine.model(trial,x.key),c=model.columns.find(c=>Engine.columnPositionKey(c)===x.columnKey);if(!c)continue;
+   const r=Engine.columnRect(c);if(Engine.rectAllowed(model.ts,r.x,r.y,r.w,r.d,true))continue;
+   const old=Engine.columnRect(x.column),oldFits=Engine.rectAllowed(model.ts,old.x,old.y,old.w,old.d,true),dx=oldFits?Math.max(0,(r.w-old.w)/2):r.w/2,dy=oldFits?Math.max(0,(r.d-old.d)/2):r.d/2;
+   const tiles=model.ts.filter(t=>t.state===1||t.state===2),xs=[r.x,...tiles.flatMap(t=>[t.x0+r.w/2,t.x1-r.w/2])],ys=[r.y,...tiles.flatMap(t=>[t.y0+r.d/2,t.y1-r.d/2])];let best=null;
+   for(const px of new Set(xs))for(const py of new Set(ys)){if(Math.abs(px-r.x)>dx+1e-6||Math.abs(py-r.y)>dy+1e-6)continue;const q={...r,x:px,y:py};if(!Engine.rectAllowed(model.ts,px,py,r.w,r.d,true)||model.walls.some(w=>Engine.overlap(q,Engine.rect(w)))||model.columns.some(o=>Engine.columnPositionKey(o)!==x.columnKey&&Engine.overlap(q,Engine.columnRect(o))))continue;const distance=(px-r.x)**2+(py-r.y)**2;if(!best||distance<best.distance)best={x:px,y:py,distance};}
+   if(!best)throw Error(x.key+' · '+c.id+'：放大後超出 site boundary，向內調整仍放不下；整批未修改');
+   const t=trial.types[x.key];t.columnPlacements=(t.columnPlacements||[]).filter(v=>v.key!==x.columnKey);t.columnPlacements.push({key:x.columnKey,x:best.x,y:best.y});
+  }
+  Engine.validate(trial);
+  for(const key of keys){const model=Engine.model(trial,key),present=new Map(model.columns.map(c=>[Engine.columnPositionKey(c),c]));
+   if(before.get(key).some(k=>!present.has(k)))throw Error(key+'：建議尺寸令柱與牆或其他柱衝突而無法生成；整批未套用，請逐支調整');
+   for(const x of plan.filter(x=>x.key===key)){const c=present.get(x.columnKey);if(!c||Math.abs(c.b*1000-x.b)>1e-6||Math.abs(c.d*1000-x.d)>1e-6)throw Error('未能套用柱尺寸；整批未修改');const r=Engine.columnRect(c);if(!Engine.rectAllowed(model.ts,r.x,r.y,r.w,r.d,true))throw Error(x.key+' · '+c.id+'：截面超出 site boundary；整批未修改');if(model.columns.some(o=>Engine.columnPositionKey(o)!==x.columnKey&&Engine.overlap(r,Engine.columnRect(o))))throw Error(x.key+' · '+c.id+'：截面與其他柱重疊；整批未修改');}
+  }
+  // Resizing auto columns can move their generated coordinate token. Keep their inputs attached.
+  if(trial.explorer){const next=Engine.generate(trial),moves=[];
+   for(const f of result.floors.filter(f=>keys.includes(f.type))){const old=Engine.floorModel(result,f.n,f.type),now=new Map(Engine.floorModel(next,f.n,f.type).columns.map(c=>[Engine.columnPositionKey(c),c]));
+    for(const c of old.columns){const to=now.get(Engine.columnPositionKey(c));if(!to)continue;const a=f.n+'|'+Loading.token('COL',c),b=f.n+'|'+Loading.token('COL',to);if(a!==b)moves.push([a,b]);}
+   }
+   for(const name of ['members','selected','reportA','reportB']){const map=trial.explorer[name];if(!map)continue;const source=Engine.clone(map);for(const [a]of moves)delete map[a];for(const [a,b]of moves){if(!Object.hasOwn(source,a))continue;if(Object.hasOwn(map,b)&&JSON.stringify(map[b])!==JSON.stringify(source[a]))throw Error('柱位置對應已有獨立輸入；整批未修改，請檢查 Loading／Check');map[b]=source[a];}}
+  }
+  for(const key of keys)p.types[key]=trial.types[key];
+  if(trial.explorer)p.explorer=trial.explorer;
+  return {columns:plan.length,floors:result.floors.filter(f=>keys.includes(f.type)).length};
+ }
+ function resizeMany(p,result,key,f,changes){
+  const model=Engine.floorModel(result,f,key),seen=new Set(),plan=[];
+  for(const {hit,b,d} of changes){assertEditable(hit,f);if(hit.kind!=='COL')throw Error('只能修改當層柱');const c=model.columns.find(c=>c.id===hit.id&&c.status!=='上层柱');if(!c)throw Error('柱已不存在，請重新選取');
+   if(![b,d].every(v=>Number.isFinite(v)&&v>=1&&v<=20000))throw Error('柱 B／D 須為 1–20000 mm');
+   const columnKey=Engine.columnPositionKey(c);if(seen.has(columnKey))throw Error('同一柱有重複修改');seen.add(columnKey);
+   const rect=Engine.columnRect(c);if(Math.abs(c.b*1000-b)<1e-6&&Math.abs(c.d*1000-d)<1e-6&&Engine.rectAllowed(model.ts,rect.x,rect.y,rect.w,rect.d,true))continue;
+   plan.push({key,columnKey,column:Engine.clone(c),floor:f,b,d});
+  }
+  return plan.length?applySizePlan(p,result,plan):{columns:0,floors:0};
+ }
  function snap(c){const r=Engine.columnRect(c);return [[r.x,r.y]];}
  function viewport(p){const xs=Object.keys(p.types).flatMap(k=>Engine.axes(p,'x',k).map(a=>a.v)),ys=Object.keys(p.types).flatMap(k=>Engine.axes(p,'y',k).map(a=>a.v));return {x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)};}
- document.addEventListener('change',e=>{const a=e.target,k=a.dataset.c101;if(!k)return;const box=a.closest('[data-column-floor]'),f=+box.dataset.columnFloor,id=box.dataset.columnId;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=box.dataset.columnFraming,c=Engine.floorModel(result,f,key).columns.find(c=>c.id===id);if(!c)throw Error('柱已不存在');const v=k==='position'?a.value:+a.value;if(k==='position')mutate(p,key,f,q=>Engine.setColumnPosition(q,key,Engine.columnPositionKey(c),v));else if(['b','d'].includes(k))mutate(p,key,f,q=>Engine.editSize(q,key,{kind:'COL',id},{b:k==='b'?v:c.b*1000,d:k==='d'?v:c.d*1000}));else{if(a.value.trim()===''||!Number.isFinite(v))throw Error('請填寫有效的柱中心座標');mutate(p,key,f,q=>{const r=Engine.columnRect(c),t=q.types[key],pk=Engine.columnPositionKey(c);t.columnPlacements=(t.columnPlacements||[]).filter(x=>x.key!==pk);t.columnPlacements.push({key:pk,x:k==='x'?v:r.x,y:k==='y'?v:r.y});});}});});
+ document.addEventListener('change',e=>{const a=e.target,k=a.dataset.c101;if(!k)return;const box=a.closest('[data-column-floor]'),f=+box.dataset.columnFloor,id=box.dataset.columnId;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=box.dataset.columnFraming,c=Engine.floorModel(result,f,key).columns.find(c=>c.id===id);if(!c)throw Error('柱已不存在');const v=k==='position'?a.value:+a.value;if(k==='position')mutate(p,key,f,q=>Engine.setColumnPosition(q,key,Engine.columnPositionKey(c),v));else if(['b','d'].includes(k))resizeMany(p,result,key,f,[{hit:{kind:'COL',id,f},b:k==='b'?v:c.b*1000,d:k==='d'?v:c.d*1000}]);else{if(a.value.trim()===''||!Number.isFinite(v))throw Error('請填寫有效的柱中心座標');mutate(p,key,f,q=>{const r=Engine.columnRect(c),t=q.types[key],pk=Engine.columnPositionKey(c);t.columnPlacements=(t.columnPlacements||[]).filter(x=>x.key!==pk);t.columnPlacements.push({key:pk,x:k==='x'?v:r.x,y:k==='y'?v:r.y});});}});});
  document.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.target.matches?.('.column-edit101 input[data-c101]')){e.preventDefault();e.target.blur();}});
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-copy]');if(!a||a.disabled)return;const box=a.closest('[data-column-floor]'),f=Number(box.dataset.columnFloor),step=Number(a.dataset.c101Copy),h=StudioHost.get();if(f!==h.floor||box.dataset.columnFraming!==h.key){h&&StudioHost.toast('請先選擇當層柱');return;}const hit={kind:'COL',id:box.dataset.columnId,f};let outcome;if(StudioHost.transact(()=>{const now=StudioHost.get();outcome=copyAdjacent(now.p,now.result,now.key,now.floor,hit,step);}))StudioHost.toast(outcome.message);});
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-delete]');if(!a)return;const b=a.closest('[data-column-floor]'),f=+b.dataset.columnFloor;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=b.dataset.columnFraming;mutate(p,key,f,q=>Engine.removeMember(q,key,{kind:'COL',id:b.dataset.columnId}));});});
  for(const name of ['editSize','removeMember','setTransferColumn']){const original=Engine[name];Engine[name]=function(p,key,hit,...args){if(hit.kind==='COL'&&hit.f){const f=hit.f,k=key||Engine.floors(p)[f-1]?.type;if(!k)throw Error('柱楼层不存在');return mutate(p,k,f,q=>original(q,k,{...hit,f:undefined},...args));}return original(p,key,hit,...args);};}
- return {record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
+ return {resizeMany,recommendationPlan,applyRecommendations,record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
 })();

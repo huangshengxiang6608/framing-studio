@@ -1,5 +1,10 @@
 # 版本记录
 
+## E2.143 - 2026-10-07
+
+- Rotate Loading area names 90 degrees when a complete horizontal label does not fit; restore horizontal labels when space permits. Keep badges inside visible loading surfaces and away from openings.
+- Verify narrow Shop labels, resizing, fallback labels, opening avoidance and actual canvas rendering without modifying project data. Preserve Section A/B reports and native Excel templates.
+
 ## E2.142 Windows - 2026-10-06
 
 - Package the verified E2.142 preview as the Windows app, including combined MB/TB/CB selection and independent SB/Slab selection.

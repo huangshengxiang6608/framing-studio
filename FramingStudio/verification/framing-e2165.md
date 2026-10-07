@@ -76,3 +76,12 @@ beams no longer emit MODEL warnings. dormant-beams168 passes in both versions:
 physical members and saved records are unchanged; manual geometry errors and
 existing member Check failures remain visible. beam-network165 also passes.
 Report, workbook, loading/strength calculation and native binary files are unchanged.
+
+## E2.169 follow-up
+
+The browser regression audit-filters169 reproduces a stale MODEL filter hiding
+119 current rows before the fix, then passes in both versions after the fix.
+Removed options reset to all; valid filters, empty intersections, new statuses and
+empty results remain consistent. The resulting table was visually inspected.
+The real column-deferred-boundary regression also passes. Report/calculation/
+geometry modules, workbook templates and native binaries are unchanged.

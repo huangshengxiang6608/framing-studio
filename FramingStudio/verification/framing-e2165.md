@@ -68,3 +68,11 @@ marks, millimetre sizes, mark-above-size ordering, vertical-member rotation,
 visibility filtering and an unchanged project after toggling. The rendered
 column/beam labels were visually inspected. Report renderers, workbook templates,
 calculation modules and native binaries are unchanged from E2.166.
+
+## E2.168 follow-up
+
+Dormant automatic snapshots outside the current model or conflicting with current
+beams no longer emit MODEL warnings. dormant-beams168 passes in both versions:
+physical members and saved records are unchanged; manual geometry errors and
+existing member Check failures remain visible. beam-network165 also passes.
+Report, workbook, loading/strength calculation and native binary files are unchanged.

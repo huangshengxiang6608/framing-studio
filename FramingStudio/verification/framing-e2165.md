@@ -59,3 +59,12 @@ shared floors, legacy enlarged centres, grow/shrink after reload, B-only resizin
 explicit positioning, custom offsets and atomic rejection. Column parameter
 table, deferred Check/boundary, beam-centres164 and beam-network165 regressions
 also pass. E2.166 changes no report, workbook or native executable files.
+
+## E2.167 follow-up
+
+`source/tests/member-labels167.cjs` passes in both the local preview and the
+Transfer Truss integration. It checks seven independent view switches, display
+marks, millimetre sizes, mark-above-size ordering, vertical-member rotation,
+visibility filtering and an unchanged project after toggling. The rendered
+column/beam labels were visually inspected. Report renderers, workbook templates,
+calculation modules and native binaries are unchanged from E2.166.

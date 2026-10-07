@@ -85,3 +85,19 @@ Removed options reset to all; valid filters, empty intersections, new statuses a
 empty results remain consistent. The resulting table was visually inspected.
 The real column-deferred-boundary regression also passes. Report/calculation/
 geometry modules, workbook templates and native binaries are unchanged.
+
+## E2.170 follow-up
+
+column-split170 covers automatic snapshots and manual MBs in both orientations,
+shared floors, reload stability, reversed beams, multiple columns, section edits,
+single/batch deletion, nonzero new-column loads and conserved beam self-weight.
+Upper-only/off-line columns are excluded; existing member inputs trigger review
+instead of being discarded. Both local and integrated builds pass.
+The private F01 replay splits MB21 into two 12 m spans; both have actions and
+pass the current program Check. All 38 secondary beams remain, with no model
+warnings. This result is specific to that saved project copy.
+Shorter-main-beams and beam-network165 pass, as do 55 existing loading assertions,
+12 integration143 and 11 downstream143 groups. Browser regressions used Chrome
+and local file URLs; the older truss browser scripts require a missing local
+fixture, so the equivalent existing VM integration/downstream suites were used.
+Report renderers, workbook templates and native executables remain unchanged.

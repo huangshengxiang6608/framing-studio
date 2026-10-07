@@ -1,3 +1,16 @@
+## E2.165 — 主梁及相連次梁一起跟隨柱中心
+
+- 修正一端接柱、另一端接轉換梁的自動主梁，以及同一直線的分段主梁，沒有跟隨柱中心的問題。
+- 次梁端點跟隨已接受的新主梁位置；保留次梁間距、牆面連接、梁號及原荷載參考線。
+- 整組驗證主梁範圍及重疊；調整被拒絕時，次梁不會連到無效的新位置。不強制改動手動畫梁或不一致的柱中心線。
+- 新增可獨立執行的 beam-network165 回歸測試，並用 F03 項目副本核對 MB26 分段及 SB28–SB34。
+- 按使用者要求，每次完成修改均建立或更新 PR，列明改動與測試結果。此次只更新網頁程式及源碼，未重新生成 EXE。
+
+## E2.165 PR integration — 2026-10-07
+
+- Integrate E2.144–E2.165 framing, loading and column updates with the existing Transfer Truss implementation on main.
+- Keep the current main desktop host and Excel bridge; update the bundled web app and source without rebuilding executables.
+
 ## E2.164 — 自動主梁中線跟隨柱中心（預覽）
 
 - 修正保存的自動 MB 只跟柱更新梁闊、仍沿用舊中線的問題；兩端柱中心可形成有效正交梁時，優先更新實體梁端點。
@@ -404,3 +417,13 @@
 当前项目 A 18 页 / B 6 页、多楼层测试模型 A 23 页 / B 9 页均已渲染检查；正文与计算字符比对通过。此次仅调整排版，未重新进行工程计算。
 
 仓库导入时保持 App 运行文件及源码与 E2.110 发布文件逐字节一致。历史发布包、个人项目、测试 PDF 及本机备份没有上传。
+
+
+## Transfer Truss release history (main)
+
+## E2.143 — 2026-10-06
+
+- Import the supplied E2.142 Windows baseline and add only the transfer-truss feature from PR #1. Existing E2.142 layout and member-selection behavior are retained.
+- Add same-floor and multi-storey S460 trusses, axial-member checks, reaction propagation and a standalone Excel workbook.
+- Preserve original Section A/B report layouts, VBA and workbook templates. Truss-affected columns use physical reactions for checking; Section A area-table export is explicitly blocked for those columns rather than reformatted.
+- Verified: 55 existing loading assertions; 11 core, 12 integration and 11 downstream groups; four no-truss models match E2.142; native Excel 451 comparisons with zero differences. UI inputs and undo checked.

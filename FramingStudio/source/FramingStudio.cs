@@ -184,7 +184,7 @@ sealed class Studio : Form {
                       var job=new Dictionary<string,object>(source);job.Remove("_reportSection");string runId=DateTime.Now.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N").Substring(0,8);
                       string directory=Path.Combine(Data,"ExcelRuns",runId);Directory.CreateDirectory(directory);ExcelRuns.Add(runId,directory);
                       object extraPages=null;
-                      if(section!=null&&job.TryGetValue("reportPages",out extraPages)){job.Remove("reportPages");File.WriteAllText(Path.Combine(directory,"report-pages.json"),Json.Serialize(extraPages),new UTF8Encoding(false));}
+                      if((section!=null||Convert.ToString(job["type"])=="Truss")&&job.TryGetValue("reportPages",out extraPages)){job.Remove("reportPages");File.WriteAllText(Path.Combine(directory,"report-pages.json"),Json.Serialize(extraPages),new UTF8Encoding(false));}
                       string path=Path.Combine(directory,"job.json");File.WriteAllText(path,Json.Serialize(job),new UTF8Encoding(false));
                     await ExcelNotify(new {progress=(section==null?"":"Section "+section+" · ")+"Excel 正在计算 "+index+" / "+total+" · "+Convert.ToString(job["label"])});
                     var start=new ProcessStartInfo(Path.Combine(Root,"Excel","ExcelBridge.exe"),"\""+Path.Combine(Root,"Excel")+"\" \""+path+"\"") { UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden };

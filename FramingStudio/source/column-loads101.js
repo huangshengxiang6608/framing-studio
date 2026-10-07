@@ -22,7 +22,7 @@ const ColumnLoads101=(()=>{
   const d=ColumnAreas103.wallSchedule(h.p,h.result,h.floor,id);
   return '<section class="wall-area158"><h3>牆組受荷面積 · '+d.members.map(esc).join(' / ')+'</h3><p>按相鄰柱／牆半跨分界；相連牆共同承托，扣除 OP 洞口及已刪樓板。</p>'+(d.errors.length?'<div class="issue">'+d.errors.map(esc).join('<br>')+'</div>':'')+'<div class="table-wrap"><table><thead><tr><th>樓層</th><th>面積 m²</th><th>本層 G kN</th><th>本層 Q kN</th></tr></thead><tbody>'+d.rows.map(r=>'<tr><td>'+esc(FloorLevels.name(h.p,r.floor))+'</td><td>'+num(r.area)+'</td><td>'+num(r.G)+'</td><td>'+num(r.Q)+'</td></tr>').join('')+'</tbody></table></div><p>牆組累計 G = <b>'+num(d.totalG)+'</b> kN；Q = <b>'+num(d.totalQ)+'</b> kN。</p><p class="muted">G = 面積 × (DL + SDL)，Q = 面積 × LL；DL 已含自重。這是牆組的幾何面積荷載，與柱面積互不重複；梁端反力另按支承模型傳遞，不再疊加到此表。牆承載力未在此驗算。</p></section>';
  }
- function viewData(p,result,f){
+ function viewData(p,result,f){if(target&&p.transferTrusses?.length&&TrussUI109.results(p,result).rows.some(r=>r.floor===target.floor&&r.token===target.token&&r.truss109?.length))return null;
   if(!target)return null;
   if(target.kind==='WALL'){const d=ColumnAreas103.wallSchedule(p,result,target.floor,target.id),row=d.rows.find(r=>r.floor===f);if(!row)return null;return {id:d.members.join(' / '),kind:'WALL',token:target.token,targetFloor:target.floor,targetName:FloorLevels.name(p,target.floor),floor:f,floorName:FloorLevels.name(p,f),area:row.area,rects:row.rects,polygons:row.polygons,partitioned:true,weighted:false,auto:true,errors:d.errors};}
   const col=Loading.members(p,result,target.floor).find(x=>x.token===target.token);

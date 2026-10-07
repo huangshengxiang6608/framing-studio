@@ -20,3 +20,7 @@ the workbook template; Excel saves can silently normalize row heights.
 After a completed, verified update, upload the current app and source to the
 existing GitHub repository. Replace the tracked latest app files while retaining
 Git history and prior local release folders. Provide the new Windows app package.
+
+After every completed update, create or update a pull request in the existing
+GitHub repository and describe the changes and validation results. Include the
+PR link in the delivery message. Honor any explicit user hold on EXE generation.

@@ -34,6 +34,33 @@ const Engine=(()=>{
  function bindMainColumns164(p,key,m){
   for(const b of p.types[key].autoBeamSnapshot?.main||[])if(!b.columnSupports164)b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);
  }
+ // Move connected automatic spans together, including column-to-beam spans.
+ // Logical reference lines remain stable for loads, saved regions and member IDs.
+ function followBeamNetwork165(p,key,beams,columns,walls,ts){
+  const horizontal=b=>near(b.rawA[1],b.rawZ[1]),axis=b=>horizontal(b)?0:1;
+  const automatic=b=>b.source==='auto'&&b.kind==='MB'&&b.widthMode!=='manual'&&p.types[key].beamWidths83?.[sig(b.rawA,b.rawZ)]==null;
+  const mains=beams.filter(automatic),groups=[],groupOf=new Map(),findColumn=link=>{if(!link)return null;const cs=columns.filter(c=>c.status!=='上层柱'),exact=cs.find(c=>columnPositionKey(c)===link.key);if(exact)return exact;const match=cs.filter(c=>columnReference(p,key,c).every((v,i)=>near(v,link.reference[i])));return match.length===1?match[0]:null;};
+  const links=new Map(mains.map(b=>[b,mainColumnSupports164(p,key,b,columns).map(findColumn)]));
+  for(const first of mains){if(groupOf.has(first))continue;const group=[first];groupOf.set(first,group);for(let i=0;i<group.length;i++)for(const b of mains){if(groupOf.has(b)||horizontal(b)!==horizontal(first))continue;const a=axis(b),cross=1-a;if(!near(b.rawA[cross],first.rawA[cross]))continue;if(![group[i].rawA,group[i].rawZ].some(q=>[b.rawA,b.rawZ].some(v=>near(q[a],v[a]))))continue;group.push(b);groupOf.set(b,group);}groups.push(group);}
+  const proposals=new Map(),targetCross=new Map();
+  for(const group of groups){const a=axis(group[0]),cross=1-a,centres=unique(group.flatMap(b=>links.get(b).filter(Boolean).map(c=>{const r=columnRect(c);return cross?r.y:r.x;})));if(centres.length!==1)continue;for(const b of group)targetCross.set(b,centres[0]);}
+  const position=b=>proposals.get(b)||b;
+  // Walls retain their existing face connection; snapping to a wall centre can
+  // extend an otherwise valid beam into the adjacent opening.
+  function receiver(point,b){const a=axis(b),cross=1-a,hits=beams.filter(v=>v!==b&&horizontal(v)!==horizontal(b)&&near(v.rawA[a],point[a])&&point[cross]>=Math.min(v.rawA[cross],v.rawZ[cross])-eps&&point[cross]<=Math.max(v.rawA[cross],v.rawZ[cross])+eps),values=unique(hits.map(v=>targetCross.get(v)??position(v).a[a]));return values.length===1?values[0]:null;}
+  function valid(b,q){const a=axis(b),r=rect(q),others=beams.filter(v=>v!==b).map(position),supports=[...others.filter(v=>horizontal(v)!==horizontal(b)),...walls].map(rect).concat(columns.filter(c=>c.status!=='上层柱').map(columnRect)),connected=['a','z'].every(end=>q[end].every((v,i)=>near(v,b[end][i]))||supports.some(s=>Math.abs(q[end][0]-s.x)<=s.w/2+eps&&Math.abs(q[end][1]-s.y)<=s.d/2+eps));return connected&&(q.z[a]-q.a[a])*(b.rawZ[a]-b.rawA[a])>eps&&rectAllowed(ts,r.x,r.y,r.w,r.d)&&!beamSpaceConflict(q,others,columns);}
+  // Validate adjoining main spans together. If one chain cannot move, recalculate
+  // dependent connections using its original position instead of a rejected target.
+  let rejected=true;while(rejected){
+   rejected=false;proposals.clear();
+   for(const b of mains){const a=axis(b),cross=1-a,value=targetCross.get(b);if(value===undefined)continue;const ends=['a','z'].map((end,i)=>{const q=[...b[end]],c=links.get(b)[i];q[cross]=value;if(c){const r=columnRect(c);q[a]=a?r.y:r.x;}else{const v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;}return q;});proposals.set(b,{...b,a:ends[0],z:ends[1]});}
+   for(const [b,q]of proposals){if(valid(b,q))continue;for(const member of groupOf.get(b))targetCross.delete(member);rejected=true;}
+  }
+  for(const [b,q]of proposals){b.a=q.a;b.z=q.z;}proposals.clear();targetCross.clear();
+  // SB spacing stays fixed; endpoints follow only the accepted receiving beams.
+  for(const b of beams.filter(b=>b.source==='auto'&&b.kind==='SB')){const a=axis(b),ends=['a','z'].map((end,i)=>{const q=[...b[end]],v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;return q;}),q={...b,a:ends[0],z:ends[1]};if(valid(b,q)){b.a=q.a;b.z=q.z;}}
+
+ }
  function freezeAutoBeams(p,key,m){
   const snapshot={main:[],secondary:[]};
   for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,kind:source.baseKind||source.kind};if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':'secondary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
@@ -47,7 +74,7 @@ const Engine=(()=>{
 
  function validate(p){
   const fail=s=>{throw Error(s)},num=(n,lo,hi,s)=>{if(typeof n!=='number'||!Number.isFinite(n)||n<lo||n>hi)fail(s);};
-  if(p?.format!=='framing-app'||p.version!==1)fail('不是本 App 的项目文件');
+  if(p?.format!=='framing-app'||p.version!==1)fail('不是本 App 的项目文件');if(typeof TrussModel109!=='undefined')TrussModel109.validate(p);
   if(p.overall!==undefined){if(p.overall?.version!==1||!p.overall.faces||typeof p.overall.faces!=='object')fail('Overall Check 数据无效');for(const f of Object.keys(p.overall.faces)){if(!['B','D'].includes(f))fail('Overall Check 面无效');const q=p.overall.faces[f];if(!q||typeof q!=='object')fail('Overall Check 输入无效');for(const field of ['input','committed','attempt'])if(q[field]!==undefined)Overall.normalize(q[field],f);}}
   if(p.elevationLevels!==undefined){const v=p.elevationLevels;if(!v||typeof v!=='object')fail('楼层标高数据无效');if(v.base!==null)num(v.base,-10000,10000,'模型底 mPD 无效');if(v.basementFromNames!==undefined&&typeof v.basementFromNames!=='boolean')fail('地下室识别设置无效');if(v.names!==undefined&&(!v.names||typeof v.names!=='object'||Object.entries(v.names).some(([k,n])=>!/^\d+$/.test(k)||typeof n!=='string'||n.length>40)))fail('楼层名称无效');}
   if(typeof p.name!=='string'||p.name.length>150)fail('项目名称无效');
@@ -315,6 +342,7 @@ const Engine=(()=>{
    if(!ok)issue(b.displayId,b.supportText);
   }
   for(const b of beams)if(b.kind==='SB'&&b.displayKind==='CB')b.d=sh;
+  followBeamNetwork165(p,key,beams,columns,walls,ts);
   const slabVoids=(t.slabVoids||[]).flatMap(r=>ts.filter(t=>t.state===1).map(t=>({x0:Math.max(t.x0,r.x0),x1:Math.min(t.x1,r.x1),y0:Math.max(t.y0,r.y0),y1:Math.min(t.y1,r.y1)})).filter(r=>r.x1>r.x0&&r.y1>r.y0));
   const columnsOnly=layout?.columnsOnly===true&&!beams.length;
   const slabs=columnsOnly?[]:slabPanels(ts,beams,walls,slabVoids,columns);if(slabs===null)issue('SLAB','板块分隔过于复杂，未显示板块信息；请减少自由坐标分段');

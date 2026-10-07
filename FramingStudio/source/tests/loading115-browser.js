@@ -1,9 +1,9 @@
 // Synthetic, non-project regression cases. Run with loading115.cjs.
 function loading115Tests(){
  const passed=[];function ok(v,n){if(!v)throw Error(n);passed.push(n);}function near(a,b,n){ok(Number.isFinite(a)&&Math.abs(a-b)<1e-7,n+': '+a+' = '+b);}
- const point=(x,y)=>({x,y}),col=(id,x,y)=>({id,x,y,b:250,d:250,on:true,status:'上下贯通'}),beam=(id,kind,a,z,b=250,d=350)=>({id,kind,a:point(...a),z:point(...z),b,d,on:true});
+ const point=(x,y)=>({x,y}),col=(id,x,y)=>({id,x,y,b:250,d:250,on:true,status:'上下贯通'}),beam=(id,kind,a,z,b=250,d=350)=>({id,kind,a:point(...a),z:point(...z),b,d,on:true,...(kind==='CB'?{widthMode:'manual'}:{})});
  function project(total=1){const p={format:'framing-app',version:1,name:'Loading regression',total,axes:{x:[{id:'1',gap:0},{id:'2',gap:6}],y:[{id:'A',gap:0},{id:'B',gap:4}]},defaults:{cb:500,cd:500,gap:3000,direction:'自动',mb:250,sb:250,tb:600,tbd:1200,slab:200,wall:300},groups:[],types:{}};
-  for(let f=1;f<=total;f++){const key='F'+f;p.types[key]={mode:'manual',autoBeams101:false,building:{'0,0':true},opening:{},columns:[],walls:[],beams:[],suppressed:[],beamDepth:350};p.groups.push({end:f===total?'顶层':f,h:3.5,type:key,sh:350,min:0,headroom:2.5,em:.5});LoadData.setFloor(p,f,{usage:'Dormitory',dl:10,sdl:0,ll:2});}return p;}
+  for(let f=1;f<=total;f++){const key='F'+f;p.types[key]={mode:'manual',cbColumnWidth171:true,autoBeams101:false,building:{'0,0':true},opening:{},columns:[],walls:[],beams:[],suppressed:[],beamDepth:350};p.groups.push({end:f===total?'顶层':f,h:3.5,type:key,sh:350,min:0,headroom:2.5,em:.5});LoadData.setFloor(p,f,{usage:'Dormitory',dl:10,sdl:0,ll:2});}return p;}
  for(const [v,w]of [[0,0],[6.121,6.13],[6.12,6.12],[.25*.35*24.5,2.15],[.1+.2,.3],[0.000001,.01]])near(BeamLoads.up(v),w,'round up '+v);
  const p=project(),t=p.types.F1;t.columns=[col('C1',0,0),col('C2',6,0),col('C3',0,4),col('C4',6,4)];t.beams=[beam('B1','MB',[0,0],[6,0]),beam('B2','MB',[0,4],[6,4]),beam('B3','MB',[0,0],[0,4]),beam('B4','MB',[6,0],[6,4])];
  let model=Engine.generate(p),floor=Engine.floorModel(model,1);ok(floor.slabs.length===1,'one slab generated');const slab=floor.slabs[0],net=LoadRegions83.netSelfWeight(slab,floor),netArea=net.reduce((n,r)=>n+LoadRegions83.area(r),0);near(netArea,5.5*3.5,'slab clear-face area');

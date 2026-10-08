@@ -17,6 +17,14 @@ the workbook template; Excel saves can silently normalize row heights.
 
 ## Delivery
 
+Use the official GitHub E2.172 software and its corresponding source as the
+baseline for the next software change, PR and upload, as requested by the user.
+The downloaded release is `output/FramingStudio_E2.172_Windows.zip` from
+`huangshengxiang6608/framing-studio`, release `v2.172`. The existing preview
+checkout is older; do not use it to overwrite E2.172 changes. Before future work,
+check the repository's current main/release and build on that baseline or its
+newer successor, preserving intervening updates.
+
 After a completed, verified update, upload the current app and source to the
 existing GitHub repository. Replace the tracked latest app files while retaining
 Git history and prior local release folders. Provide the new Windows app package.

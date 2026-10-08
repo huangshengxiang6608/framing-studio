@@ -6,10 +6,20 @@ const Loading=(()=>{
  const tol=1e-6,nice=n=>Math.round(n*1e6)/1e6,eq=(a,b)=>Math.abs(a-b)<tol,pt=(a,b)=>eq(a[0],b[0])&&eq(a[1],b[1]),pos=c=>[c.x,c.y],contains=(c,q)=>{const r=E.columnRect(c);return Math.abs(r.x-q[0])<=r.w/2+tol&&Math.abs(r.y-q[1])<=r.d/2+tol;},a=b=>b.rawA||b.a,z=b=>b.rawZ||b.z,L=b=>Math.hypot(z(b)[0]-a(b)[0],z(b)[1]-a(b)[1]);
  function on(p,b){const len=L(b);return len>tol&&Math.abs((p[0]-a(b)[0])*(z(b)[1]-a(b)[1])-(p[1]-a(b)[1])*(z(b)[0]-a(b)[0]))<tol*len&&distance(p,b)>=-tol&&distance(p,b)<=len+tol;}
  function distance(p,b){return ((p[0]-a(b)[0])*(z(b)[0]-a(b)[0])+(p[1]-a(b)[1])*(z(b)[1]-a(b)[1]))/L(b);}
- // Beam point loads use reference nodes/lines; wall contact retains actual sections.
- function contact(point,b){if(!on(point,b)&&(['MB','SB','TB','CB'].includes(b.kind)||!E.on(point,b)))return null;const x=distance(point,b),len=L(b);if(x<-tol||x>len+tol)return null;return {x:Math.max(0,Math.min(len,x)),section:!on(point,b)};}
+ // Preserve saved reference stations; also accept the current, moved centreline.
+ // Physical contact is projected back to the reference span for load positions.
+ function contact(point,b){
+  const len=L(b);if(on(point,b)){const x=distance(point,b);return {x:Math.max(0,Math.min(len,x)),section:false};}
+  if(['MB','SB','TB','CB'].includes(b.kind)){
+   if(!b.a||!b.z)return null;const dx=b.z[0]-b.a[0],dy=b.z[1]-b.a[1],ll=dx*dx+dy*dy;if(ll<tol*tol)return null;
+   const t=((point[0]-b.a[0])*dx+(point[1]-b.a[1])*dy)/ll;
+   if(t<-tol||t>1+tol||Math.abs((point[0]-b.a[0])*dy-(point[1]-b.a[1])*dx)>tol*Math.sqrt(ll))return null;
+   return {x:Math.max(0,Math.min(1,t))*len,section:false,moved173:true};
+  }
+  if(!E.on(point,b))return null;const x=distance(point,b);return x>=-tol&&x<=len+tol?{x:Math.max(0,Math.min(len,x)),section:true}:null;
+ }
  function columnLoadPoint(p,model,c){return E.columnReference(p,model.key,c);}
- function token(kind,c){if(c.autoTransfer&&kind===c.kind)kind=c.baseKind;if(kind==='COL')return 'COL|'+pos(c).map(nice);if(kind==='SLAB')return 'SLAB|'+JSON.stringify(c.rects.map(r=>[r.x0,r.x1,r.y0,r.y1].map(nice)));return kind+'|'+[a(c),z(c)].map(p=>p.map(nice).join(',')).sort().join('|');}
+ function token(kind,c){if((c.autoTransfer||c.autoCantilever173)&&kind===c.kind)kind=c.baseKind;if(kind==='COL')return 'COL|'+pos(c).map(nice);if(kind==='SLAB')return 'SLAB|'+JSON.stringify(c.rects.map(r=>[r.x0,r.x1,r.y0,r.y1].map(nice)));return kind+'|'+[c.cantileverOrigin173?.rawA||a(c),c.cantileverOrigin173?.rawZ||z(c)].map(p=>p.map(nice).join(',')).sort().join('|');}
  const defaults={fcu:45,fire:2,columnFcu:60,columnFire:2,tbFcu:60,tbFire:2,columnRatio:2.5,columnFactor:1,columnProject:1.25,wallFcu:60};
  function settings(p){const cfg={...defaults,...p.explorer?.settings};if(cfg.wallFcu===null||cfg.wallFcu===undefined||cfg.wallFcu==='')cfg.wallFcu=defaults.wallFcu;return cfg;}
  function init(p){p.explorer??={};p.explorer.settings??={};p.explorer.floors??={};p.explorer.members??={};p.explorer.selected??={};return p.explorer;}
@@ -67,7 +77,7 @@ const Loading=(()=>{
   return ['a','z'].map(end=>{const label=end==='a'?'A':'B';if(root&&root.fixedEnd!==end)return {end:label,text:root.fixedEnd?'自由端':'固定端未确认'};
    const chosen=manualSupport(p,model,f,c,end);let hits=[];
    if(chosen){if(chosen.invalid)return {end:label,text:'手动 Support 已失效'};hits=[chosen];}
-   else{const opts=supportOptions(model,c,end),cols=opts.filter(x=>x.type==='COL'),walls=opts.filter(x=>x.type==='WALL'),point=end==='a'?a(c):z(c);hits=cols.length?cols:walls.length?walls:opts.filter(x=>x.type==='BEAM'&&(distance(point,x.member)>tol&&distance(point,x.member)<L(x.member)-tol||cbTipSupport(p,r,f,x.member,point)));if(hits.length>1&&hits.every(x=>x.type==='WALL')){const joined=new Set([hits[0].member]);let change=true;while(change){change=false;for(const w of model.walls)if(!joined.has(w)&&[...joined].some(v=>[a(w),z(w)].some(q=>on(q,v))||[a(v),z(v)].some(q=>on(q,w)))){joined.add(w);change=true;}}if(hits.every(x=>joined.has(x.member)))hits=[{label:hits.map(x=>x.label).join(' / ')}];}}
+   else{const opts=supportOptions(model,c,end),cols=opts.filter(x=>x.type==='COL'),walls=opts.filter(x=>x.type==='WALL'),point=end==='a'?a(c):z(c);hits=cols.length?cols:walls.length?walls:opts.filter(x=>x.type==='BEAM'&&(contact(point,x.member)?.x>tol&&contact(point,x.member).x<L(x.member)-tol||cbTipSupport(p,r,f,x.member,point)));if(hits.length>1&&hits.every(x=>x.type==='WALL')){const joined=new Set([hits[0].member]);let change=true;while(change){change=false;for(const w of model.walls)if(!joined.has(w)&&[...joined].some(v=>[a(w),z(w)].some(q=>on(q,v))||[a(v),z(v)].some(q=>on(q,w)))){joined.add(w);change=true;}}if(hits.every(x=>joined.has(x.member)))hits=[{label:hits.map(x=>x.label).join(' / ')}];}}
    return {end:label,text:(root?'固定端 · ':'')+(hits.length===1?hits[0].label:hits.length?'多重连接，待确认':'未找到支承')};
   });
  }
@@ -80,7 +90,7 @@ const Loading=(()=>{
   const resolved=input(p,f,token(c.kind,c)),saved=resolved.fixedEnd??c.fixedEnd101,model=E.floorModel(r,f);
   const hits=q=>[...model.columns.filter(x=>x.status!=='上层柱'&&contains(x,q)).map(x=>'柱 '+x.id),...model.walls.filter(w=>contact(q,w)).map(w=>'墙 '+w.id)];
   const connections={a:hits(a(c)),z:hits(z(c))};if(resolved.supportConflicts?.includes('fixedEnd'))return {fixedEnd:null,mode:'conflict',connections,message:'同 Framing 各层 CB 固定端设置冲突，请选择一次并保存统一'};
-  if(['a','z'].includes(saved))return {fixedEnd:saved,mode:'manual',connections,message:'手动指定 '+saved+' 端'};
+  if(['a','z'].includes(saved)){const automatic=c.autoCantilever173&&resolved.fixedEnd==null;return {fixedEnd:saved,mode:automatic?'auto':'manual',connections,message:(automatic?'自動識別 ':'手动指定 ')+saved+' 端'};}
   if(!!connections.a.length!==!!connections.z.length){const fixedEnd=connections.a.length?'a':'z';return {fixedEnd,mode:'auto',connections,message:'自动选 '+fixedEnd+' 端：连接'+connections[fixedEnd].join('、')};}
   return {fixedEnd:null,mode:'auto',connections,message:connections.a.length?'两端均连接柱／墙，请手动指定 CB 固定端':'两端未找到唯一的柱／墙根部，请手动指定 CB 固定端'};
  }
@@ -91,7 +101,7 @@ const Loading=(()=>{
   const floors=E.floors(p);if(!f||floors[f-1]?.type!==model.key)f=floors.find(x=>x.type===model.key)?.n;if(!f)return model;
   const r={floors,models:{[model.key]:model}},memo=new Map();
   const direct=q=>model.columns.filter(c=>c.status!=='上层柱'&&contains(c,q)).length===1||model.walls.some(w=>contact(q,w));
-  function held(point,exclude,path){const end=pt(point,a(exclude))?'a':'z',manual=manualSupport(p,model,f,exclude,end);if(manual)return !manual.invalid&&(manual.type!=='BEAM'||connected(manual.member,path));if(direct(point))return true;const hits=model.beams.filter(b=>b!==exclude&&contact(point,b)&&(distance(point,b)>tol&&distance(point,b)<L(b)-tol||cbTipSupport(p,r,f,b,point)));return hits.length===1&&connected(hits[0],path);}
+  function held(point,exclude,path){const end=pt(point,a(exclude))?'a':'z',manual=manualSupport(p,model,f,exclude,end);if(manual)return !manual.invalid&&(manual.type!=='BEAM'||connected(manual.member,path));if(direct(point))return true;const hits=model.beams.filter(b=>b!==exclude&&contact(point,b)&&(contact(point,b)?.x>tol&&contact(point,b).x<L(b)-tol||cbTipSupport(p,r,f,b,point)));return hits.length===1&&connected(hits[0],path);}
   function connected(b,path=new Set()){
    if(path.has(b))return false;if(memo.has(b))return memo.get(b);const next=new Set(path);next.add(b);const root=b.displayKind==='CB'?cbRoot(p,r,f,b):null;
    const ok=root?!!root.fixedEnd&&held(root.fixedEnd==='a'?a(b):z(b),b,next):held(a(b),b,next)&&held(z(b),b,next);memo.set(b,ok);return ok;
@@ -185,7 +195,7 @@ const Loading=(()=>{
    const groupMap=new Map();walls.forEach((w,i)=>{const k=root(i);if(!groupMap.has(k))groupMap.set(k,{member:w.member,members:[],g:0,q:0,errors:[],slabs:new Set()});w.group=groupMap.get(k);w.group.members.push(w.member);});const wallGroups=[...groupMap.values()];wallGroups.forEach(g=>g.signature=g.members.map(c=>token('WALL',c)).sort().join(';'));
 
    function addRow(kind,c,extra={}){const t=token(kind,c),rr={floor:f,framing:r.floors[f-1].type,kind,id:c.displayId||c.id,token:t,member:c,input:input(p,f,t),...extra};local.push(rr);return rr;}
-   function sink(point,exclude){const end=pt(point,a(exclude.member))?'a':'z',manual=manualSupport(p,model,f,exclude.member,end);if(manual){if(manual.invalid)return null;const t=manual.value;if(manual.type==='COL')return {type:'COL',target:columns.find(x=>token('COL',x.member)===t)};if(manual.type==='WALL')return {type:'WALL',target:walls.find(x=>token('WALL',x.member)===t).group};const target=beams.find(x=>x.token===t);return {type:'BEAM',target,x:contact(point,target.member).x};}const cs=columns.filter(c=>contains(c.member,point));if(cs.length===1)return {type:'COL',target:cs[0]};if(cs.length>1)return null;const ws=walls.filter(c=>contact(point,c.member));if(ws.length&&ws.every(w=>w.group===ws[0].group))return {type:'WALL',target:ws[0].group};let bs=beams.filter(b=>b!==exclude&&contact(point,b.member)&&(distance(point,b.member)>tol&&distance(point,b.member)<L(b.member)-tol||cbTipSupport(p,r,f,b.member,point)));if(bs.length===1)return {type:'BEAM',target:bs[0],x:contact(point,bs[0].member).x};return null;}
+   function sink(point,exclude){const end=pt(point,a(exclude.member))?'a':'z',manual=manualSupport(p,model,f,exclude.member,end);if(manual){if(manual.invalid)return null;const t=manual.value;if(manual.type==='COL')return {type:'COL',target:columns.find(x=>token('COL',x.member)===t)};if(manual.type==='WALL')return {type:'WALL',target:walls.find(x=>token('WALL',x.member)===t).group};const target=beams.find(x=>x.token===t);return {type:'BEAM',target,x:contact(point,target.member).x};}const cs=columns.filter(c=>contains(c.member,point));if(cs.length===1)return {type:'COL',target:cs[0]};if(cs.length>1)return null;const ws=walls.filter(c=>contact(point,c.member));if(ws.length&&ws.every(w=>w.group===ws[0].group))return {type:'WALL',target:ws[0].group};let bs=beams.filter(b=>b!==exclude&&contact(point,b.member)&&(contact(point,b.member)?.x>tol&&contact(point,b.member).x<L(b.member)-tol||cbTipSupport(p,r,f,b.member,point)));if(bs.length===1)return {type:'BEAM',target:bs[0],x:contact(point,bs[0].member).x};return null;}
    // TT provenance is independent of area tracing and of whether reactions can
    // be solved. Keep it on every receiver so overrides cannot hide missing loads.
    function inheritTruss(target,sources=[]){if(!sources.length)return;target.truss109=[...new Set([...(target.truss109||[]),...sources])];if(target.row)target.row.truss109=[...target.truss109];}

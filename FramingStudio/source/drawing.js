@@ -193,7 +193,7 @@ const Drawing=(()=>{
    if(b.a.some((v,i)=>Math.abs(v-b.rawA[i])>1e-6)||b.z.some((v,i)=>Math.abs(v-b.rawZ[i])>1e-6))rows.push(['贴边后中心线',point(b.a)+' → '+point(b.z)]);
    note='参考线长度不是净跨或设计计算跨度。仅检查几何支承路径，未核实连接刚度、荷载及承载力。';
    if(b.supportStatus==='unverified')title=b.displayKind==='CB'?(b.kind==='CB'?'悬臂梁 CB · '+b.id:b.displayId):'⚠ 支承未确认 · '+(b.displayId||b.id);
-   if(b.displayKind==='CB'){const input=rows.find(r=>r[0]==='输入类型');if(input){input[0]='类型';input[1]=b.kind==='CB'?'CB · 悬臂梁（手动指定）':'CB · 悬臂梁（按外伸几何识别）';}}
+   if(b.displayKind==='CB'){const input=rows.find(r=>r[0]==='输入类型');if(input){input[0]='类型';input[1]=b.autoCantilever173?'CB · 懸臂梁（自動識別）':b.kind==='CB'?'CB · 悬臂梁（手动指定）':'CB · 悬臂梁（按外伸几何识别）';}}
    if(b.autoTransfer){rows.push(['TB 識別','自動 · 承托 '+b.transferLandings.map(c=>FloorLevels.name(p,c.floor)+' '+c.id).join('、')]);note+=' 原梁 '+b.id+' 的荷載及勾選保留。';}
    size={b:b.b*1000,d:b.d*1000};
   }else if(hit.kind==='COL'){

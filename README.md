@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前网页版本为 **E2.180**（保留 E2.172–E2.179 更新，SB 結構區限深及 ULS 荷載／反力圖），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前网页版本为 **E2.181**（保留 E2.172–E2.180 更新，支承標示及短反力箭嘴），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 
@@ -21,6 +21,8 @@ E2.178 分清 SB 預設深度與主梁 Structural Zone，板資料及列表顯�
 E2.179 按構件獨立計算梁自重，板反力以原線荷載強度施加全梁跨；柱仍採 tributary area。[修改差異](FramingStudio/docs/changes-e2179.md)。
 
 E2.180 限制 SB 不超過當層／局部 Structural Zone，並顯示加係數荷載及支承反力箭頭。[修改差異](FramingStudio/docs/changes-e2180.md)。
+
+E2.181 將支承標示移至各端反力旁，縮短箭嘴並避免文字重疊。[修改差異](FramingStudio/docs/changes-e2181.md)。
 
 ## 运行
 

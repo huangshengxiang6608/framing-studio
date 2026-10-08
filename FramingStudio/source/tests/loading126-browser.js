@@ -54,23 +54,23 @@ function loading126Tests(){
  const missing=copy(base);LoadData.setFloor(missing,1,{dl:10,sdl:1.5,ll:null});const missingRow=Loading.run(missing,Engine.generate(missing)).rows.find(r=>r.id==='B1');assert(!missingRow.actions&&missingRow.loadErrors.some(x=>x.includes('梁顶')),'Missing beam-top LL stays pending');
  const endSlab={rects:[{x0:2,x1:4,y0:0,y1:2}]},endModel={slabs:[endSlab],beams:[{a:[0,1],z:[2,1],b:.2}]},endArea=copy(base);endArea.explorer.areas[1]=[{id:'END',name:'End contact',panels:[Loading.token('SLAB',endSlab)],dl:10,sdl:2,ll:5}];near(LoadRegions83.surfaceRegions(endArea,1,endModel)[0].rects.reduce((n,r)=>n+LoadRegions83.area(r),0),4,'Beam end contact does not extend a panel region along the beam length');
  passed.push('Panel-region half-widths, outer beam widths, exact coordinate overrides and missing-input guards');
- // Code Eq. 5.4 example independent of the force model: 2.125 + .1 + .1.
+ // Centre-to-centre example independent of the force model: 2.125 + .5 + .125.
  const slab={id:'SL-SAMPLE',x0:1,x1:5.5,y0:1,y1:3.125,rects:[{x0:1,x1:5.5,y0:1,y1:3.125}],area:4.5*2.125,rectangular:true,netBoundary120:true,thickness:200};
  const member=(id,a,z,b)=>({id,kind:'MB',a,z,rawA:a,rawZ:z,b,d:.6}),support={columns:[],walls:[],beams:[member('MB',[.5,.5],[6,.5],1),member('SB',[.5,3.25],[6,3.25],.25)]};
- let span=Loading.slabSpan(slab,'Y',support);near(span.clear,2.125,'Sample net span');near(span.effective,2.325,'Sample effective span');
- near(Loading.slabSpan(slab,'Y',support,'top').effective,2.225,'Cantilever root extension only');
- const narrow=copy(support);narrow.beams[1]=member('SB',[.5,3.175],[6,3.175],.1);near(Loading.slabSpan(slab,'Y',narrow).effective,2.275,'Narrow support controls extension');
- const transpose=o=>{const n=copy(o);for(const b of n.beams){b.a.reverse();b.z.reverse();b.rawA.reverse();b.rawZ.reverse();}return n;},sx={...slab,x0:slab.y0,x1:slab.y1,y0:slab.x0,y1:slab.x1};near(Loading.slabSpan(sx,'X',transpose(support)).effective,2.325,'X/Y span symmetry');
+ let span=Loading.slabSpan(slab,'Y',support);near(span.clear,2.125,'Sample net span');near(span.effective,2.75,'Sample effective span');
+ near(Loading.slabSpan(slab,'Y',support,'top').effective,2.625,'Cantilever root extension only');
+ const narrow=copy(support);narrow.beams[1]=member('SB',[.5,3.175],[6,3.175],.1);near(Loading.slabSpan(slab,'Y',narrow).effective,2.675,'Narrow support controls extension');
+ const transpose=o=>{const n=copy(o);for(const b of n.beams){b.a.reverse();b.z.reverse();b.rawA.reverse();b.rawZ.reverse();}return n;},sx={...slab,x0:slab.y0,x1:slab.y1,y0:slab.x0,y1:slab.x1};near(Loading.slabSpan(sx,'X',transpose(support)).effective,2.75,'X/Y span symmetry');
  const gap=copy(support);gap.beams[1].a[1]+=.01;gap.beams[1].z[1]+=.01;assert(Loading.slabSpan(slab,'Y',gap).effective===null,'No fabricated span over support gap');
  const duplicate=copy(support);duplicate.beams.push(copy(duplicate.beams[0]));assert(Loading.slabSpan(slab,'Y',duplicate).effective===null,'Ambiguous support does not create an effective span');
  passed.push('Effective span, unequal/narrow supports, X/Y, cantilever root and invalid-support guards');
  // Design span goes to every existing calculation consumer; transfer uses net
  // geometry. Native report templates are not modified.
  const design=copy(fixtures.slab),dr=Engine.generate(design),s=Engine.floorModel(dr,1).slabs[0],token=Loading.token('SLAB',s);design.explorer.selected['1|'+token]=true;design.explorer.reportA['1|'+token]=true;design.explorer.reportB['1|'+token]=true;
- const result=Loading.run(design,dr),row=result.rows.find(r=>r.token===token);near(row.loading.clearSpan,3.5,'Net span retained');near(row.loading.L,3.7,'Design uses effective span');near(row.result.inputs.C2,3700,'Section B check input');
+ const result=Loading.run(design,dr),row=result.rows.find(r=>r.token===token);near(row.loading.clearSpan,3.5,'Net span retained');near(row.loading.L,3.75,'Design uses effective span');near(row.result.inputs.C2,3750,'Section B check input');
  const reactionQ=row.slabReactions.reduce((n,e)=>n+e.q*e.length,0);near(reactionQ,s.area*2,'Effective span adds no slab load');
- for(const sec of ['A','B']){const plan=RCPlan.build(design,sec);assert(plan.issues.length===0,sec+' native plan ready');near(plan.batches[0].cells.B34,3.7,sec+' native span input');}
- const changed=copy(design);changed.types.F1.slabSizes=[{signature:SlabGeometry120.signature(s),value:180}];const rr=Loading.run(changed,Engine.generate(changed)).rows.find(r=>r.token===token);near(rr.loading.L,3.68,'Slab depth updates effective span');near(rr.slabReactions.reduce((n,e)=>n+e.q*e.length,0),reactionQ,'Slab depth does not enlarge LL area');
+ for(const sec of ['A','B']){const plan=RCPlan.build(design,sec);assert(plan.issues.length===0,sec+' native plan ready');near(plan.batches[0].cells.B34,3.75,sec+' native span input');}
+ const changed=copy(design);changed.types.F1.slabSizes=[{signature:SlabGeometry120.signature(s),value:180}];const rr=Loading.run(changed,Engine.generate(changed)).rows.find(r=>r.token===token);near(rr.loading.L,3.75,'Slab depth does not change support centres');near(rr.slabReactions.reduce((n,e)=>n+e.q*e.length,0),reactionQ,'Slab depth does not enlarge LL area');
  passed.push('Section A/B native input parity; effective span does not alter slab LL or floor area');
  return {passed};
 }

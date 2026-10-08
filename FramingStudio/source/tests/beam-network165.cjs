@@ -25,6 +25,9 @@ const collision=fixture();collision.beams.push({...copy(collision.beams[0]),id:'
 console.log('Invalid or colliding main chains remain in place, and SBs never follow rejected targets');
 const disconnected=fixture();for(const c of disconnected.columns)c.cx=19.75;disconnected.beams[2].z[0]=18;disconnected.beams[2].rawZ[0]=18;run(disconnected);for(const b of disconnected.beams.slice(0,2))near(b.a[0],10);near(disconnected.beams[3].z[0],10);
 console.log('A main chain cannot move beyond its receiving transfer beam even while inside the floor');
-const manual=fixture();for(const b of manual.beams)b.source='manual';const unchanged=JSON.stringify(manual.beams);run(manual);assert.equal(JSON.stringify(manual.beams),unchanged);
+const manual=fixture();for(const b of manual.beams){b.source='manual';b.positionMode175='fixed';}const unchanged=JSON.stringify(manual.beams);run(manual);assert.equal(JSON.stringify(manual.beams),unchanged);
 const skew=fixture();skew.columns[1].cx=9.25;run(skew);for(const b of skew.beams.slice(0,2))near(b.a[0],10);
-console.log('Manual beams and conflicting column centre lines are preserved');
+console.log('Explicitly fixed beams and conflicting column centre lines are preserved');
+
+for(const source of ['auto','manual'])for(const widthMode of ['column','manual']){const u=fixture();for(const b of u.beams){b.source=source;b.widthMode=widthMode;}run(u);for(const b of u.beams.slice(0,2))near(b.a[0],9.75);for(const b of u.beams.slice(3))near(b.z[0],9.75);assert.equal(u.beams[0].b,1);}
+console.log('Manual/automatic main and secondary beams follow identically; manual widths remain unchanged');

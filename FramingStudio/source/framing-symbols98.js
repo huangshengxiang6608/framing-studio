@@ -53,10 +53,10 @@ const FramingSymbols98=(()=>{
   const displayBeams191=opt.drawingOffsets191?ReviewLayout191.model(m,opt.drawingOffsets191).beams:m.beams;
   if(opt.drawingOffsets191){
    const shown=displayBeams191.filter((b,i)=>visible[m.beams[i].kind]!==false&&(!(b.displayKind==='CB')||visible.CB!==false)&&(typeof TrussModel109==='undefined'||!TrussModel109.replacement(p,f,m.beams[i]))),polygons=shown.map(ReviewLayout191.beamPolygon);
-   // White faces mask the background grid first; clipped outlines cannot cross another beam.
+   // Mask background lines first. CB support outlines take precedence over supported beam edges.
    for(let i=0;i<shown.length;i++)if(polygons[i].length)out.push({type:'polygon',points:polygons[i].map(q=>[X(q[0]),Y(q[1])]),fill:'#ffffff',color:'#ffffff',width:.1,mono98:true,reviewBeam197:shown[i].id});
    for(let i=0;i<shown.length;i++){const b=shown[i],poly=polygons[i],cb=(b.displayKind||b.kind)==='CB';
-    for(let j=0;j<poly.length;j++)for(const [a,z]of ReviewLayout191.outsideSegments(poly[j],poly[(j+1)%poly.length],polygons.filter((_,n)=>n!==i))){line(out,X(a[0]),Y(a[1]),X(z[0]),Y(z[1]),cb?.85:.75,!cb);out.at(-1).reviewBeamEdge197=b.id;}
+    for(let j=0;j<poly.length;j++)for(const [a,z]of ReviewLayout191.outsideSegments(poly[j],poly[(j+1)%poly.length],polygons.filter((_,n)=>n!==i&&(!cb||(shown[n].displayKind||shown[n].kind)==='CB')))){line(out,X(a[0]),Y(a[1]),X(z[0]),Y(z[1]),cb?.85:.75,!cb);out.at(-1).reviewBeamEdge197=b.id;}
     hits.push({r:ReviewLayout191.beamRect(b),id:b.id,displayId:b.displayId||b.id,kind:b.kind,source:b.source});if(opt.labels!==false)text(out,opt.beamLabel?.(b)||b.displayId||b.id,X(b.a[0]+(b.z[0]-b.a[0])*.28)+3,Y(b.a[1]+(b.z[1]-b.a[1])*.28)-12,45,11,7,false);
    }
   }else{

@@ -1,7 +1,7 @@
 const path=require('path'),assert=require('assert/strict'),{pathToFileURL}=require('url'),{chromium}=require('playwright'),fixture=require('./tributary187.cjs');
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});try{
  const page=await browser.newPage({viewport:{width:1400,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());await page.goto(pathToFileURL(path.resolve(__dirname,'../../assets/index.html')).href);
- const p=JSON.parse(JSON.stringify(fixture.p));for(const g of p.groups){g.sh=1000;g.headroom=1;g.em=.5;}p.types.F1.beamDepth=600;p.types.F1.beams.find(b=>b.id==='B1').typeMode175='fixed';
+ const p=JSON.parse(JSON.stringify(fixture.p));for(const g of p.groups){g.sh=1000;g.headroom=1;g.em=.5;}p.types.F1.beamDepth=600;p.types.F1.beams=p.types.F1.beams.filter(b=>b.id!=='V2');p.types.F1.beams.find(b=>b.id==='B1').typeMode175='fixed';
  const load=async p=>{await page.locator('#file').setInputFiles({name:'auto-types.framing.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await page.evaluate(()=>StudioHost.navigate('beamLayout'));};
  await page.evaluate(()=>{const draw=Drawing.plan;Drawing.plan=(...a)=>window.plot199=draw(...a);});await load(p);
  const model=()=>page.evaluate(()=>{const h=StudioHost.get();return Engine.floorModel(h.result,h.floor);}),beam=async()=> (await model()).beams.find(b=>b.id==='B1');

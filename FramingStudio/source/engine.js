@@ -75,6 +75,7 @@ const Engine=(()=>{
   const direct=q=>columns.some(c=>c.status!=='上层柱'&&contains(q,c))||m.walls.some(w=>on(q,w)||on(q,{a:w.rawA,z:w.rawZ})||(()=>{const v=rect(w);return Math.abs(q[0]-v.x)<=v.w/2+eps&&Math.abs(q[1]-v.y)<=v.d/2+eps;})());
   for(const b of m.beams){
    if(b.kind!=='SB'||b.secondaryCantilever101||![b.a,b.z].some(q=>contains(q,column))||![b.a,b.z].every(direct))continue;
+   if(b.splitSecondaryParent200&&b.source==='manual')materializeColumnSpans170(p,key,m);
    const snap=t.autoBeamSnapshot,row=b.source==='auto'?snap.secondary.find(v=>v.id===b.id):t.beams.find(v=>v.id===b.id&&v.kind==='SB');if(!row)continue;
    row.kind='MB';row.loadKind194='SB';delete row.bay171;count++;
    row.columnSupports164=mainColumnSupports164(p,key,{...b,columnSupports164:undefined},columns);
@@ -274,11 +275,35 @@ const Engine=(()=>{
   }
   beams.splice(0,beams.length,...out);
  }
+ // Existing/manual SBs obey the same primary-bay boundaries as newly generated SBs.
+ function splitSecondarySpans200(p,key,beams,receivers,issue){
+  const reserved=new Set(beams.map(b=>b.id)),out=[];
+  for(const b of beams){if(b.kind!=='SB'){out.push(b);continue;}
+   const axis=near(b.a[1],b.z[1])?0:1,cross=1-axis,sign=Math.sign(b.z[axis]-b.a[axis]),cuts=[];
+   for(const support of receivers){if(near(support.a[cross],support.z[cross]))continue;
+    const point=[...b.a];point[axis]=support.a[axis];
+    if((point[axis]-b.a[axis])*sign<=eps||(b.z[axis]-point[axis])*sign<=eps||!on(point,support))continue;
+    cuts.push({value:point[axis],raw:support.rawA[axis]});
+   }
+   cuts.sort((a,z)=>(a.value-z.value)*sign);const uniqueCuts=cuts.filter((v,i)=>!i||!near(v.value,cuts[i-1].value));
+   if(!uniqueCuts.length){out.push(b);continue;}
+   const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null,hasInput=token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length);
+   if(hasInput){issue(b.id,'SB 跨過中間支承，但原跨有構件輸入；保留原梁，請核對並清除原跨輸入後自動分段');out.push(b);continue;}
+   const points=[{value:b.a[axis],raw:b.rawA[axis]},...uniqueCuts,{value:b.z[axis],raw:b.rawZ[axis]}];
+   if(points.some((v,i)=>i&&(v.raw-points[i-1].raw)*sign<=eps)){issue(b.id,'SB 支承中心與參考線次序不一致，請核對後分段');out.push(b);continue;}
+   for(let i=1;i<points.length;i++){const a=[...b.a],z=[...b.z],rawA=[...b.rawA],rawZ=[...b.rawZ];a[axis]=points[i-1].value;z[axis]=points[i].value;rawA[axis]=points[i-1].raw;rawZ[axis]=points[i].raw;
+    if(p.types[key].suppressed.includes(sig(rawA,rawZ)))continue;
+    let id=b.id+'-'+i;while(reserved.has(id))id+='A';reserved.add(id);
+    const part={...b,id,a,z,rawA,rawZ,splitSecondaryParent200:b.id};delete part.columnSupports164;
+    if(part.positionMode175==='fixed'){part.fixedA175=[...a];part.fixedZ175=[...z];}out.push(part);
+   }
+  }beams.splice(0,beams.length,...out);
+ }
  // A user edit/delete of a derived manual span first materializes its siblings.
  function materializeColumnSpans170(p,key,m){
-  const t=p.types[key],parents=new Set(m.beams.filter(b=>b.source==='manual'&&b.splitColumnParent170).map(b=>b.splitColumnParent170));
+  const t=p.types[key],parent=b=>b.splitColumnParent170||b.splitSecondaryParent200,parents=new Set(m.beams.filter(b=>b.source==='manual'&&parent(b)).map(parent));
   if(!parents.size)return;
-  t.beams=t.beams.flatMap(row=>!parents.has(row.id)?[row]:m.beams.filter(b=>b.source==='manual'&&b.splitColumnParent170===row.id).map(b=>({...row,id:b.id,a:{x:b.rawA[0],y:b.rawA[1]},z:{x:b.rawZ[0],y:b.rawZ[1]},b:b.b*1000,d:b.d*1000,edgeInset:true})));
+  t.beams=t.beams.flatMap(row=>!parents.has(row.id)?[row]:m.beams.filter(b=>b.source==='manual'&&parent(b)===row.id).map(b=>({...row,id:b.id,a:{x:b.rawA[0],y:b.rawA[1]},z:{x:b.rawZ[0],y:b.rawZ[1]},b:b.splitSecondaryParent200?row.b:b.b*1000,d:b.splitSecondaryParent200?row.d:b.d*1000,...(b.positionMode175==='fixed'?{fixedA175:clone(b.a),fixedZ175:clone(b.z)}:{}),edgeInset:true})));
  }
  // Resolve crossing automatic MBs in ascending original span order. Only rooted, strictly
  // shorter members can receive a longer member; this gives a directed acyclic load path.
@@ -427,6 +452,7 @@ const Engine=(()=>{
   }else{
    let changed=true;while(changed){changed=false;for(const b of primary){if(supported.has(b))continue;const root=b.fixedEnd101,cb=b.kind==='CB',ok=cb?root==='a'?held(b.rawA):root==='z'?held(b.rawZ):support(b.rawA)!==support(b.rawZ):held(b.rawA)&&held(b.rawZ);if(ok){supported.add(b);changed=true;}}}
   }
+  splitSecondarySpans200(p,key,beams,[...walls,...supported],issue);
   const edges=[...walls,...supported],currentBays171=beamBays171(bayEdges171(edges,columns),ts,key),savedSB171=(t.autoBeamSnapshot?.secondary||[]).filter(b=>b.kind==='SB'),oldBays171=savedSB171.some(b=>!b.bay171)?beamBays171(edges,ts,key):[],changedBays171=new Set();
   // Repair only bays whose primary boundaries changed, retaining other saved spacing.
   for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=b.bay171||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
@@ -690,7 +716,7 @@ const Engine=(()=>{
  function removeBeam(p,key,id,kind,f){
   const t=p.types[key];if(!t)throw Error('Framing 类型不存在');
   const b=(f?floorModel(generate(p),f,key):model(p,key)).beams.find(b=>b.id===id&&b.kind===kind);if(!b)throw Error('所选梁已不存在');
-  if(b.splitMainParent){const m=f?floorModel(generate(p),f,key):model(p,key);materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}
+  if(b.splitMainParent||b.splitSecondaryParent200){const m=f?floorModel(generate(p),f,key):model(p,key);materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}
   if(b.source==='manual'){const i=t.beams.findIndex(c=>c.id===id&&c.kind===(b.baseKind||kind));if(i<0)throw Error('原始梁已不存在');t.beams.splice(i,1);}
   const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);
  }
@@ -700,13 +726,13 @@ const Engine=(()=>{
   if(hit.kind==='SLAB'){const s=m.slabs.find(s=>s.id===hit.slabId);if(!s)throw Error('板块已不存在');const signature=slabSignature(s);t.slabSizes=(t.slabSizes||[]).filter(s=>s.signature!==signature);if(size.b!==null)t.slabSizes.push({signature,value:size.b});return;}
   if(hit.kind==='COL'){const c=m.columns.find(c=>c.id===hit.id);if(!c)throw Error('柱已不存在');if(t.mode==='auto'&&c.anchorX!==undefined){t.columnSizes=(t.columnSizes||[]).filter(o=>o.ax!==c.anchorX||o.ay!==c.anchorY);if(size.b!==null||size.d!==null)t.columnSizes.push({ax:c.anchorX,ay:c.anchorY,b:size.b??p.defaults.cb,d:size.d??p.defaults.cd});}else{const row=t.columns.find(c=>c.id===hit.id);row.b=size.b??p.defaults.cb;row.d=size.d??p.defaults.cd;}return;}
   if(hit.kind==='WALL'){const row=t.walls.find(w=>w.id===hit.id);if(!row)throw Error('墙已不存在');row.b=size.b??p.defaults.wall;return;}
-  const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)throw Error('梁已不存在');if(size.depthOverride184&&size.d!==null){for(const f of floors(p).filter(f=>f.type===key)){const limit=LocalHeights96.beamAllowance(p,f.n,b);if(size.d>limit+1e-6)throw Error(b.id+' 梁深 '+size.d+' mm 超過 '+FloorLevels.name(p,f.n)+' Structural Zone 上限 '+limit+' mm；未套用');}}const requestedKind=size.kind??b.kind,nextKind=(b.autoTransfer||b.autoCantilever173)&&requestedKind===b.kind?b.baseKind:requestedKind;if(!['MB','SB','TB','CB'].includes(nextKind))throw Error('梁类型须为 MB、SB、TB 或 CB');if(nextKind!==b.kind&&m.beams.some(other=>other!==b&&other.kind===nextKind&&sig(other.rawA,other.rawZ)===sig(b.rawA,b.rawZ)))throw Error('同位置已存在该类型的梁，请先检查重复构件');if(b.splitMainParent){materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}let row=t.beams.find(c=>c.id===b.id&&c.kind===(b.baseKind||b.kind)&&b.source==='manual');
+  const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)throw Error('梁已不存在');if(size.depthOverride184&&size.d!==null){for(const f of floors(p).filter(f=>f.type===key)){const limit=LocalHeights96.beamAllowance(p,f.n,b);if(size.d>limit+1e-6)throw Error(b.id+' 梁深 '+size.d+' mm 超過 '+FloorLevels.name(p,f.n)+' Structural Zone 上限 '+limit+' mm；未套用');}}const requestedKind=size.kind??b.kind,nextKind=(b.autoTransfer||b.autoCantilever173)&&requestedKind===b.kind?b.baseKind:requestedKind;if(!['MB','SB','TB','CB'].includes(nextKind))throw Error('梁类型须为 MB、SB、TB 或 CB');if(nextKind!==b.kind&&m.beams.some(other=>other!==b&&other.kind===nextKind&&sig(other.rawA,other.rawZ)===sig(b.rawA,b.rawZ)))throw Error('同位置已存在该类型的梁，请先检查重复构件');if(b.splitMainParent||b.splitSecondaryParent200){materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}let row=t.beams.find(c=>c.id===b.id&&c.kind===(b.baseKind||b.kind)&&b.source==='manual');
   if(!row){let n=1;while(t.beams.some(b=>b.id==='EDIT_'+n))n++;const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);row={id:'EDIT_'+n,kind:nextKind,a:{x:original.rawA[0],y:original.rawA[1]},z:{x:original.rawZ[0],y:original.rawZ[1]},on:true,original:signature};t.beams.push(row);}
   if(b.loadKind194)row.loadKind194=b.loadKind194;
   row.columnSupports164=clone(b.columnSupports164||mainColumnSupports164(p,key,b,m.columns));
   row.positionMode175=size.positionMode175??b.positionMode175??'follow';delete row.typeMode175;
   if(row.positionMode175==='fixed'){row.fixedA175=clone(b.a);row.fixedZ175=clone(b.z);}else{delete row.fixedA175;delete row.fixedZ175;}
-  if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;if(nextKind==='CB'&&(b.kind!=='CB'||b.autoCantilever173))row.extendToBoundary173=true;row.widthMode=size.preserveWidth199?(b.widthMode??(b.source==='auto'?(b.kind==='SB'?'default':['MB','CB'].includes(b.kind)?'column':'manual'):'manual')):size.b===null?(["MB","CB"].includes(nextKind)?"column":"default"):"manual";row.kind=nextKind;row.b=size.b??p.defaults[nextKind==='SB'?'sb':nextKind==='TB'?'tb':'mb'];if(size.depthOverride184){if(size.d===null)delete row.depthOverride184;else row.depthOverride184=size.d;}row.d??=null;if(requestedKind!==b.kind&&!size.depthOverride184){delete row.depthOverride184;row.d=null;}else if(!size.preserveDepth184)row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;return model(p,key).beams.find(v=>v.id===row.id)||{id:row.id,kind:row.kind,rawA:resolve(p,row.a,key),rawZ:resolve(p,row.z,key)};
+  if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;if(nextKind==='CB'&&(b.kind!=='CB'||b.autoCantilever173))row.extendToBoundary173=true;row.widthMode=size.preserveWidth199?(b.widthMode??(b.source==='auto'?(b.kind==='SB'?'default':['MB','CB'].includes(b.kind)?'column':'manual'):'manual')):size.b===null?(["MB","CB"].includes(nextKind)?"column":"default"):"manual";row.kind=nextKind;row.b=size.b??p.defaults[nextKind==='SB'?'sb':nextKind==='TB'?'tb':'mb'];if(size.depthOverride184){if(size.d===null)delete row.depthOverride184;else row.depthOverride184=size.d;}row.d??=null;if(requestedKind!==b.kind&&!size.depthOverride184){delete row.depthOverride184;row.d=null;}else if(!size.preserveDepth184)row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;return model(p,key).beams.find(v=>v.id===row.id||v.splitSecondaryParent200===row.id)||{id:row.id,kind:row.kind,rawA:resolve(p,row.a,key),rawZ:resolve(p,row.z,key)};
  }
  // Resolve every target before mutation: generated member IDs may change after deletion.
  function removeMembers(p,key,hits,f){

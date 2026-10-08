@@ -1,0 +1,24 @@
+const path=require('path'),assert=require('assert/strict'),{pathToFileURL}=require('url'),{chromium}=require('playwright'),fixture=require('./review-layout191.cjs');
+(async()=>{const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});try{
+ const page=await browser.newPage({viewport:{width:1117,height:884}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(path.resolve(__dirname,'../../assets/index.html')).href);
+ await page.locator('#file').setInputFiles({name:'review.framing.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture.p))});
+ await page.evaluate(()=>{const old=Drawing.plan;Drawing.plan=(...args)=>window.plot191=old(...args);StudioHost.navigate('review');});await page.waitForTimeout(150);
+ const baseline=await page.evaluate(()=>JSON.stringify(StudioHost.get().result));
+ await page.locator('[data-review-select191="MB:B1"]').check();await page.locator('[data-review-select191="MB:V2"]').check();await page.locator('#review-distance191').fill('0.25');await page.locator('[data-review191="right"]').click();await page.waitForTimeout(80);
+ let saved=await page.evaluate(()=>JSON.stringify(StudioHost.get().p));assert.equal(JSON.parse(saved).drawingOffsets191.F1['MB:B1'].dx,.25);
+ assert.equal(await page.evaluate(()=>JSON.stringify(StudioHost.get().result)),baseline);
+ await page.locator('[data-review191="up"]').click();await page.waitForTimeout(80);assert.equal(await page.evaluate(()=>StudioHost.get().p.drawingOffsets191.F1['MB:V2'].dy),-.25);
+ const positions=await page.evaluate(()=>{const h=StudioHost.get(),b=Engine.floorModel(h.result,1).beams.find(b=>b.id==='B1');return {original:Engine.rect(b),shown:plot191.hits.find(h=>h.id==='B1'&&h.kind==='MB').r};});assert.equal(positions.shown.x,positions.original.x+.25);assert.equal(positions.shown.y,positions.original.y-.25);
+ await page.locator('#review-distance191').fill('-1');await page.locator('[data-review191="left"]').click();assert.equal(await page.evaluate(()=>StudioHost.get().p.drawingOffsets191.F1['MB:B1'].dx),.25);
+ await page.locator('#review-distance191').fill('0.25');await page.locator('[data-review191="none"]').click();
+ const q=await page.evaluate(()=>{const h=plot191.hits.find(h=>h.id==='B1'&&h.kind==='MB');return {x:plot191.ox+(h.r.x-h.r.w/4)*plot191.scale,y:plot191.oy+h.r.y*plot191.scale};});await page.locator('#canvas').click({position:q});assert(await page.locator('[data-review-select191="MB:B1"]').isChecked());
+ await page.keyboard.press('Delete');assert.equal(await page.evaluate(()=>JSON.stringify(StudioHost.get().result)),baseline);assert(!(await page.locator('[data-review-select191="MB:B1"]').isChecked()));
+ // Box selection at the displayed coordinates, followed by a reversible movement.
+ const box=await page.evaluate(()=>{const r=document.querySelector('#canvas').getBoundingClientRect();return {x:r.x+plot191.ox+.5*plot191.scale,y:r.y+plot191.oy+1.2*plot191.scale,x2:r.x+plot191.ox+9.6*plot191.scale,y2:r.y+plot191.oy+2.5*plot191.scale};});await page.mouse.move(box.x,box.y);await page.mouse.down();await page.mouse.move(box.x2,box.y2,{steps:5});await page.mouse.up();assert(await page.locator('[data-review-select191="MB:B1"]').isChecked());
+ await page.locator('[data-review191="down"]').click();await page.locator('[data-review191="left"]').click();
+ if(process.env.UI_SCREENSHOT)await page.screenshot({path:process.env.UI_SCREENSHOT});
+ await page.locator('[data-review191="restore"]').click();assert(!(await page.evaluate(()=>StudioHost.get().p.drawingOffsets191)));await page.locator('#undo').click();assert(await page.evaluate(()=>!!StudioHost.get().p.drawingOffsets191));
+ await page.locator('[data-review191="restore"]').click();await page.waitForTimeout(80);const restored=await page.evaluate(()=>{const h=StudioHost.get(),b=Engine.floorModel(h.result,1).beams.find(b=>b.id==='B1');return {a:Engine.rect(b),b:plot191.hits.find(h=>h.id==='B1'&&h.kind==='MB').r};});assert.deepEqual(restored.a,restored.b);
+ page.once('dialog',d=>d.accept());await page.locator('#file').setInputFiles({name:'saved-offset.framing.json',mimeType:'application/json',buffer:Buffer.from(saved)});await page.evaluate(()=>StudioHost.navigate('review'));await page.waitForTimeout(80);assert.equal(await page.evaluate(()=>StudioHost.get().p.drawingOffsets191.F1['MB:B1'].dx),.25);
+ assert.deepEqual(errors,[]);console.log('PASS: table/canvas/box multi-select, four directions, invalid distance, project persistence, restore/undo, deletion safety and original geometry unchanged');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

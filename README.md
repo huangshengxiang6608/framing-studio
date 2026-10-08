@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前网页版本为 **E2.186**（保留 E2.172–E2.185 更新，柱中心傳荷及 DL／LL 名稱），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前网页版本为 **E2.187**（保留 E2.172–E2.186 更新，受荷區尺寸及板反力區段），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 
@@ -33,6 +33,8 @@ E2.184 新增梁深 D 輸入、移除梁設計額外梁頂面荷載，並修正�
 E2.185 在完整 Factored 自重公式結尾取整，後續反力沿用畫面顯示值。[修改差異](FramingStudio/docs/changes-e2185.md)。
 
 E2.186 按柱截面中心定位轉換梁集中荷載，操作介面統一 DL／LL。[修改差異](FramingStudio/docs/changes-e2186.md)。
+
+E2.187 顯示受荷區 X／Y 尺寸，並按每塊板支承中心線區段傳荷。[修改差異](FramingStudio/docs/changes-e2187.md)。
 
 ## 运行
 

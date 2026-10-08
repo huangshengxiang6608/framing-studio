@@ -185,14 +185,21 @@ const Loading=(()=>{
   if(autoSW){const concrete=LoadRegions83.reaction(z.concrete,sw.dir,mid,z.origin,z.span,right,cs,factored183?BeamLoads.surface({sw:sw.value*transfer.swScale}).sw:sw.value*transfer.swScale,true);for(const k of ['g','sw','mG'])r[k]+=concrete[k];}
   return r;
  }
- // A slab reaction is an external line load on the receiving member. Map its
- // complete support strip to 0..L without diluting the line-load intensity.
- // Keep different slab sides separate; local load changes retain their order.
- function fullSpanSlabLoads179(lines,len){
+ // Map each panel to its own support-centre interval on the receiving line.
+ // Only outer faces move to centres; regional load transitions and real voids keep their stations.
+ function fullSpanSlabLoads179(lines,len,member=null,model=null){
   const groups=new Map();
   for(const line of lines){if(!line.slabLoad179)continue;const key=line.label+'|'+line.slabSide179,group=groups.get(key)||[];group.push(line);groups.set(key,group);}
-  const bounds=new Map([...groups].map(([key,group])=>[key,{lo:Math.min(...group.map(l=>l.start)),hi:Math.max(...group.map(l=>l.end))}]));
-  return lines.map(line=>{if(!line.slabLoad179)return line;const {lo,hi}=bounds.get(line.label+'|'+line.slabSide179);if(hi-lo<=tol)return line;return {...line,start:eq(line.start,lo)?0:(line.start-lo)/(hi-lo)*len,end:eq(line.end,hi)?len:(line.end-lo)/(hi-lo)*len};});
+  const bounds=new Map([...groups].map(([key,group])=>{
+   const lo=Math.min(...group.map(l=>l.start)),hi=Math.max(...group.map(l=>l.end));let targetLo=0,targetHi=len;
+   if(member&&model){
+    const slab=model.slabs.find(c=>c.id===group[0].label),axis=eq(a(member)[1],z(member)[1])?0:1,dim=axis?'y':'x';
+    targetLo=lo;targetHi=hi;
+    if(slab){const span=slabSpan(slab,axis?'Y':'X',model,null,{},true),extensions=span.errors.length?[0,0]:[0,1].map(i=>Math.max(0,...span.segments.map(s=>s.extensions[i]||0))),u=[...a(member)],v=[...a(member)];u[axis]=slab[dim+'0']-extensions[0];v[axis]=slab[dim+'1']+extensions[1];const stations=[distance(u,member),distance(v,member)];targetLo=Math.max(0,Math.min(...stations));targetHi=Math.min(len,Math.max(...stations));}
+   }
+   return [key,{lo,hi,targetLo,targetHi}];
+  }));
+  return lines.map(line=>{if(!line.slabLoad179)return line;const {lo,hi,targetLo,targetHi}=bounds.get(line.label+'|'+line.slabSide179);if(hi-lo<=tol)return line;const map=v=>member&&model?(eq(v,lo)?targetLo:eq(v,hi)?targetHi:v):targetLo+(v-lo)/(hi-lo)*(targetHi-targetLo);return {...line,start:Math.max(0,map(line.start)),end:Math.min(len,map(line.end))};}).filter(line=>line.end-line.start>tol);
  }
  function addBeamSurface(p,f,model,beams,autoSW,areaTracing,claims=[]){
   for(const {beam:b,rects,parts,errors}of LoadRegions83.beamSurface(p,f,model,beams,claims)){
@@ -279,7 +286,7 @@ const Loading=(()=>{
    // Retain geometric surface bookkeeping only for the existing Area/Section A path.
    if(areaTracing||section==='A')addBeamSurface(p,f,model,beams,autoSW,areaTracing,slabClaims177);
    addColumnSurface(p,f,model,columns,autoSW,areaTracing,slabClaims177);
-   function solve(b,path=new Set()){if(b.done)return;if(path.has(b)){for(const item of path)item.errors.push('梁之间形成相互支承，简支传荷顺序不明确');b.errors.push('梁之间形成相互支承，简支传荷顺序不明确');return;}path=new Set(path);path.add(b);for(const child of beams.filter(x=>x.sinks.some(s=>s?.target===b)))solve(child,path);if(b.done)return;const c=b.member,rr=addRow(b.kind,c),o=resolvedInput(p,r,f,c),span=beamSpan(c,o),len=span.value,scaled=beamSpanLoads(span,areaTracing?b.lines:fullSpanSlabLoads179(b.lines,span.automatic),b.points),manual=o.mode==='manual'&&!b.truss109?.length,isCB=c.displayKind==='CB',table=Array.isArray(o.beamLoads)?BeamLoads.resolve(o,len):null;let gd=0,ql=0,points=scaled.points.map(x=>({...x})),error=[...b.errors];b.lines=scaled.lines;b.points=scaled.points;b.row=rr;inheritTruss(b,b.truss109);if(b.truss109?.length&&o.mode==='manual')error.push('此梁承接桁架反力，须恢复自动传荷模式，避免覆盖反力或掩盖上游不完整输入');
+   function solve(b,path=new Set()){if(b.done)return;if(path.has(b)){for(const item of path)item.errors.push('梁之间形成相互支承，简支传荷顺序不明确');b.errors.push('梁之间形成相互支承，简支传荷顺序不明确');return;}path=new Set(path);path.add(b);for(const child of beams.filter(x=>x.sinks.some(s=>s?.target===b)))solve(child,path);if(b.done)return;const c=b.member,rr=addRow(b.kind,c),o=resolvedInput(p,r,f,c),span=beamSpan(c,o),len=span.value,scaled=beamSpanLoads(span,areaTracing?b.lines:fullSpanSlabLoads179(b.lines,span.automatic,c,model),b.points),manual=o.mode==='manual'&&!b.truss109?.length,isCB=c.displayKind==='CB',table=Array.isArray(o.beamLoads)?BeamLoads.resolve(o,len):null;let gd=0,ql=0,points=scaled.points.map(x=>({...x})),error=[...b.errors];b.lines=scaled.lines;b.points=scaled.points;b.row=rr;inheritTruss(b,b.truss109);if(b.truss109?.length&&o.mode==='manual')error.push('此梁承接桁架反力，须恢复自动传荷模式，避免覆盖反力或掩盖上游不完整输入');
     const replacement=tt?.replaced(f,b);if(replacement){tt.rejectDirect(replacement,b,o);b.done=true;rr.replacedByTruss=replacement.t.id;rr.result={status:'REPLACED',fail:[],description:replacement.t.name+' 独立桁架设计'};if(replacement.errors.length)traceProblem(b,replacement.errors.join('；'));return;}
     if(manual){error=[...b.supportErrors,...b.errors.filter(x=>x.includes('相互支承'))];if(isCB&&!['a','z'].includes(o.fixedEnd))error.push('CB：'+cbRoot(p,r,f,c).message);if(table){error.push(...table.errors);}else if(!available(o.udlDead)||!available(o.udlLive))error.push('请填写手动线荷载 G、Q（含结构自重）');else {gd+=o.udlDead;ql=o.udlLive;}points=[];if(areaTracing)error.push('使用手动总荷载，无法对应自动承载面积');}
     if(span.error)error.push(span.error);

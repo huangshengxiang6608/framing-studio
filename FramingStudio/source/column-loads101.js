@@ -34,6 +34,12 @@ const ColumnLoads101=(()=>{
   const weighted=row.parts.some(x=>x.weighted||x.rects.some(r=>Math.abs(r.fraction-1)>1e-6));
   return {id:col.id,token:target.token,targetFloor:target.floor,targetName:FloorLevels.name(p,target.floor),floor:f,floorName:FloorLevels.name(p,f),area:row.area,rects,polygons,partitioned:row.parts.some(x=>x.partitioned),weighted,auto:auto&&!row.parts.some(x=>x.manualArea),errors:d.errors,targetRect:Engine.columnRect(col.member||col)};
  }
+ function dimensions(data){
+  const points=[...(data.rects||[]).flatMap(r=>[[r.x0,r.y0],[r.x1,r.y1]]),...(data.polygons||[]).flatMap(p=>p.points)];
+  if(!points.length)return null;
+  const x0=Math.min(...points.map(p=>p[0])),x1=Math.max(...points.map(p=>p[0])),y0=Math.min(...points.map(p=>p[1])),y1=Math.max(...points.map(p=>p[1])),x=x1-x0,y=y1-y0;
+  return {x0,x1,y0,y1,x,y,rectangle:data.auto&&!data.weighted&&Math.abs(x*y-data.area)<1e-6};
+ }
  // Union boundaries omit internal joints and retain real Opening boundaries.
  function outline(rects){
   const xs=[...new Set(rects.flatMap(r=>[r.x0,r.x1]))].sort((a,b)=>a-b),segments=[];
@@ -71,7 +77,7 @@ const ColumnLoads101=(()=>{
 
  function badge(ctx,plot,w,h,data,paint){
   if(!data||w<80||h<60)return null;
-  const margin=12,bw=Math.min(w<700?242:280,w-2*margin),bh=Math.min(data.compact?44:98,h-2*margin),overlap=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+  const dims=dimensions(data);const margin=12,bw=Math.min(w<700?242:280,w-2*margin),bh=Math.min(data.compact?(dims?104:44):(dims?158:98),h-2*margin),overlap=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
   const canvasBox=ctx.canvas.id==='canvas'?ctx.canvas.getBoundingClientRect():null,overlays=canvasBox?[document.getElementById('hint'),ctx.canvas.parentElement.querySelector('.canvas-actions')].filter(Boolean).map(el=>{const r=el.getBoundingClientRect();return {x:r.left-canvasBox.left-6,y:r.top-canvasBox.top-6,w:r.width+12,h:r.height+12};}):[];
   const belowHint=Math.max(margin,...overlays.filter(r=>r.y<h/2).map(r=>r.y+r.h+6));
   const candidates=[{x:margin,y:margin},{x:w-bw-margin,y:margin},{x:margin,y:belowHint},{x:w-bw-margin,y:belowHint},{x:margin,y:h-bh-48},{x:w-bw-margin,y:h-bh-48}].map(r=>({...r,y:Math.max(margin,Math.min(h-bh-margin,r.y)),w:bw,h:bh}));
@@ -85,9 +91,9 @@ const ColumnLoads101=(()=>{
   write(title+(data.compact&&!data.auto?' · 手动面积':''),data.compact?14:19,data.compact?11:13,true);write(Number.isFinite(data.area)?'受荷面积 '+num(data.area)+' m²':'受荷面积待确认',data.compact?35:46,data.compact?18:21,true,colour,true);
   if(!data.compact)write('来源楼层：'+data.floorName,66,12,false,'#36586d');
   const caption=issueCaption(data)||(!data.rects.length&&!data.polygons?.length?(data.auto?'所选范围没有楼板面积':'手动面积，暂无对应几何范围'):data.weighted?'斜线：几何面积经转换梁分配':data.partitioned?'矩形優先分配 · Opening 已扣除':'几何半跨范围 · Opening 已扣除');
-  if(!data.compact)write(caption,87,12,false,'#36586d',true);ctx.restore();
-  return {...box,title,caption,area:data.area,floor:data.floor,targetFloor:data.targetFloor,overlayOverlap:overlays.reduce((n,t)=>n+overlap(box,t),0)};
+  if(!data.compact)write(caption,87,12,false,'#36586d',true);if(dims){const top=data.compact?55:110;write('X = '+num(dims.x)+' m · Y = '+num(dims.y)+' m',top,12,true,colour,true);write('X: '+num(dims.x0)+'–'+num(dims.x1)+' · Y: '+num(dims.y0)+'–'+num(dims.y1)+' m',top+19,11,false,'#36586d',true);write(dims.rectangle?'面積 = X × Y':data.weighted?'外包尺寸；面積按傳荷比例計算':'外包尺寸；實際面積以高亮區為準',top+37,11,false,'#36586d',true);}ctx.restore();
+  return {...box,title,caption,dimensions:dims,area:data.area,floor:data.floor,targetFloor:data.targetFloor,overlayOverlap:overlays.reduce((n,t)=>n+overlap(box,t),0)};
  }
 
- return {select,clear,table,wallTable,schedule,highlights,viewData,region,badge,outline,issueCaption,browsing:()=>sourceView,matches:(t,f)=>target?.floor===f&&target?.token===t};
+ return {dimensions,select,clear,table,wallTable,schedule,highlights,viewData,region,badge,outline,issueCaption,browsing:()=>sourceView,matches:(t,f)=>target?.floor===f&&target?.token===t};
 })();

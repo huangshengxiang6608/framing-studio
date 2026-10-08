@@ -3,7 +3,20 @@ const ReviewLayout191=(()=>{
  const token=b=>b.kind+':'+b.id,signature=b=>JSON.stringify(b.kind==='COL'?['COL',Engine.columnRect(b)]:[b.a,b.z,b.b]),fmt=n=>String(Number(n.toFixed(6))),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function offsets(p,key){const map=p.drawingOffsets191?.[key];return map&&typeof map==='object'&&!Array.isArray(map)?map:{};}
  function offset(b,map){const o=map[token(b)];return o&&o.signature===signature(b)&&[o.dx,o.dy].every(Number.isFinite)?o:{dx:0,dy:0};}
- function beam(b,map){const o=offset(b,map);return o.dx||o.dy?{...b,a:[b.a[0]+o.dx,b.a[1]+o.dy],z:[b.z[0]+o.dx,b.z[1]+o.dy]}:b;}
+ function beam(b,map,columns=[]){
+  const o=offset(b,map),ends=['a','z'].map(end=>{const point=b[end],hits=columns.filter(c=>{if(c.status==='上层柱')return false;const r=Engine.columnRect(c);return Math.abs(point[0]-r.x)<=r.w/2+1e-6&&Math.abs(point[1]-r.y)<=r.d/2+1e-6;});
+   const co=hits.length===1?offset({...hits[0],kind:'COL'},map):null,move=co&&(co.dx||co.dy)?co:o;
+   return [point[0]+move.dx,point[1]+move.dy];
+  });return {...b,a:ends[0],z:ends[1]};
+ }
+ function beamPolygon(b){const dx=b.z[0]-b.a[0],dy=b.z[1]-b.a[1],L=Math.hypot(dx,dy);if(L<1e-9)return [];const x=-dy/L*b.b/2,y=dx/L*b.b/2;return [[b.a[0]+x,b.a[1]+y],[b.z[0]+x,b.z[1]+y],[b.z[0]-x,b.z[1]-y],[b.a[0]-x,b.a[1]-y]];}
+ function beamRect(b){const pts=beamPolygon(b);if(!pts.length)return {x:b.a[0],y:b.a[1],w:0,d:0};const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);return {x:(x0+x1)/2,y:(y0+y1)/2,w:x1-x0,d:y1-y0};}
+ const cross=(a,b)=>a[0]*b[1]-a[1]*b[0];
+ function insidePolygon(point,poly){if(poly.length<3)return false;const sides=poly.map((a,i)=>{const z=poly[(i+1)%poly.length];return cross([z[0]-a[0],z[1]-a[1]],[point[0]-a[0],point[1]-a[1]]);});return sides.every(v=>v>1e-8)||sides.every(v=>v< -1e-8);}
+ // Remove only stroke portions strictly inside another beam face (including skew display spans).
+ function outsideSegments(a,z,polygons){const d=[z[0]-a[0],z[1]-a[1]],cuts=[0,1];for(const poly of polygons)for(let i=0;i<poly.length;i++){const v=poly[i],w=poly[(i+1)%poly.length],e=[w[0]-v[0],w[1]-v[1]],den=cross(d,e);if(Math.abs(den)<1e-10)continue;const q=[v[0]-a[0],v[1]-a[1]],t=cross(q,e)/den,u=cross(q,d)/den;if(t>0&&t<1&&u>=-1e-8&&u<=1+1e-8)cuts.push(t);}
+  cuts.sort((a,b)=>a-b);const point=t=>[a[0]+t*d[0],a[1]+t*d[1]],out=[];for(let i=1;i<cuts.length;i++){const lo=cuts[i-1],hi=cuts[i];if(hi-lo>1e-9&&!polygons.some(p=>insidePolygon(point((lo+hi)/2),p)))out.push([point(lo),point(hi)]);}return out;
+ }
  function members(m){return [...m.beams,...m.columns.map(c=>({...c,kind:'COL'}))];}
  function column(c,map){const o=offset({...c,kind:'COL'},map);if(!o.dx&&!o.dy)return c;const r=Engine.columnRect(c);return {...c,x:c.x+o.dx,y:c.y+o.dy,cx:r.x+o.dx,cy:r.y+o.dy};}
  function columnEntry(c,map,f){if(c.floor!=null&&c.floor!==f)return c;const o=offset({...c.column,kind:'COL'},map);if(!o.dx&&!o.dy)return c;return {...c,column:column(c.column,map),...(c.rect?{rect:{...c.rect,x:c.rect.x+o.dx,y:c.rect.y+o.dy}}:{})};}
@@ -13,7 +26,7 @@ const ReviewLayout191=(()=>{
   for(const n of [f,f+1]){if(!result.floors[n-1])continue;const m=Engine.floorModel(result,n),o=n===f?map:offsets(p,m.key);floorModels[n]={...m,columns:m.columns.map(c=>column(c,o))};}
   return ColumnPlan87.items({...result,floorModels},f);
  }
- function model(m,map){return {...m,beams:m.beams.map(b=>beam(b,map)),columns:m.columns.map(c=>column(c,map))};}
+ function model(m,map){return {...m,beams:m.beams.map(b=>beam(b,map,m.columns)),columns:m.columns.map(c=>column(c,map))};}
  function contains(bounds,r){const e=1e-8;return r.x-r.w/2>=bounds.x0-e&&r.x+r.w/2<=bounds.x1+e&&r.y-r.d/2>=bounds.y0-e&&r.y+r.d/2<=bounds.y1+e;}
 
  function move(p,m,ids,dx,dy){if(![dx,dy].every(Number.isFinite)||Math.max(Math.abs(dx),Math.abs(dy))>1000)throw Error('移動距離須為有限數字，單次不超過 1000 m');
@@ -23,7 +36,7 @@ const ReviewLayout191=(()=>{
  }
  function restore(p,key){if(p.drawingOffsets191){delete p.drawingOffsets191[key];if(!Object.keys(p.drawingOffsets191).length)delete p.drawingOffsets191;}}
  function checkPaper(p,m,ratio,paper,result){const map=offsets(p,m.key),f=paper.floor,upper=result&&result.floors[f-1]?.type===m.key&&result.floors[f]?Engine.floorModel(result,f+1):null,upperMap=upper?offsets(p,upper.key):{};if(!Object.keys(map).length&&!Object.keys(upperMap).length)return;const W=paper.size==='A3'?(paper.portrait?297:420):297,H=paper.size==='A3'?(paper.portrait?420:297):210,s=1000/ratio,xs=Engine.axes(p,'x',m.key),ys=Engine.axes(p,'y',m.key),ox=(W-xs.at(-1).v*s)/2,oy=(H-ys.at(-1).v*s)/2;
-  for(const [b,displayMap]of [...members(m).map(b=>[b,map]),...(upper?.columns||[]).map(c=>[{...c,kind:'COL'},upperMap])]){const o=offset(b,displayMap);if(!o.dx&&!o.dy)continue;const r=b.kind==='COL'?Engine.columnRect(column(b,displayMap)):Engine.rect(beam(b,displayMap));if(ox+(r.x-r.w/2)*s<5||ox+(r.x+r.w/2)*s>W-5||oy+(r.y-r.d/2)*s<5||oy+(r.y+r.d/2)*s>H-20)throw Error('移動後的構件超出圖紙範圍；請調整打印比例或恢復出圖位置');}
+  for(const [b,displayMap]of [...members(m).map(b=>[b,map]),...(upper?.columns||[]).map(c=>[{...c,kind:'COL'},upperMap])]){const o=offset(b,displayMap);if(!o.dx&&!o.dy&&b.kind==='COL')continue;const r=b.kind==='COL'?Engine.columnRect(column(b,displayMap)):beamRect(beam(b,displayMap,m.columns));if(ox+(r.x-r.w/2)*s<5||ox+(r.x+r.w/2)*s>W-5||oy+(r.y-r.d/2)*s<5||oy+(r.y+r.d/2)*s>H-20)throw Error('移動後的構件超出圖紙範圍；請調整打印比例或恢復出圖位置');}
  }
  function create({canvas,get,update,refresh,redraw,toast}){
   let scope='',project=null,selected=new Set(),box=null,distance='0.1',filter='ALL';
@@ -31,7 +44,7 @@ const ReviewLayout191=(()=>{
   function context(){const s=get(),id=s.floor+'|'+s.key;if(scope!==id||project!==s.p){scope=id;project=s.p;selected.clear();box=null;}const live=new Set(members(s.model).map(token));selected=new Set([...selected].filter(t=>live.has(t)));return s;}
   function rows(s){return members(s.model).filter(b=>(filter==='ALL'||(b.displayKind||b.kind)===filter)&&s.visible[b.kind]!==false);}
   function render(){const s=context(),map=offsets(s.p,s.key),all=members(s.model).filter(b=>selected.has(token(b))),moved=members(s.model).filter(b=>{const o=offset(b,map);return o.dx||o.dy;}).length,stale=Object.keys(map).filter(k=>!members(s.model).some(b=>token(b)===k&&map[k]?.signature===signature(b))).length;
-   return '<section id="review-layout191"><h3>出圖構件位置調整</h3><p class="muted">只調整本頁平面及打印／SVG；'+esc(s.key)+' 共用樓層同步。Functional Framing、支承及計算保持原位。</p><div class="row"><label>選取類型 <select id="review-filter191">'+['ALL','COL','MB','SB','TB','CB'].map(v=>'<option value="'+v+'" '+(filter===v?'selected':'')+'>'+({ALL:'全部梁／柱',COL:'柱 COL'}[v]||v)+'</option>').join('')+'</select></label><button data-review191="none">清除選取</button></div><p>已選 '+selected.size+' 個 · 已移動 '+moved+' 個</p><div class="row"><label>移動距離 · m <input id="review-distance191" type="number" min="0.000001" max="1000" step="any" value="'+esc(distance)+'" style="width:110px"></label></div><div class="row">'+[['up','↑ 上'],['down','↓ 下'],['left','← 左'],['right','→ 右']].map(([v,t])=>'<button data-review191="'+v+'" '+(!selected.size?'disabled':'')+'>'+t+'</button>').join('')+'</div><div class="row"><button data-review191="restore" '+(!Object.keys(map).length?'disabled':'')+'>恢復 Functional Framing</button></div><p class="muted">單擊累加，Shift＋左鍵取消該項；框選只加入完全包住的梁／柱。表格取消勾選，Esc 清除。上＝−Y，下＝＋Y；可用上方「撤銷」。恢復會清除 '+esc(s.key)+' 全部出圖位移。</p>'+(stale?'<p class="notice">'+stale+' 項舊位移的構件已變更，暫不套用；可恢復清除。</p>':'')+(all.length?'<div class="table-wrap" style="max-height:310px;overflow:auto"><table style="min-width:0;width:100%;table-layout:fixed"><thead><tr><th style="width:37%">已選構件</th><th>B × D mm</th><th>ΔX m</th><th>ΔY m</th></tr></thead><tbody>'+all.map(b=>{const k=token(b),o=offset(b,map);return '<tr><td style="overflow-wrap:anywhere"><label><input type="checkbox" data-review-select191="'+esc(k)+'" '+(selected.has(k)?'checked':'')+'> '+esc(b.displayId||b.id)+' · '+esc(b.displayKind||b.kind)+'</label></td><td>'+Math.round(b.b*1000)+' × '+Math.round(b.d*1000)+'</td><td>'+fmt(o.dx)+'</td><td>'+fmt(o.dy)+'</td></tr>';}).join('')+'</tbody></table></div>':'<p class="muted">請在圖上單擊或完整框選梁／柱；此處只列已選構件。</p>')+'</section>';
+   return '<section id="review-layout191"><h3>出圖構件位置調整</h3><p class="muted">只調整本頁平面及打印／SVG；'+esc(s.key)+' 共用樓層同步。Functional Framing、支承及計算保持原位。</p><div class="row"><label>選取類型 <select id="review-filter191">'+['ALL','COL','MB','SB','TB','CB'].map(v=>'<option value="'+v+'" '+(filter===v?'selected':'')+'>'+({ALL:'全部梁／柱',COL:'柱 COL'}[v]||v)+'</option>').join('')+'</select></label><button data-review191="none">清除選取</button></div><p>已選 '+selected.size+' 個 · 已移動 '+moved+' 個</p><div class="row"><label>移動距離 · m <input id="review-distance191" type="number" min="0.000001" max="1000" step="any" value="'+esc(distance)+'" style="width:110px"></label></div><div class="row">'+[['up','↑ 上'],['down','↓ 下'],['left','← 左'],['right','→ 右']].map(([v,t])=>'<button data-review191="'+v+'" '+(!selected.size?'disabled':'')+'>'+t+'</button>').join('')+'</div><div class="row"><button data-review191="restore" '+(!Object.keys(map).length?'disabled':'')+'>恢復 Functional Framing</button></div><p class="muted">移柱時，原柱支承的梁端會跟隨伸縮。單擊累加，Shift＋左鍵取消該項；框選只加入完全包住的梁／柱。表格取消勾選，Esc 清除。上＝−Y，下＝＋Y；可用上方「撤銷」。恢復會清除 '+esc(s.key)+' 全部出圖位移。</p>'+(stale?'<p class="notice">'+stale+' 項舊位移的構件已變更，暫不套用；可恢復清除。</p>':'')+(all.length?'<div class="table-wrap" style="max-height:310px;overflow:auto"><table style="min-width:0;width:100%;table-layout:fixed"><thead><tr><th style="width:37%">已選構件</th><th>B × D mm</th><th>ΔX m</th><th>ΔY m</th></tr></thead><tbody>'+all.map(b=>{const k=token(b),o=offset(b,map);return '<tr><td style="overflow-wrap:anywhere"><label><input type="checkbox" data-review-select191="'+esc(k)+'" '+(selected.has(k)?'checked':'')+'> '+esc(b.displayId||b.id)+' · '+esc(b.displayKind||b.kind)+'</label></td><td>'+Math.round(b.b*1000)+' × '+Math.round(b.d*1000)+'</td><td>'+fmt(o.dx)+'</td><td>'+fmt(o.dy)+'</td></tr>';}).join('')+'</tbody></table></div>':'<p class="muted">請在圖上單擊或完整框選梁／柱；此處只列已選構件。</p>')+'</section>';
   }
   document.getElementById('side').addEventListener('input',e=>{if(e.target.id==='review-distance191')distance=e.target.value;});
   document.getElementById('side').addEventListener('change',e=>{if(e.target.id==='review-filter191'){filter=e.target.value;refresh();}else if(e.target.dataset.reviewSelect191){const k=e.target.dataset.reviewSelect191;e.target.checked?selected.add(k):selected.delete(k);refresh();}});
@@ -40,9 +53,9 @@ const ReviewLayout191=(()=>{
   const point=(e,s)=>{const r=canvas.getBoundingClientRect();return s.plot.world(e.clientX-r.left,e.clientY-r.top);};
   canvas.addEventListener('pointerdown',e=>{const s=context();if(!enabled(s)||!s.plot||e.button!==0||s.spaceHeld)return;block(e);canvas.focus({preventScroll:true});box={a:point(e,s),z:point(e,s),x:e.clientX,y:e.clientY,moved:false,remove:e.shiftKey};canvas.setPointerCapture(e.pointerId);},true);
   canvas.addEventListener('pointermove',e=>{if(!box)return;const s=context();if(!box||!enabled(s)){box=null;return;}block(e);box.z=point(e,s);box.moved||=Math.hypot(e.clientX-box.x,e.clientY-box.y)>4;redraw();},true);
-  canvas.addEventListener('pointerup',e=>{if(!box)return;block(e);const q=box,s=context();box=null;if(!q||!enabled(s))return;const map=offsets(s.p,s.key),hits=rows(s).filter(b=>(s.plot.hits||[]).some(h=>token(h)===token(b)&&(h.f==null||h.f===s.floor))).map(b=>({kind:b.kind,id:b.id,r:b.kind==='COL'?Engine.columnRect(column(b,map)):Engine.rect(beam(b,map))}));let chosen;
+  canvas.addEventListener('pointerup',e=>{if(!box)return;block(e);const q=box,s=context();box=null;if(!q||!enabled(s))return;const map=offsets(s.p,s.key),hits=rows(s).filter(b=>(s.plot.hits||[]).some(h=>token(h)===token(b)&&(h.f==null||h.f===s.floor))).map(b=>({kind:b.kind,id:b.id,poly:b.kind==='COL'?null:beamPolygon(beam(b,map,s.model.columns)),r:b.kind==='COL'?Engine.columnRect(column(b,map)):beamRect(beam(b,map,s.model.columns))}));let chosen;
    if(q.moved){const x0=Math.min(q.a[0],q.z[0]),x1=Math.max(q.a[0],q.z[0]),y0=Math.min(q.a[1],q.z[1]),y1=Math.max(q.a[1],q.z[1]);chosen=hits.filter(h=>contains({x0,x1,y0,y1},h.r));}
-   else{const pad=5/s.plot.scale;chosen=hits.filter(h=>Math.abs(q.a[0]-h.r.x)<=h.r.w/2+pad&&Math.abs(q.a[1]-h.r.y)<=h.r.d/2+pad).reverse().slice(0,1);}
+   else{const pad=5/s.plot.scale;chosen=hits.filter(h=>h.poly?insidePolygon(q.a,h.poly)||h.poly.some((a,i)=>{const z=h.poly[(i+1)%h.poly.length],dx=z[0]-a[0],dy=z[1]-a[1],t=Math.max(0,Math.min(1,((q.a[0]-a[0])*dx+(q.a[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(q.a[0]-a[0]-t*dx,q.a[1]-a[1]-t*dy)<=pad;}):Math.abs(q.a[0]-h.r.x)<=h.r.w/2+pad&&Math.abs(q.a[1]-h.r.y)<=h.r.d/2+pad).reverse().slice(0,1);}
    for(const h of chosen)q.remove?selected.delete(token(h)):selected.add(token(h));refresh();
   },true);
   for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,()=>{box=null;redraw();});
@@ -54,5 +67,5 @@ const ReviewLayout191=(()=>{
   }
   return {render,draw};
  }
- return {offsets,offset,beam,column,columnEntry,columnPlan,members,model,contains,move,restore,checkPaper,create};
+ return {offsets,offset,beam,column,columnEntry,columnPlan,beamPolygon,beamRect,insidePolygon,outsideSegments,members,model,contains,move,restore,checkPaper,create};
 })();

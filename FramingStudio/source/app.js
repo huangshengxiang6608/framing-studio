@@ -445,14 +445,14 @@
   const editor=memberEditor;if(!editor){memberStatus('请重新右键选择要修改的构件。',true);return false;}
   if(FloorColumns101.isReference(editor.hit,floor)){memberStatus('非當層的柱只供參考，請切換至所屬樓層修改。',true);return false;}
   const {hit,targetKey,position}=editor,isBeam=['MB','SB','TB','CB'].includes(hit.kind),draft=memberDraft();
-  const reset=resetDimensions===true,kindChanged=isBeam&&draft.kind!==hit.kind;
-  const size={b:reset||draft.b.trim()===''?null:Number(draft.b),d:isBeam||$('memberdwrap').hidden||draft.d.trim()===''?null:Number(draft.d),...(hit.kind==='COL'?{preserveColumnB201:!reset&&draft.b===editor.baseline.b,preserveColumnD201:!reset&&draft.d===editor.baseline.d}:{}),...(isBeam?{kind:draft.kind,positionMode175:draft.positionMode175,preserveWidth199:!reset&&!kindChanged&&draft.b===editor.baseline.b,preserveDepth184:!reset&&!kindChanged,...(reset?{depthOverride184:true}:{})}:{})};
+  const reset=resetDimensions===true,kindChanged=isBeam&&draft.kind!==hit.kind,previewDefault=isBeam&&editor.previewWidth202===draft.b;
+  const size={b:reset||previewDefault||draft.b.trim()===''?null:Number(draft.b),d:isBeam||$('memberdwrap').hidden||draft.d.trim()===''?null:Number(draft.d),...(hit.kind==='COL'?{preserveColumnB201:!reset&&draft.b===editor.baseline.b,preserveColumnD201:!reset&&draft.d===editor.baseline.d}:{}),...(isBeam?{kind:draft.kind,positionMode175:draft.positionMode175,preserveWidth199:!reset&&!previewDefault&&!kindChanged&&draft.b===editor.baseline.b,preserveDepth184:!reset&&!kindChanged,...(reset?{depthOverride184:true}:{})}:{})};
   let edited,failure;
   const applied=transact(()=>{if(hit.kind==='COL')Engine.setTransferColumn(p,targetKey,hit,draft.transfer);const oldBeam=isBeam?Engine.floorModel(result,hit.f??floor,targetKey).beams.find(b=>b.id===hit.id&&b.kind===hit.kind):null;edited=Engine.editSize(p,targetKey,{...hit,f:hit.f??floor},size);moveBeamInputs(oldBeam,edited,targetKey);
    if(isBeam){const generated=Engine.model(p,targetKey);if(!generated.beams.some(b=>b.id===edited.id&&b.kind===edited.kind))throw Error(generated.issues.find(i=>i.id===edited.id)?.msg||'修改后未能生成此梁，请检查尺寸和位置');}
   },error=>{failure=error.message;});
   if(!applied){
-   openMemberCard(hit,position,targetKey);$('memberb').value=draft.b;$('memberd').value=draft.d;$('memberkind').value=draft.kind;$('membertransfer').checked=draft.transfer;$('memberposition175').checked=draft.positionMode175==='fixed';
+   openMemberCard(hit,position,targetKey);if(previewDefault)memberEditor.previewWidth202=draft.b;$('memberb').value=draft.b;$('memberd').value=draft.d;$('memberkind').value=draft.kind;$('membertransfer').checked=draft.transfer;$('memberposition175').checked=draft.positionMode175==='fixed';
    memberStatus('未应用：'+failure+'。输入已保留，请修改后重试。',true);return false;
   }
   const actual=edited?Engine.floorModel(result,hit.f??floor,targetKey).beams.find(b=>b.id===edited.id):null;
@@ -461,7 +461,20 @@
   memberStatus('已应用 · '+targetKey+' · '+(edited?.kind||hit.kind)+' · 请点“保存项目”保存文件。');
   toast((isBeam?'梁类型及尺寸':'尺寸')+'已更新，可撤销');return true;
  }
- $('sizeapply').onclick=applyMemberEdit;$('memberreset199').onclick=()=>applyMemberEdit(true);$('memberkind').addEventListener('change',()=>{if(memberEditor&&$('memberb').value===memberEditor.baseline.b)$('memberb').value='';$('memberd').value='';$('memberd').placeholder='套用後按參數更新';$('memberd').readOnly=true;});
+ $('sizeapply').onclick=applyMemberEdit;$('memberreset199').onclick=()=>applyMemberEdit(true);function previewMemberDimensions202(){
+  const editor=memberEditor;if(!editor)return;const draft=memberDraft(),useDefault=draft.b.trim()===''||draft.b===editor.baseline.b||draft.b===editor.previewWidth202;
+  try{
+   // Preview on a copy so displaying defaults cannot commit geometry or pin a width.
+   const preview=Engine.clone(p),edited=Engine.editSize(preview,editor.targetKey,editor.hit,{kind:draft.kind,b:useDefault?null:Number(draft.b),d:null,positionMode175:draft.positionMode175,preserveDepth184:draft.kind===editor.hit.kind}),next=Engine.floorModel(Engine.generate(preview),editor.hit.f??floor,editor.targetKey).beams.find(b=>b.id===edited.id);
+   if(!next)throw Error('此尺寸／類型未能生成梁');
+   if(useDefault){$('memberb').value=Number((next.b*1000).toFixed(6));editor.previewWidth202=$('memberb').value;}else delete editor.previewWidth202;
+   $('memberd').value=Number((next.d*1000).toFixed(6));$('memberd').readOnly=true;$('memberd').placeholder='';
+   memberStatus('已顯示對應尺寸；按「應用」套用。'+(useDefault?' B 跟隨預設；D 按所選類型規則計算。':''));
+  }catch(error){memberStatus('未能預覽：'+error.message+'。請核對類型及尺寸後套用。',true);}
+ }
+ $('memberkind').addEventListener('change',previewMemberDimensions202);
+ $('memberb').addEventListener('change',()=>{if(memberEditor&&['MB','SB','TB','CB'].includes(memberEditor.hit.kind)&&$('memberb').value.trim()==='')previewMemberDimensions202();});
+ $('memberb').addEventListener('input',()=>{if(memberEditor)delete memberEditor.previewWidth202;});
  for(const id of ['memberb','memberd','memberkind','membertransfer','memberposition175']){
   $(id).addEventListener('input',()=>memberStatus('有未应用修改，请点“应用”或“保存项目”。'));
   $(id).addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();applyMemberEdit();}});

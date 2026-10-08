@@ -69,16 +69,18 @@ const Engine=(()=>{
  // Adding a real column can turn an existing secondary span into a primary span.
  // Retain its logical load identity so saved inputs and support references survive.
  function promoteColumnBeams194(p,key,m,column){
-  const t=p.types[key],columns=[...m.columns,column];
+  if(!column||column.status==='上层柱')return 0;
+  const t=p.types[key],columns=m.columns.some(c=>c.id===column.id)?m.columns:[...m.columns,column];let count=0;
   const contains=(q,c)=>{const v=columnRect(c);return Math.abs(q[0]-v.x)<=v.w/2+eps&&Math.abs(q[1]-v.y)<=v.d/2+eps;};
   const direct=q=>columns.some(c=>c.status!=='上层柱'&&contains(q,c))||m.walls.some(w=>on(q,w)||on(q,{a:w.rawA,z:w.rawZ})||(()=>{const v=rect(w);return Math.abs(q[0]-v.x)<=v.w/2+eps&&Math.abs(q[1]-v.y)<=v.d/2+eps;})());
   for(const b of m.beams){
    if(b.kind!=='SB'||b.typeMode175==='fixed'||b.secondaryCantilever101||![b.a,b.z].some(q=>contains(q,column))||![b.a,b.z].every(direct))continue;
    const snap=t.autoBeamSnapshot,row=b.source==='auto'?snap.secondary.find(v=>v.id===b.id):t.beams.find(v=>v.id===b.id&&v.kind==='SB');if(!row)continue;
-   row.kind='MB';row.loadKind194='SB';delete row.bay171;
+   row.kind='MB';row.loadKind194='SB';delete row.bay171;count++;
    row.columnSupports164=mainColumnSupports164(p,key,{...b,columnSupports164:undefined},columns);
    if(b.source==='auto'){snap.secondary=snap.secondary.filter(v=>v!==row);snap.main.push(row);}
   }
+  return count;
  }
  function addColumn(p,key,x,y){const t=p.types[key],m=model(p,key);if(![x,y].every(Number.isFinite))throw Error('请填写有效柱坐标');if(noColumn(t,x,y))throw Error('禁柱区内部不能补柱；边界和角点可以');if(![-eps,eps].some(dx=>[-eps,eps].some(dy=>inside(m.ts,x+dx,y+dy,true))))throw Error('柱须放在建筑范围内或边界上');if(m.columns.some(c=>{const ref=columnReference(p,key,c);return Math.hypot(ref[0]-x,ref[1]-y)<Math.min(c.b,c.d)/2;}))throw Error('此位置已有柱');let n=1;while([...t.columns,...m.columns].some(c=>c.id==='C'+n))n++;const c={id:'C'+n,x,y,b:p.defaults.cb,d:p.defaults.cd,status:'上下贯通',on:true,...(t.mode==='auto'?{autoAdded:true}:{})};t.columnPlacements=(t.columnPlacements||[]).filter(v=>v.key!=='id:'+c.id);t.columnAxisPositions=(t.columnAxisPositions||[]).filter(v=>v.key!=='id:'+c.id);t.columns.push(c);const built=baseModel(p,key).columns.find(q=>q.id===c.id);if(!built||!rectAllowed(m.ts,columnRect(built).x,columnRect(built).y,built.b,built.d,true)||m.columns.some(q=>overlap(columnRect(q),columnRect(built)))){t.columns.pop();throw Error('此位置与柱、墙或边界冲突，不能补柱');}freezeAutoBeams(p,key,m);promoteColumnBeams194(p,key,m,built);return c;}
  function setColumnMode(p,key,mode){const t=p.types[key];if(!['auto','manual'].includes(mode))throw Error('柱模式无效');if(t.mode==='auto'&&mode==='manual'){const drawn=model(p,key).columns,hidden=t.columns.filter(c=>!drawn.some(d=>d.id===c.id));const positions=[],placements=[],columns=drawn.map(c=>{const ref=columnReference(p,key,c),r=columnRect(c),id='id:'+c.id,position=c.axisPosition;if(position)positions.push({key:id,position});const offset=columnDirections[position];if(!offset||Math.abs(ref[0]+offset[0]*c.b/2-r.x)>eps||Math.abs(ref[1]+offset[1]*c.d/2-r.y)>eps)placements.push({...clone((t.columnPlacements||[]).find(v=>v.key===columnPositionKey(c))||{}),key:id,x:r.x,y:r.y});return {id:c.id,x:ref[0],y:ref[1],b:c.b*1000,d:c.d*1000,status:c.status,on:true,transferColumn:!!c.transferManual};});const hiddenKeys=new Set(hidden.map(c=>'id:'+c.id));t.columnAxisPositions=[...(t.columnAxisPositions||[]).filter(r=>hiddenKeys.has(r.key)),...positions];t.columnPlacements=[...(t.columnPlacements||[]).filter(r=>hiddenKeys.has(r.key)),...placements];t.columns=[...columns,...hidden];}t.mode=mode;}
@@ -739,6 +741,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
+ return {promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

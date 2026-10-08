@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前网页版本为 **E2.195**（保留 E2.172–E2.194 更新，取消選取及上層柱出圖同步），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前网页版本为 **E2.196**（保留 E2.172–E2.195 更新，複製柱後同步識別主梁），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 
@@ -47,6 +47,8 @@ E2.193 出圖調整表只列已選梁／柱；框選只加入完整包住的構�
 E2.194 補柱接到 SB 端點、另一端已有柱或牆支承時，自動轉為 MB。[使用說明](FramingStudio/docs/changes-e2194.md)。
 
 E2.195 加入 Shift 取消出圖選取，修正 Member Check 焦點清除，Column above 跟隨上層出圖位移。[使用說明](FramingStudio/docs/changes-e2195.md)。
+
+E2.196 單支／批量複製柱後也會自動識別 MB；已複製的柱可再按複製修正梁類型，不會重複加柱。[使用說明](FramingStudio/docs/changes-e2196.md)。
 
 ## 运行
 

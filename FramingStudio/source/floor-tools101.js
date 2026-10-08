@@ -18,22 +18,22 @@ const FloorColumns101=(()=>{
   if(targetKey===key)return {copied:false,message:label+' 與當層共用 '+key+'，此柱已共用，無須重複複製。'};
   const m=Engine.floorModel(result,target,targetKey),r=Engine.columnRect(source),ref=Engine.columnReference(p,key,source),position=source.axisPosition||'',t=p.types[targetKey];
   const identical=m.columns.find(c=>{const q=Engine.columnRect(c);return ['x','y','w','d'].every(k=>Math.abs(q[k]-r[k])<1e-7);});
-  if(identical)return {copied:false,message:label+' 已有相同座標及尺寸的柱 '+identical.id+'，未重複新增。'};
+  if(identical){const trial=Engine.clone(p);let reclassified=0;mutate(trial,targetKey,target,q=>{const before=Engine.model(q,targetKey),column=before.columns.find(c=>c.id===identical.id);Engine.freezeAutoBeams(q,targetKey,before);reclassified=Engine.promoteColumnBeams194(q,targetKey,before,column);});if(reclassified)p.types[targetKey]=trial.types[targetKey];return {copied:false,reclassified,message:label+' 已有相同座標及尺寸的柱 '+identical.id+'，未重複新增。'+(reclassified?'已更新 '+reclassified+' 條梁為 MB。':'')};}
   if(!Engine.rectAllowed(m.ts,r.x,r.y,r.w,r.d,true)||Engine.noColumn(t,r.x,r.y))throw Error('目標層此位置不允許放柱');
   if(m.columns.some(c=>Engine.overlap(r,Engine.columnRect(c)))||m.walls.some(w=>Engine.overlap(r,Engine.rect(w))))throw Error('目標層此位置與現有柱或牆重疊，未複製');
   const used=new Set([...t.columns,...m.columns].map(c=>c.id));let id=source.id,n=1;while(used.has(id))id='C'+n++;
-  mutate(p,targetKey,target,q=>{const to=q.types[targetKey];Engine.freezeAutoBeams(q,targetKey,Engine.model(q,targetKey));to.columns.push({id,x:ref[0],y:ref[1],b:source.b*1000,d:source.d*1000,status:source.status,on:true,...(to.mode==='auto'?{autoAdded:true}:{})});to.columnAxisPositions=(to.columnAxisPositions||[]).filter(v=>v.key!=='id:'+id);if(position)to.columnAxisPositions.push({key:'id:'+id,position});to.columnPlacements=(to.columnPlacements||[]).filter(v=>v.key!=='id:'+id);const offset=Engine.columnDirections[position];if(!offset||Math.abs(ref[0]+offset[0]*source.b/2-r.x)>1e-7||Math.abs(ref[1]+offset[1]*source.d/2-r.y)>1e-7)to.columnPlacements.push({...Engine.clone((p.types[key].columnPlacements||[]).find(v=>v.key===Engine.columnPositionKey(source))||{}),key:'id:'+id,x:r.x,y:r.y});const built=Engine.model(q,targetKey).columns.find(c=>c.id===id);if(!built||['x','y','w','d'].some(k=>Math.abs(Engine.columnRect(built)[k]-r[k])>1e-7))throw Error('未能保留柱的中心座標及尺寸，已取消複製');});
-  return {copied:true,id,target,message:'已複製至 '+label+' · '+id+'（'+targetKey+' 共用），可撤銷。'};
+  let reclassified=0;mutate(p,targetKey,target,q=>{const to=q.types[targetKey],before=Engine.model(q,targetKey);Engine.freezeAutoBeams(q,targetKey,before);to.columns.push({id,x:ref[0],y:ref[1],b:source.b*1000,d:source.d*1000,status:source.status,on:true,...(to.mode==='auto'?{autoAdded:true}:{})});to.columnAxisPositions=(to.columnAxisPositions||[]).filter(v=>v.key!=='id:'+id);if(position)to.columnAxisPositions.push({key:'id:'+id,position});to.columnPlacements=(to.columnPlacements||[]).filter(v=>v.key!=='id:'+id);const offset=Engine.columnDirections[position];if(!offset||Math.abs(ref[0]+offset[0]*source.b/2-r.x)>1e-7||Math.abs(ref[1]+offset[1]*source.d/2-r.y)>1e-7)to.columnPlacements.push({...Engine.clone((p.types[key].columnPlacements||[]).find(v=>v.key===Engine.columnPositionKey(source))||{}),key:'id:'+id,x:r.x,y:r.y});const built=Engine.model(q,targetKey).columns.find(c=>c.id===id);if(!built||['x','y','w','d'].some(k=>Math.abs(Engine.columnRect(built)[k]-r[k])>1e-7))throw Error('未能保留柱的中心座標及尺寸，已取消複製');reclassified=Engine.promoteColumnBeams194(q,targetKey,before,built);});
+  return {copied:true,id,target,reclassified,message:'已複製至 '+label+' · '+id+'（'+targetKey+' 共用），可撤銷。'+(reclassified?'已更新 '+reclassified+' 條梁為 MB。':'')};
  }
  function copyManyAdjacent(p,result,key,f,hits,step){
   if(!Array.isArray(hits)||!hits.length)throw Error('請先框選當層柱');
   const unique=[...new Map(hits.map(hit=>[hit.id,hit])).values()];
   for(const hit of hits){assertEditable(hit,f);if(hit.kind!=='COL')throw Error('只能複製當層柱');}
-  const trial=Engine.clone(p);let current=result,copied=0,skipped=0;
-  for(const hit of unique){let out;try{out=copyAdjacent(trial,current,key,f,hit,step);}catch(e){throw Error(hit.id+'：'+e.message+'；整批未複製');}if(out.copied){copied++;current=Engine.generate(trial);}else skipped++;}
+  const trial=Engine.clone(p);let current=result,copied=0,skipped=0,reclassified=0;
+  for(const hit of unique){let out;try{out=copyAdjacent(trial,current,key,f,hit,step);}catch(e){throw Error(hit.id+'：'+e.message+'；整批未複製');}if(out.copied)copied++;else skipped++;reclassified+=out.reclassified||0;if(out.copied||out.reclassified)current=Engine.generate(trial);}
   const target=f+step,targetKey=result.floors[target-1]?.type;
-  if(copied)p.types[targetKey]=trial.types[targetKey];
-  return {copied,skipped,target,message:FloorLevels.name(p,target)+'：已複製 '+copied+' 支柱'+(skipped?'；'+skipped+' 支已存在／共用 Framing，略過':'')+'。'};
+  if(copied||reclassified)p.types[targetKey]=trial.types[targetKey];
+  return {copied,skipped,target,reclassified,message:FloorLevels.name(p,target)+'：已複製 '+copied+' 支柱'+(skipped?'；'+skipped+' 支已存在／共用 Framing，略過':'')+'。'+(reclassified?'已更新 '+reclassified+' 條梁為 MB。':'')};
  }
  function removeMany(p,result,key,f,hits){
   if(!Array.isArray(hits)||!hits.length)throw Error('請先選取當層柱');

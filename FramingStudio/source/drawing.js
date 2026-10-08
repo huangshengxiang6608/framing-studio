@@ -184,8 +184,8 @@ const Drawing=(()=>{
    const t=m.slabs.find(t=>t.id===hit.slabId);if(!t)return null;
    const xx=Engine.axes(p,'x',m.key),yy=Engine.axes(p,'y',m.key);title='楼板 · '+hit.id;if(typeof Loading!=='undefined'){const o=Loading.input(p,f,Loading.token('SLAB',t));rows.push(['板类型',o.slabType==='CS'?'CS · 悬臂板':'普通单向板']);if(o.slabType==='CS')rows.push(['固定边',({left:'左',right:'右',top:'上',bottom:'下'}[o.csFixedEdge]||'未选择')]);}
    const location=t.tileKeys.map(k=>{const [i,j]=k.split(',').map(Number);return 'X '+xx[i].id+'–'+xx[i+1].id+' / Y '+yy[j].id+'–'+yy[j+1].id;}).join('；');
-   rows.push(['板厚',t.thickness+' mm'],['所在轴线格',location],['板块形状',t.rectangular?'矩形':'不规则／含洞板块'],[t.rectangular?'板块尺寸':'外包尺寸',fmt(t.x1-t.x0)+' × '+fmt(t.y1-t.y0)+' m'],['板块面积',t.area.toFixed(2)+' m²'],['X 范围',fmt(t.x0)+' → '+fmt(t.x1)+' m'],['Y 范围',fmt(t.y0)+' → '+fmt(t.y1)+' m']);size={b:t.thickness,d:null};
-   note='按主梁、次梁、墙的参考线及建筑／Opening 边界分隔。面积扣除 Opening，未扣梁墙宽度；几何尺寸不等于净跨或计算跨度。';
+   rows.push(['板厚',t.thickness+' mm'],['所在轴线格',location],['板块形状',t.rectangular?'矩形':'不规则／含洞板块'],['板尺寸 X × Y（支承中心距）',(()=>{const x=Loading.slabSpan(t,'X',m,null,{},true).effective,y=Loading.slabSpan(t,'Y',m,null,{},true).effective;return x>0&&y>0?fmt(x)+' × '+fmt(y)+' m':'待確認支承／非矩形板';})()],['板淨面積',t.area.toFixed(2)+' m²'],['淨板 X 範圍',fmt(t.x0)+' → '+fmt(t.x1)+' m'],['淨板 Y 範圍',fmt(t.y0)+' → '+fmt(t.y1)+' m']);size={b:t.thickness,d:null};
+   note='板尺寸採支承中心距；自由邊至實際板邊。淨面積及淨板範圍保留實際幾何，扣除梁牆及 Opening，不能用來比較中心跨度。';
   }else if(['MB','SB','TB','CB'].includes(hit.kind)){
    const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)return null;
    title=({'MB':'主梁 MB','SB':'次梁 SB','TB':'转换梁 TB','CB':'悬臂梁 CB'}[b.kind])+' · '+(b.displayId||b.id);

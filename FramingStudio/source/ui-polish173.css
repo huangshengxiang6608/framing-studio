@@ -1,0 +1,4 @@
+.unit-warning173{display:block;max-width:24em;margin-top:4px;padding:3px 6px;border-radius:4px;background:#fff7e0;color:#7a4b00;font-size:12px;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+input.unit-warning-field173{border-color:#c98a00!important}
+td:has(>.unit-warning173){position:relative}
+td>.unit-warning173{position:absolute;z-index:5;top:100%;right:0;width:15em;max-width:none;margin-top:2px;box-shadow:0 2px 8px #203b4d33;pointer-events:none}

@@ -1,3 +1,13 @@
+## E2.203 — E2.202 + Issue #3 interface improvements (2026-10-08)
+
+- 修复网页重新打包时量距及绘图调整模块被 app.js 覆盖的问题：保留原模块内容，使用独立打包标记。
+
+- Merge PR #5 on the exact E2.202 baseline from PR #6. Preserve E2.202 beam dimensions, classifications, bay splitting, support/load rules and drawing tools.
+- Add field unit suffixes and non-blocking m/mm hints, button tooltips, accessible names and Simplified Chinese selection hints.
+- Windows close review offers Save / Don't save / Cancel only for unsaved work, including unapplied floor/member inputs, open Loading editors and invalid drafts. Cancelled or failed saves remain unsaved.
+- Rebuild the Windows host as E2.203. Calculation and Section A/B report, Excel/VBA and template files remain byte-identical to E2.202.
+- Verification and release evidence: FramingStudio/verification/release203.md.
+
 ## E2.202 — 梁類型切換即時顯示預設尺寸
 
 - 右鍵卡片切換梁類型時，B／D 直接顯示對應數值，不再留空等套用後才顯示。

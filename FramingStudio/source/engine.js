@@ -561,7 +561,7 @@ const Engine=(()=>{
  function applyFloorBeamDepths(p,result){
   const cache=new WeakMap();
   for(const f of result.floors){const source=floorModel(result,f.n),zones=typeof LocalHeights96!=='undefined'?LocalHeights96.zones(p,f.n):[],signature=JSON.stringify([f.sh,zones.map(z=>[z.rect.x0,z.rect.x1,z.rect.y0,z.rect.y1,z.sh])]);let profiles=cache.get(source);if(!profiles){profiles=new Map();cache.set(source,profiles);}let m=profiles.get(signature);
-   if(!m){const beams=source.beams.map(b=>{if(!['MB','TB','CB'].includes(b.displayKind||b.kind))return b;const r=rect(b),box={x0:r.x-r.w/2,x1:r.x+r.w/2,y0:r.y-r.d/2,y1:r.y+r.d/2},hits=zones.filter(z=>LocalHeights96.overlap(z.rect,box)>eps),mm=hits.length?Math.min(...hits.map(z=>z.sh??0)):f.sh;if(!Number.isFinite(mm)||mm<=0)throw Error(FloorLevels.name(p,f.n)+' · '+b.id+'：結構高度未完整設定');return {...b,d:mm/1000,structuralDepthMm:mm};});m={...source,sh:f.sh/1000,beams};profiles.set(signature,m);}
+   if(!m){const beams=source.beams.map(b=>{if(!['MB','TB','CB','SB'].includes(b.displayKind||b.kind))return b;const r=rect(b),box={x0:r.x-r.w/2,x1:r.x+r.w/2,y0:r.y-r.d/2,y1:r.y+r.d/2},hits=zones.filter(z=>LocalHeights96.overlap(z.rect,box)>eps),mm=hits.length?Math.min(...hits.map(z=>z.sh??0)):f.sh;if(!Number.isFinite(mm)||mm<=0)throw Error(FloorLevels.name(p,f.n)+' · '+b.id+'：結構高度未完整設定');const secondary=(b.displayKind||b.kind)==='SB',requested=b.requestedDepthMm180??b.d*1000;return {...b,d:(secondary?Math.min(requested,mm):mm)/1000,structuralDepthMm:mm,...(secondary?{requestedDepthMm180:requested,depthCapped180:requested>mm+1e-6}:{})};});m={...source,sh:f.sh/1000,beams};profiles.set(signature,m);}
    result.floorModels[f.n]=m;
   }
   return result;

@@ -1,0 +1,29 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{pathToFileURL}=require('url'),{chromium}=require('playwright');
+(async()=>{const root=path.resolve(__dirname,'../..'),browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});try{const page=await browser.newPage({viewport:{width:1228,height:884}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(path.join(root,'assets/index.html')).href);const seed=fs.readFileSync(path.join(__dirname,'slab-bay178.cjs'),'utf8').split('const result=c.run(`')[1].split('`);')[0],fixture=await page.evaluate(code=>eval(code).p,seed);await page.locator('#file').setInputFiles({name:'synthetic179.framing.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});await page.evaluate(()=>{const old=Drawing.plan;Drawing.plan=(...a)=>window.plot179=old(...a);StudioHost.navigate('beams');});await page.getByRole('button',{name:'选择 / 删除',exact:true}).click();const point=await page.evaluate(()=>{const h=StudioHost.get(),b=Engine.floorModel(h.result,h.floor).beams.find(b=>b.kind==='SB'&&b.d===.6);window.sb179id=b.id;return {x:plot179.ox+(b.a[0]+b.z[0])/2*plot179.scale,y:plot179.oy+(b.a[1]+b.z[1])/2*plot179.scale};});await page.locator('#canvas').click({position:point});await page.locator('#ex-beam-span').waitFor();await page.waitForFunction(()=>document.querySelector('.bl-plot')?.textContent.includes('ULS:'));let text=await page.locator('.bl-plot').textContent();assert(!text.includes('扣除'));assert(text.includes('0.00–4.00 m'));
+const actions=await page.evaluate(()=>{const h=StudioHost.get(),row=Loading.run(h.p,h.result,'B').rows.find(r=>r.floor===h.floor&&r.id===window.sb179id);return row.actions;});
+assert.equal(Number(await page.locator('.bl-reaction180[data-end="A"]').getAttribute('data-value')),actions.left);
+assert.equal(Number(await page.locator('.bl-reaction180[data-end="B"]').getAttribute('data-value')),actions.right);
+assert.equal(await page.locator('.bl-reaction180[data-end="A"]').getAttribute('data-direction'),'up');
+assert((await page.locator('.beam-load-editor').innerText()).includes('手動輸入及明細保留未加係數值'));
+if(process.env.UI_SCREENSHOT)await page.locator('.bl-plot').screenshot({path:process.env.UI_SCREENSHOT});
+// Test actual SVG orientation and cantilever fixed-end reaction with the same resolved load case.
+for(const variant of ['reverse','fixedA','fixedB']){
+ await page.evaluate(variant=>{BeamLoadUI.clear();const h=StudioHost.get(),m=Engine.floorModel(h.result,h.floor),original=m.beams.find(b=>b.id===window.sb179id),row=Loading.run(h.p,h.result,'B').rows.find(r=>r.floor===h.floor&&r.id===original.id),c={...original};if(variant==='reverse'){[c.a,c.z]=[c.z,c.a];[c.rawA,c.rawZ]=[original.rawZ||original.z,original.rawA||original.a];}else c.displayKind='CB';const ctx={p:h.p,result:h.result,floor:h.floor,key:h.key,data:{fixedEnd:variant==='fixedB'?'z':'a'},selected:{token:Loading.token(c.kind,c),member:c}};document.querySelector('#side').innerHTML=BeamLoadUI.render(ctx,row);},variant);
+ await page.waitForFunction(()=>document.querySelector('.bl-reaction180'));
+ assert.equal(await page.locator('.bl-reaction180').count(),variant==='reverse'?2:1);
+ if(variant==='reverse')assert.equal(await page.locator('.bl-plot').getAttribute('data-start-end'),'B');
+ else {assert.equal(await page.locator('.bl-reaction180').getAttribute('data-end'),variant==='fixedA'?'A':'B');assert((await page.locator('.bl-plot').textContent()).includes('固定端 M ='));}
+}
+await page.evaluate(()=>{StudioHost.navigate('parameters');});
+await page.locator('[data-action="framing-depth176"]').first().fill('10000');await page.locator('[data-action="framing-depth176"]').first().press('Tab');
+assert.equal(await page.evaluate(()=>StudioHost.get().p.types.F1.beamDepth),2000);
+assert((await page.locator('#side').innerText()).includes('各層實際 SB'));
+await page.locator('[data-action="framing-depth176"]').first().fill('600');await page.locator('[data-action="framing-depth176"]').first().press('Tab');
+await page.evaluate(()=>{StudioHost.navigate('beams');});
+const slabPoint=await page.evaluate(()=>{const h=StudioHost.get(),s=Engine.floorModel(h.result,h.floor).slabs[0];window.slab180id=s.id;return {x:plot179.ox+(s.x0+s.x1)/2*plot179.scale,y:plot179.oy+(s.y0+s.y1)/2*plot179.scale};});
+await page.locator('#canvas').click({position:slabPoint});await page.locator('.slab-panel121').waitFor();await page.waitForFunction(()=>document.querySelector('.steel-summary176'));
+const rows=await page.locator('[data-sp-fold="loads"] .sp-table').first().innerText();assert(rows.includes('1.4 × 4.90 = 6.86'));assert(rows.includes('1.4 × 0.00 = 0.00'));assert(rows.includes('1.6 × 7.50 = 12.00'));
+const reactions=await page.evaluate(()=>{const h=StudioHost.get(),s=Engine.floorModel(h.result,h.floor).slabs.find(s=>s.id===window.slab180id);return Loading.inspectSlab(h.p,h.result,h.floor,Loading.token('SLAB',s)).slabReactions;});
+const table=await page.locator('[data-sp-fold="loads"] .sp-table').nth(1).innerText();for(const r of reactions)assert(table.includes((1.4*r.g).toFixed(2)+' / '+(1.6*r.q).toFixed(2)));
+assert.deepEqual(errors,[]);console.log('PASS: ULS loads and reactions, support-position arrows, reversed A/B, cantilever fixed A/B, default depth input cap, per-floor effective depths, no browser errors');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

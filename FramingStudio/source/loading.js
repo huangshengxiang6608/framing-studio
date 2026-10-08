@@ -123,7 +123,7 @@ const Loading=(()=>{
  }
  // Project convention: beam/support centre-to-centre design dimensions.
  // A cantilever extends from the root centre to its actual free edge.
- // Automatic design span never enlarges the physical load area or transfer reactions.
+ // Design and transfer use L; physical Area tracing keeps the occupied floor geometry.
  function slabSpan(c,dir,model,fixedEdge=null,supports={},allowFree=false){
   const clear=dir==='X'?c.x1-c.x0:dir==='Y'?c.y1-c.y0:null;
   if(!clear||!slabGeometry.designRectangle(c,model)||!(c.thickness>0))return {clear,effective:null,segments:[],errors:['板有效跨度：净跨、板厚或矩形范围未确认']};
@@ -140,7 +140,7 @@ const Loading=(()=>{
   }if(extensions.length===sides.length)segments.push({start:cuts[i-1],end:cuts[i],extensions,supports:supportDetails,effective:clear+extensions.reduce((n,v)=>n+v,0)});}
   return {clear,effective:errors.length||!segments.length?null:Math.max(...segments.map(s=>s.effective)),segments,errors:[...new Set(errors)]};
  }
- // One saved slab calculation input; physical floor regions/supports stay geometric.
+ // One saved slab calculation input; transfer follows L, framing stays geometric.
  function slabCalculation(c,dir,model,o={}){
   const automatic=slabSpan(c,dir,model,o.slabType==='CS'?o.csFixedEdge:null,o),saved=o.slabSpan131,manual=saved!=null,
    widthSpan=dir?slabSpan(c,dir==='X'?'Y':'X',model,null,{},true):null,geometricWidth=widthSpan?.effective??null,netArea=LoadRegions83.netSelfWeight(c,model).reduce((n,r)=>n+LoadRegions83.area(r),0),errors=[];
@@ -148,14 +148,52 @@ const Loading=(()=>{
   if(manual&&(!saved||typeof saved!=='object'||Array.isArray(saved)||!valid(saved.L)||saved.width!=null&&!valid(saved.width)||!['span','net'].includes(saved.selfWeight)))errors.push('板 Span L、板宽 B 须为不小于 0.001 m 的有效数值，并选择自重面积');
   if(o.supportConflicts?.includes('slabSpan131'))errors.push('同 Framing 各层板 Span 设置冲突，请修改并保存统一');
   const width=manual&&saved?.width!=null?saved.width:geometricWidth,L=manual?saved?.L:automatic.effective;
-  const area=manual&&saved?.selfWeight==='span'?L*width:netArea;
+  const clear=dir==='X'?c.x1-c.x0:c.y1-c.y0,area=manual&&saved?.selfWeight==='span'?L*width:(L>0&&clear>0?netArea*L/clear:netArea);
   if(manual&&(!Number.isFinite(area)||!(area>0)||!(netArea>0)||!Number.isFinite(area/netArea)))errors.push('板计算面积无效，请核对 L、B 及实际板区');
   if(!valid(width))errors.push('板寬 B 未確認，請核對兩側梁或輸入指定板寬');
   if(!manual)errors.push(...automatic.errors,...(widthSpan?.errors||[]));
   return {manual,automatic,L:errors.length?null:L,width,geometricWidth,netArea,selfWeightArea:errors.length?netArea:area,selfWeightScale:errors.length?1:area/netArea,selfWeight:manual?saved?.selfWeight:'net',errors:[...new Set(errors)]};
  }
- function addBeamSurface(p,f,model,beams,autoSW,areaTracing){
-  for(const {beam:b,rects,parts,errors}of LoadRegions83.beamSurface(p,f,model,beams)){
+ // Transfer the slab load over the same L used by its design check. Geometry
+ // remains unchanged; support-centre strips are claimed once from beam tops.
+ function slabTransfer177(p,f,c,dir,model,o,part,calculation,claims,assigned=LoadRegions83.surfaceRegions(p,f,model)){
+  const cross=dir==='X'?'x':'y',along=dir==='X'?'y':'x',lo=part[cross+'0'],hi=part[cross+'1'],cs=o.slabType==='CS';
+  if(!(calculation.L>0))return null;
+  const automatic=slabSpan({...c,...part,rectangular:true},dir,model,cs?o.csFixedEdge:null,o),segments=automatic.segments.length?automatic.segments:[{start:part[along+'0'],end:part[along+'1'],extensions:[],supports:[]}],zones=[];
+  for(const segment of segments){
+   const start=Math.max(part[along+'0'],segment.start),end=Math.min(part[along+'1'],segment.end);if(end-start<=tol)continue;
+   const extensions=[0,0];segment.supports.forEach((v,i)=>extensions[v.side]=segment.extensions[i]);
+   const physical={...part,[along+'0']:start,[along+'1']:end,[cross+'0']:lo-extensions[0],[cross+'1']:hi+extensions[1]},physicalSpan=physical[cross+'1']-physical[cross+'0'],span=calculation.manual?calculation.L:physicalSpan,origin=physical[cross+'0'],scale=span/physicalSpan;
+   // Exact coordinate load regions retain their location before mapping to a
+   // user-specified design span; a panel assignment includes its beam-top share.
+   const map=r=>({...r,[cross+'0']:origin+(r[cross+'0']-origin)*scale,[cross+'1']:origin+(r[cross+'1']-origin)*scale});
+   const pieces=LoadRegions83.pieces(p,f,{rects:[physical]},assigned).map(map),concrete=[map({...physical,load:{dl:0,sdl:0,ll:0}})];
+   zones.push({start,end,origin,span,pieces,concrete});
+   const additions=LoadRegions83.difference([physical],c.rects);
+   claims.push(...additions.map(r=>({...r,h:c.thickness/1000,slab:c.id})));
+  }
+  return {zones,swScale:calculation.manual&&calculation.selfWeight==='span'?calculation.width/(calculation.netArea/(dir==='X'?c.x1-c.x0:c.y1-c.y0)):1};
+ }
+ function slabReaction177(transfer,mid,right,cs,sw,autoSW){
+  const z=transfer.zones.find(z=>mid>z.start-tol&&mid<z.end+tol);if(!z)return null;
+  const r=LoadRegions83.reaction(z.pieces,sw.dir,mid,z.origin,z.span,right,cs,0,autoSW);
+  if(autoSW){const concrete=LoadRegions83.reaction(z.concrete,sw.dir,mid,z.origin,z.span,right,cs,sw.value*transfer.swScale,true);for(const k of ['g','sw','mG'])r[k]+=concrete[k];}
+  return r;
+ }
+ // Full beam concrete less only the slab layer already carried over its top.
+ // Split the residual footprint, so opposing slabs and intersections cannot
+ // subtract the same concrete twice. Explicit beam self-weight remains full.
+ function beamWeight177(c,len,claims){
+  const rect=E.rect(c),footprint={x0:rect.x-rect.w/2,x1:rect.x+rect.w/2,y0:rect.y-rect.d/2,y1:rect.y+rect.d/2},along=eq(a(c)[1],z(c)[1])?'x':'y',cross=along==='x'?'y':'x',idx=along==='x'?0:1,origin=a(c)[idx],sign=z(c)[idx]>origin?1:-1,ratio=len/L(c);
+  let free=[footprint];const layers=[];
+  for(const claim of [...claims].sort((a,b)=>b.h-a.h)){const cuts=free.map(r=>LoadRegions83.intersect(r,claim)).filter(Boolean);layers.push(...cuts.map(r=>({...r,h:Math.min(c.d,claim.h)})));free=LoadRegions83.difference(free,cuts);}
+  if(!layers.length)return beamSelfWeight(c,len);
+  const cuts=[...new Set([origin,origin+sign*L(c),...layers.flatMap(r=>[r[along+'0'],r[along+'1']])])].sort((a,b)=>a-b),out=[];
+  for(let i=1;i<cuts.length;i++){const lo=cuts[i-1],hi=cuts[i],mid=(lo+hi)/2,deduction=layers.filter(r=>mid>r[along+'0']&&mid<r[along+'1']).reduce((n,r)=>n+(r[cross+'1']-r[cross+'0'])*r.h,0),u=(lo-origin)*sign*ratio,v=(hi-origin)*sign*ratio;out.push({start:Math.max(0,Math.min(u,v)),end:Math.min(len,Math.max(u,v)),g:BeamLoads.up(24.5*Math.max(0,c.b*c.d-deduction)),q:0,label:'梁自重（扣除已計板層）'});}
+  return out.filter(l=>l.end-l.start>tol);
+ }
+ function addBeamSurface(p,f,model,beams,autoSW,areaTracing,claims=[]){
+  for(const {beam:b,rects,parts,errors}of LoadRegions83.beamSurface(p,f,model,beams,claims)){
    b.errors.push(...errors);
    const c=b.member,along=eq(a(c)[1],z(c)[1])?'x':'y',cross=along==='x'?'y':'x',idx=along==='x'?0:1,origin=a(c)[idx],sign=z(c)[idx]>origin?1:-1;
    b.surfaceArea=rects.reduce((n,r)=>n+LoadRegions83.area(r),0);
@@ -176,9 +214,9 @@ const Loading=(()=>{
  }
  // Loads over a column footprint enter that column directly, once. They do
  // not add slab concrete or duplicate the beam-top strips at column joints.
- function addColumnSurface(p,f,model,columns,autoSW,areaTracing){
+ function addColumnSurface(p,f,model,columns,autoSW,areaTracing,claims=[]){
   for(const {column,rects,parts,errors}of LoadRegions83.columnSurface(p,f,model)){const c=columns.find(c=>c.member===column);if(!c)continue;c.errors.push(...errors);c.surfaceArea=rects.reduce((n,r)=>n+LoadRegions83.area(r),0);
-   for(const r of parts){const load=r.load,A=LoadRegions83.area(r),dl=autoSW?0:load.dl;if(![dl,load.sdl,load.ll].every(available)||!autoSW&&load.basis!=='total'){c.errors.push('柱位 '+load.areaName+'：請填寫 DL / SDL / LL');continue;}c.g+=(dl+load.sdl)*A;c.q+=load.ll*A;if(areaTracing&&load.ll>tol)(c.sources101??=[]).push({floor:f,slab:'柱位 '+column.id,rect:{...r,load:undefined},area:load.ll*A});}
+   for(const r of parts.flatMap(r=>LoadRegions83.difference([r],claims).map(q=>({...r,...q})))){const load=r.load,A=LoadRegions83.area(r),dl=autoSW?0:load.dl;if(![dl,load.sdl,load.ll].every(available)||!autoSW&&load.basis!=='total'){c.errors.push('柱位 '+load.areaName+'：請填寫 DL / SDL / LL');continue;}c.g+=(dl+load.sdl)*A;c.q+=load.ll*A;if(areaTracing&&load.ll>tol)(c.sources101??=[]).push({floor:f,slab:'柱位 '+column.id,rect:{...r,load:undefined},area:load.ll*A});}
   }
  }
  function run(...args){const steps=runSteps(...args);let next;do{next=steps.next();}while(!next.done);return next.value;}
@@ -186,7 +224,7 @@ const Loading=(()=>{
   function design(method,o){const stamp=JSON.stringify([method,o]);if(!memo.has(stamp)){try{memo.set(stamp,S[method](o));}catch(e){memo.set(stamp,{status:'INPUT REQUIRED',fail:[e.message],description:'—'});}}return memo.get(stamp);}
   const queue=(method,o)=>({status:'NOT SELECTED',fail:[],description:'未选作 Check',pendingCheck:{method,o}});
   for(let f=inspectionFloor??p.total;f>=(inspectionFloor??1);f--){const model=E.floorModel(r,f),fl=floorload(p,f),columns=model.columns.filter(c=>c.status!=='上层柱').map(c=>({member:c,g:0,q:0,errors:[]})),walls=model.walls.map(c=>({member:c,g:0,q:0,errors:[]}));
-   const beams=model.beams.map(c=>({member:c,kind:c.kind,token:token(c.kind,c),lines:[],points:[],errors:[],csMoments:[],cbMoments:[],done:false})),map=new Map(beams.map(b=>[b.token,b]));const local=[];const areaErrors=LD.validate(p,f,model.slabs.map(c=>token('SLAB',c)),model);const slabTokens=new Set(model.slabs.map(c=>token('SLAB',c)));
+   const beams=model.beams.map(c=>({member:c,kind:c.kind,token:token(c.kind,c),lines:[],points:[],errors:[],csMoments:[],cbMoments:[],done:false})),map=new Map(beams.map(b=>[b.token,b]));const local=[],slabClaims177=[];let transferRegions177;const areaErrors=LD.validate(p,f,model.slabs.map(c=>token('SLAB',c)),model);const slabTokens=new Set(model.slabs.map(c=>token('SLAB',c)));
    for(const [key,value]of Object.entries(p.explorer?.members||{}))if(key.startsWith(f+'|SLAB|')&&value.slabType==='CS'&&!slabTokens.has(key.slice(String(f).length+1)))areaErrors.push('CS 板块几何已改变，请重新指定悬臂板及固定边；旧记录：'+key);
    areaErrors.forEach(msg=>issues.push({floor:f,msg}));
    // Connected walls receive joint reactions as one vertical wall group; no artificial
@@ -222,10 +260,10 @@ const Loading=(()=>{
    columnAbove.length=0;wallAbove.length=0;
    for(const c of model.slabs){yield {phase:'传荷',floor:f,id:c.id};const rr=addRow('SLAB',c),o=rr.input,cs=o.slabType==='CS',edgeName=o.csFixedEdge,edgeValid=['left','right','top','bottom'].includes(edgeName),load=(()=>{try{return LoadRegions83.summary(LoadRegions83.pieces(p,f,c));}catch(e){return {dl:null,sdl:null,ll:null,basis:'total',areaName:'荷载区域',inputError:e.message};}})(),dir=slabDirection(p,f,rr.token,c,model),span=dir==='X'?c.x1-c.x0:c.y1-c.y0,width=dir==='X'?c.y1-c.y0:c.x1-c.x0;
     const pieces=LoadRegions83.pieces(p,f,c),netSW=autoSW?LoadRegions83.netSelfWeight(c,model):[];const calculation=slabCalculation(c,dir,model,o),spanData=calculation.automatic,designRectangle=slabGeometry.designRectangle(c,model),originalDL=load.dl;if(autoSW)load.dl=0;rr.displayType=cs?'CS':'SLAB';rr.loading={...load,direction:dir,L:calculation.L,clearSpan:span,effectiveSpan:spanData.effective,spanSegments:spanData.segments,width:calculation.width,clearWidth:width,area:c.area,...(calculation.manual?{manualSpan:calculation.L,calculationWidth:calculation.width,selfWeightBasis:calculation.selfWeight,selfWeightArea:calculation.selfWeightArea}:{}),selfWeightNetArea:netSW.reduce((v,x)=>v+LoadRegions83.area(x),0),originalDL,sw:autoSW?c.thickness/1000*24.5:0,support:cs?'Cantilever':'Simply-supported',fixedEdge:cs?edgeName:null};let errors=[...areaErrors.filter(e=>e!=='板块荷载区域重复'),...(load.inputError?[load.inputError]:[])];if(calculation.manual&&calculation.errors.length)errors.push(...calculation.errors);if(o.supportConflicts?.some(k=>['slabType','csFixedEdge'].includes(k)))errors.push('同 Framing 各层板支承设置冲突，请重新选择板类型及固定边，统一保存');if(cs&&!edgeValid)errors.push('CS：请选择上／下／左／右固定边');if(!dir)errors.push('等边单向板：请选择 X 或 Y 受力方向');if(!autoSW&&load.basis!=='total')errors.push('旧版 DL 为附加荷载：请在 Loading 确认含结构自重的总 DL 并保存');if(!designRectangle&&!calculation.manual)errors.push('非矩形板块：现有 Excel 单向矩形板输入不适用');const missing=(autoSW?['sdl','ll']:['dl','sdl','ll']).filter(k=>!available(load[k]));if(missing.length)errors.push('Section '+section+'：请在 Loading 的'+load.areaName+'填写 '+missing.map(k=>({dl:'D.L.（含自重）',sdl:'SDL',ll:'LL'}[k])).join('、')+'（kPa，可填 0）');const axis=dir==='X'?1:0,cross=1-axis;
-    const supportPlan=supportPlanner().plan(c,dir,model,o);errors.push(...supportPlan.errors);rr.supportSegments132=supportPlan.rows.map(v=>({side:v.side,face:v.face,start:v.start,end:v.end,target:v.value,manual:!!v.manual,error:v.error}));const strips=(dir?slabStrips118(c,dir):[]).map(part=>{const ends=dir==='X'?[[[part.x0,part.y0],[part.x0,part.y1]],[[part.x1,part.y0],[part.x1,part.y1]]]:[[[part.x0,part.y0],[part.x1,part.y0]],[[part.x0,part.y1],[part.x1,part.y1]]];return {part,ends,edges:cs?(edgeValid?[ends[['left','top'].includes(edgeName)?0:1]]:[]):ends};}),supportEdges=strips.flatMap(s=>s.edges);rr.rootMoments=[];rr.slabReactions=[];
-    for(const strip of strips){const {part,ends}=strip,span=dir==='X'?part.x1-part.x0:part.y1-part.y0,spanStart=dir==='X'?part.x0:part.y0,clip=rs=>rs.flatMap(r=>{const hit=LoadRegions83.intersect(r,part);return hit?[{...r,...hit}]:[];}),localPieces=c.rectangular?pieces:clip(pieces),localSW=c.rectangular?netSW:clip(netSW);
-    for(const [e1,e2]of strip.edges){const candidates=[...(c.netBoundary120?columns.map(v=>({type:'COL',target:v,member:v.member})):[]),...walls.map(w=>({type:'WALL',target:w.group,member:w.member})),...beams.map(b=>({type:'BEAM',target:b,member:b.member}))].filter(v=>slabFace(c,v.member,cross,e1[cross]));const cuts=[e1[axis],e2[axis],...supportPlan.rows.filter(v=>eq(v.face,e1[cross])).flatMap(v=>[v.start,v.end]).filter(v=>v>e1[axis]&&v<e2[axis]),...[...localPieces,...localSW].flatMap(r=>axis===1?[r.y0,r.y1]:[r.x0,r.x1]),...candidates.flatMap(v=>slabFace(c,v.member,cross,e1[cross])).filter(v=>v>e1[axis]&&v<e2[axis])].sort((a,b)=>a-b);let edges=[];for(let j=0;j<cuts.length-1;j++){if(cuts[j+1]-cuts[j]<tol)continue;const mid=[...e1];mid[axis]=(cuts[j]+cuts[j+1])/2;const side=eq(e1[cross],ends[1][0][cross])?'B':'A',match=supportPlanner().resolve(c,dir,o,{side,face:e1[cross],start:cuts[j],end:cuts[j+1],point:mid,options:candidates}),hit=match.hit;if(!hit)continue;edges.push({...hit,start:cuts[j],end:cuts[j+1]});}
-     for(const edge of edges){const reaction=LoadRegions83.reaction(localPieces,dir,(edge.start+edge.end)/2,spanStart,span,eq(e1[cross],ends[1][0][cross]),cs,0,autoSW);if(autoSW){const concrete=LoadRegions83.reaction(localSW,dir,(edge.start+edge.end)/2,spanStart,span,eq(e1[cross],ends[1][0][cross]),cs,rr.loading.sw*(areaTracing?1:calculation.selfWeightScale),true);for(const k of ['g','sw','mG'])reaction[k]+=concrete[k];}const {good}=reaction,g=BeamLoads.up(reaction.g),q=BeamLoads.up(reaction.q);rr.slabReactions.push({side:eq(e1[cross],ends[1][0][cross])?'B':'A',supportType:edge.type,supportId:edge.member.displayId||edge.member.id,start:edge.start,end:edge.end,g,q,length:edge.end-edge.start,good});
+    const supportPlan=supportPlanner().plan(c,dir,model,o);errors.push(...supportPlan.errors);rr.supportSegments132=supportPlan.rows.map(v=>({side:v.side,face:v.face,start:v.start,end:v.end,target:v.value,manual:!!v.manual,error:v.error}));const strips=(dir?slabStrips118(c,dir):[]).map(part=>{const ends=dir==='X'?[[[part.x0,part.y0],[part.x0,part.y1]],[[part.x1,part.y0],[part.x1,part.y1]]]:[[[part.x0,part.y0],[part.x1,part.y0]],[[part.x0,part.y1],[part.x1,part.y1]]];return {part,ends,edges:cs?(edgeValid?[ends[['left','top'].includes(edgeName)?0:1]]:[]):ends};}),supportEdges=strips.flatMap(s=>s.edges);rr.rootMoments=[];rr.slabReactions=[];const transferPieces177=[];
+    for(const strip of strips){const {part,ends}=strip,span=dir==='X'?part.x1-part.x0:part.y1-part.y0,spanStart=dir==='X'?part.x0:part.y0,clip=rs=>rs.flatMap(r=>{const hit=LoadRegions83.intersect(r,part);return hit?[{...r,...hit}]:[];}),localPieces=c.rectangular?pieces:clip(pieces),localSW=c.rectangular?netSW:clip(netSW),transfer=areaTracing?null:slabTransfer177(p,f,c,dir,model,o,part,calculation,slabClaims177,transferRegions177??=LoadRegions83.surfaceRegions(p,f,model));if(transfer)transferPieces177.push(...transfer.zones.flatMap(z=>z.pieces));
+    for(const [e1,e2]of strip.edges){const candidates=[...(c.netBoundary120?columns.map(v=>({type:'COL',target:v,member:v.member})):[]),...walls.map(w=>({type:'WALL',target:w.group,member:w.member})),...beams.map(b=>({type:'BEAM',target:b,member:b.member}))].filter(v=>slabFace(c,v.member,cross,e1[cross]));const cuts=[e1[axis],e2[axis],...supportPlan.rows.filter(v=>eq(v.face,e1[cross])).flatMap(v=>[v.start,v.end]).filter(v=>v>e1[axis]&&v<e2[axis]),...(transfer?transfer.zones.flatMap(z=>[z.start,z.end,...z.pieces.flatMap(r=>axis===1?[r.y0,r.y1]:[r.x0,r.x1])]):[]),...[...localPieces,...localSW].flatMap(r=>axis===1?[r.y0,r.y1]:[r.x0,r.x1]),...candidates.flatMap(v=>slabFace(c,v.member,cross,e1[cross])).filter(v=>v>e1[axis]&&v<e2[axis])].sort((a,b)=>a-b);let edges=[];for(let j=0;j<cuts.length-1;j++){if(cuts[j+1]-cuts[j]<tol)continue;const mid=[...e1];mid[axis]=(cuts[j]+cuts[j+1])/2;const side=eq(e1[cross],ends[1][0][cross])?'B':'A',match=supportPlanner().resolve(c,dir,o,{side,face:e1[cross],start:cuts[j],end:cuts[j+1],point:mid,options:candidates}),hit=match.hit;if(!hit)continue;edges.push({...hit,start:cuts[j],end:cuts[j+1]});}
+     for(const edge of edges){let reaction=LoadRegions83.reaction(localPieces,dir,(edge.start+edge.end)/2,spanStart,span,eq(e1[cross],ends[1][0][cross]),cs,0,autoSW);if(autoSW){const concrete=LoadRegions83.reaction(localSW,dir,(edge.start+edge.end)/2,spanStart,span,eq(e1[cross],ends[1][0][cross]),cs,rr.loading.sw*(areaTracing?1:calculation.selfWeightScale),true);for(const k of ['g','sw','mG'])reaction[k]+=concrete[k];}if(transfer)reaction=slabReaction177(transfer,(edge.start+edge.end)/2,eq(e1[cross],ends[1][0][cross]),cs,{dir,value:rr.loading.sw},autoSW)||reaction;const {good}=reaction,g=BeamLoads.up(reaction.g),q=BeamLoads.up(reaction.q);rr.slabReactions.push({side:eq(e1[cross],ends[1][0][cross])?'B':'A',supportType:edge.type,supportId:edge.member.displayId||edge.member.id,start:edge.start,end:edge.end,g,q,length:edge.end-edge.start,good});
       const sources101=areaTracing?localPieces.filter(r=>r.load.ll>tol).map(r=>{const along=dir==='X'?'y':'x',lo=Math.max(r[along+'0'],edge.start),hi=Math.min(r[along+'1'],edge.end);if(hi-lo<=tol)return null;const rect={x0:r.x0,x1:r.x1,y0:r.y0,y1:r.y1};rect[along+'0']=lo;rect[along+'1']=hi;const q=LoadRegions83.reaction([r],dir,(lo+hi)/2,spanStart,span,eq(e1[cross],ends[1][0][cross]),cs,0,false).q;return q>tol?{floor:f,slab:c.id,rect,area:q*(hi-lo)}:null;}).filter(Boolean):[];
       if(cs&&good){const root={floor:f,slab:c.id,slabToken:rr.token,fixedEdge:edgeName,supportType:edge.type,supportId:edge.member.displayId||edge.member.id,start:edge.start,end:edge.end,length:edge.end-edge.start,g,q,mG:reaction.mG,mQ:reaction.mQ};root.mULS=1.4*root.mG+1.6*root.mQ;root.totalMULS=root.mULS*root.length;rr.rootMoments.push(root);rootMoments.push(root);if(edge.type==='BEAM')edge.target.csMoments.push(root);}
       if(edge.type==='WALL'||edge.type==='COL'){if(edge.type==='WALL')edge.target.slabs.add(c.id);if(areaTracing)(edge.target.sources101??=[]).push(...sources101);edge.target.g+=g*(edge.end-edge.start);edge.target.q+=q*(edge.end-edge.start);if(!good)edge.target.errors.push(c.id+' 荷载未填');}else{const u=[...e1],v=[...e1];u[axis]=edge.start;v[axis]=edge.end;const start=distance(u,edge.member),end=distance(v,edge.member);if(Math.abs(end-start)<tol)edge.target.points.push({x:Math.max(0,Math.min(L(edge.member),start)),g:g*(edge.end-edge.start),q:q*(edge.end-edge.start),sources101,label:c.id});else edge.target.lines.push({start:Math.min(start,end),end:Math.max(start,end),g,q,sources101,sw:reaction.sw,dl:reaction.dl,sdl:reaction.sdl,label:c.id});if(!good||!designRectangle&&!calculation.manual)edge.target.errors.push(c.id+' 荷载／单向板范围未确认');}}
@@ -233,10 +271,10 @@ const Loading=(()=>{
     const transferErrors=[...new Set(errors)];rr.transferErrors=transferErrors;
     if(errors.length){markEdges(supportEdges.length&&!o.supportConflicts?.length?supportEdges:c.edges,FloorLevels.name(p,f)+' '+c.id+'：'+[...new Set(errors)].join('；'));wallGroups.filter(w=>w.slabs.has(c.id)).forEach(w=>w.errors.push(c.id+' 荷载或支承边未确认'));beams.filter(b=>[...b.lines,...b.points].some(l=>l.label===c.id)).forEach(b=>b.errors.push(c.id+'：'+errors[0]));issues.push({floor:f,msg:c.id+'：'+[...new Set(errors)].join('；')});}
     if(calculation.manual)errors=errors.filter(e=>!supportPlan.errors.includes(e));errors.push(...calculation.errors);
-    if(new Set(pieces.map(r=>JSON.stringify(autoSW?[r.load.sdl,r.load.ll]:[r.load.dl,r.load.sdl,r.load.ll]))).size>1&&!areaTracing)errors.push('此板含局部或不同区域荷载：已按实际范围传荷；原 Excel 均布荷载板验算不适用，需单独验算');rr.result=errors.length?{status:'INPUT REQUIRED',fail:[...new Set(errors)],description:'—'}:queue('slab',{kind:cs?'CS':'SLAB',id:c.id,L:calculation.L,h:c.thickness,fcu:cfg.fcu,fire:cfg.fire,dl:load.dl,sdl:load.sdl,ll:load.ll,steel:o.steel,dlIncludesSelfWeight:!autoSW});
+    if(new Set([...pieces,...transferPieces177].map(r=>JSON.stringify(autoSW?[r.load.sdl,r.load.ll]:[r.load.dl,r.load.sdl,r.load.ll]))).size>1&&!areaTracing)errors.push('此板含局部或不同区域荷载：已按实际范围传荷；原 Excel 均布荷载板验算不适用，需单独验算');rr.result=errors.length?{status:'INPUT REQUIRED',fail:[...new Set(errors)],description:'—'}:queue('slab',{kind:cs?'CS':'SLAB',id:c.id,L:calculation.L,h:c.thickness,fcu:cfg.fcu,fire:cfg.fire,dl:load.dl,sdl:load.sdl,ll:load.ll,steel:o.steel,dlIncludesSelfWeight:!autoSW});
    }
-   addBeamSurface(p,f,model,beams,autoSW,areaTracing);
-   addColumnSurface(p,f,model,columns,autoSW,areaTracing);
+   addBeamSurface(p,f,model,beams,autoSW,areaTracing,slabClaims177);
+   addColumnSurface(p,f,model,columns,autoSW,areaTracing,slabClaims177);
    function solve(b,path=new Set()){if(b.done)return;if(path.has(b)){for(const item of path)item.errors.push('梁之间形成相互支承，简支传荷顺序不明确');b.errors.push('梁之间形成相互支承，简支传荷顺序不明确');return;}path=new Set(path);path.add(b);for(const child of beams.filter(x=>x.sinks.some(s=>s?.target===b)))solve(child,path);if(b.done)return;const c=b.member,rr=addRow(b.kind,c),o=resolvedInput(p,r,f,c),span=beamSpan(c,o),len=span.value,scaled=beamSpanLoads(span,b.lines,b.points),manual=o.mode==='manual'&&!b.truss109?.length,isCB=c.displayKind==='CB',table=Array.isArray(o.beamLoads)?BeamLoads.resolve(o,len):null;let gd=0,ql=0,points=scaled.points.map(x=>({...x})),error=[...b.errors];b.lines=scaled.lines;b.points=scaled.points;b.row=rr;inheritTruss(b,b.truss109);if(b.truss109?.length&&o.mode==='manual')error.push('此梁承接桁架反力，须恢复自动传荷模式，避免覆盖反力或掩盖上游不完整输入');
     const replacement=tt?.replaced(f,b);if(replacement){tt.rejectDirect(replacement,b,o);b.done=true;rr.replacedByTruss=replacement.t.id;rr.result={status:'REPLACED',fail:[],description:replacement.t.name+' 独立桁架设计'};if(replacement.errors.length)traceProblem(b,replacement.errors.join('；'));return;}
     if(manual){error=[...b.supportErrors,...b.errors.filter(x=>x.includes('相互支承'))];if(isCB&&!['a','z'].includes(o.fixedEnd))error.push('CB：'+cbRoot(p,r,f,c).message);if(table){error.push(...table.errors);}else if(!available(o.udlDead)||!available(o.udlLive))error.push('请填写手动线荷载 G、Q（含结构自重）');else {gd+=o.udlDead;ql=o.udlLive;}points=[];if(areaTracing)error.push('使用手动总荷载，无法对应自动承载面积');}
@@ -245,7 +283,7 @@ const Loading=(()=>{
     if(!table&&o.extraDead!==undefined&&o.extraDead!==null){if(!available(o.extraDead))error.push('附加线恒载须不小于 0');else gd+=o.extraDead;}
     if(!table&&o.points!=null&&!Array.isArray(o.points))error.push('集中荷载记录格式无效，请重新输入');for(const x of !table&&Array.isArray(o.points)?o.points:[]){if(!x||!available(x.x)||x.x>len||!available(x.g)||!available(x.q))error.push('集中荷载位置／G／Q 无效');else points.push({...x,label:x.label||'手动集中荷载'});}
     if(table){if(!manual)error.push(...table.errors);points.push(...table.points);}
-    const swParts=(manual?table?.selfWeight:autoSW)?beamSelfWeight(c,len):[],uniformSW=swParts[0]?.g||0,varyingSW=[];gd+=uniformSW;
+    const swParts=(manual?table?.selfWeight:autoSW)?(manual||areaTracing?beamSelfWeight(c,len):beamWeight177(c,len,slabClaims177)):[],uniformSW=swParts.length===1&&swParts[0].start===0&&eq(swParts[0].end,len)?swParts[0].g:0,varyingSW=uniformSW?[]:swParts;gd+=uniformSW;
     gd=BeamLoads.up(gd);ql=BeamLoads.up(ql);points=points.map(BeamLoads.rounded);if(table){table.lines=table.lines.map(BeamLoads.rounded);table.points=table.points.map(BeamLoads.rounded);}
     if(isCB&&o.fixedEnd==='z')points=points.map(x=>({...x,x:len-x.x}));rr.loading={L:span.error?null:len,...(span.manual?{automaticSpan:span.automatic,manualSpan:span.value}:{}),fixedEnd:isCB?o.fixedEnd:null,rootSelection:isCB?cbRoot(p,r,f,c):null,sw:uniformSW,selfWeight:swParts.reduce((v,x)=>v+x.g*(x.end-x.start),0),selfWeightLines:swParts,automaticLines:[...b.lines,...varyingSW],automaticPoints:b.points.map(x=>({...x})),udlDead:gd,udlLive:ql,points,surfaceArea:b.surfaceArea||0,mode:manual?'手动总荷载':'自动传荷',support:isCB?'Cantilever':'Simply-supported',sources:manual?[]:b.lines};
     rr.supportMoments=b.csMoments;rr.cbSupportMoments=b.cbMoments;const designErrors=isCB&&o.cover!=null&&(!Number.isFinite(o.cover)||o.cover<=0)?['CB 手动保护层 cover 须大于 0；留空按 FRR 自动取值']:[];
@@ -335,6 +373,6 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   return {items:items.sort((a,b)=>a.floor-b.floor||a.id.localeCompare(b.id)),total:out.rows.filter(r=>r.checked).length};
  }
  function inspectSlab(p,r,f,t){if(!Number.isInteger(f)||f<1||f>p.total||!E.floorModel(r,f).slabs.some(s=>token('SLAB',s)===t))throw Error('板块已变化，请重新选择');const preview=E.clone(p);init(preview).selected={[f+'|'+t]:true};return run(preview,r,'B',false,f).rows.find(row=>row.floor===f&&row.kind==='SLAB'&&row.token===t);}
- return {columnLoadPoint,slabStrips118,slabFace,slabWinner,audit,auditSteps,slabCalculation,beamSpan,beamSpanLoads,slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};
+ return {slabTransfer177,slabReaction177,beamWeight177,columnLoadPoint,slabStrips118,slabFace,slabWinner,audit,auditSteps,slabCalculation,beamSpan,beamSpanLoads,slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};
 })();
 if(typeof module!=='undefined')module.exports=Loading;

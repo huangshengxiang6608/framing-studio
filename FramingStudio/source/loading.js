@@ -275,7 +275,9 @@ const Loading=(()=>{
     if(calculation.manual)errors=errors.filter(e=>!supportPlan.errors.includes(e));errors.push(...calculation.errors);
     if(new Set([...pieces,...transferPieces177].map(r=>JSON.stringify(autoSW?[r.load.sdl,r.load.ll]:[r.load.dl,r.load.sdl,r.load.ll]))).size>1&&!areaTracing)errors.push('此板含局部或不同区域荷载：已按实际范围传荷；原 Excel 均布荷载板验算不适用，需单独验算');rr.result=errors.length?{status:'INPUT REQUIRED',fail:[...new Set(errors)],description:'—'}:queue('slab',{kind:cs?'CS':'SLAB',id:c.id,L:calculation.L,h:c.thickness,fcu:cfg.fcu,fire:cfg.fire,dl:load.dl,sdl:load.sdl,ll:load.ll,steel:o.steel,dlIncludesSelfWeight:!autoSW});
    }
-   addBeamSurface(p,f,model,beams,autoSW,areaTracing,slabClaims177);
+   // Design transfer already carries the slab load across the whole receiving beam.
+   // Retain geometric surface bookkeeping only for the existing Area/Section A path.
+   if(areaTracing||section==='A')addBeamSurface(p,f,model,beams,autoSW,areaTracing,slabClaims177);
    addColumnSurface(p,f,model,columns,autoSW,areaTracing,slabClaims177);
    function solve(b,path=new Set()){if(b.done)return;if(path.has(b)){for(const item of path)item.errors.push('梁之间形成相互支承，简支传荷顺序不明确');b.errors.push('梁之间形成相互支承，简支传荷顺序不明确');return;}path=new Set(path);path.add(b);for(const child of beams.filter(x=>x.sinks.some(s=>s?.target===b)))solve(child,path);if(b.done)return;const c=b.member,rr=addRow(b.kind,c),o=resolvedInput(p,r,f,c),span=beamSpan(c,o),len=span.value,scaled=beamSpanLoads(span,areaTracing?b.lines:fullSpanSlabLoads179(b.lines,span.automatic),b.points),manual=o.mode==='manual'&&!b.truss109?.length,isCB=c.displayKind==='CB',table=Array.isArray(o.beamLoads)?BeamLoads.resolve(o,len):null;let gd=0,ql=0,points=scaled.points.map(x=>({...x})),error=[...b.errors];b.lines=scaled.lines;b.points=scaled.points;b.row=rr;inheritTruss(b,b.truss109);if(b.truss109?.length&&o.mode==='manual')error.push('此梁承接桁架反力，须恢复自动传荷模式，避免覆盖反力或掩盖上游不完整输入');
     const replacement=tt?.replaced(f,b);if(replacement){tt.rejectDirect(replacement,b,o);b.done=true;rr.replacedByTruss=replacement.t.id;rr.result={status:'REPLACED',fail:[],description:replacement.t.name+' 独立桁架设计'};if(replacement.errors.length)traceProblem(b,replacement.errors.join('；'));return;}
@@ -344,7 +346,7 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
  // enclosing primary-beam/wall bay. Never use inferred peers as new evidence.
  function slabDirection(p,f,t,c,model){
   const own=slabOwnDirection161(p,f,t,c,model);
-  if(own||!c.netBoundary120||input(p,f,t).slabType==='CS'||Math.abs((c.x1-c.x0)-(c.y1-c.y0))>=tol)return own;
+  if(own||!c.netBoundary120||input(p,f,t).slabType==='CS')return own;
   model??=E.floorModel(E.generate(p),f);
   const inside=(s,b)=>s.x0>=b[0]-tol&&s.x1<=b[1]+tol&&s.y0>=b[2]-tol&&s.y1<=b[3]+tol;
   const bays=[...new Map((model.panels||[]).filter(b=>inside(c,b)).map(b=>[b.map(nice).join(','),b])).values()];
@@ -358,7 +360,9 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   }
   return known.size===1?[...known][0]:null;
  }
- function slabOwnDirection161(p,f,t,c,model){if(c.direction101&&!c.direction116&&!c.shortSpan116&&!input(p,f,t).direction)return c.direction101;const o=input(p,f,t);if(o.slabType==='CS'){if(['left','right'].includes(o.csFixedEdge))return 'X';if(['top','bottom'].includes(o.csFixedEdge))return 'Y';return null;}if(['X','Y'].includes(c.direction116))return c.direction116;if(c.netBoundary120&&['X','Y'].includes(o.direction))return o.direction;if(c.netBoundary120&&Math.abs((c.x1-c.x0)-(c.y1-c.y0))<tol)return null;const short=c.x1-c.x0<=c.y1-c.y0?'X':'Y',other=short==='X'?'Y':'X';if(c.shortSpan116||c.netBoundary120)return short;model??=E.floorModel(E.generate(p),f);return oppositeSupports(model,c,short)?short:oppositeSupports(model,c,other)?other:short;}
+ // Use the same support-centre dimensions as the slab calculation when both axes resolve.
+ function slabAutoDimensions184(c,model){const clear=[c.x1-c.x0,c.y1-c.y0];if(!c.netBoundary120||!c.rectangular||!model?.beams||!model?.walls||!model?.columns||!(c.thickness>0))return clear;const spans=['X','Y'].map(dir=>slabSpan(c,dir,model).effective);return spans.every(v=>v>0)?spans:clear;}
+ function slabOwnDirection161(p,f,t,c,model){if(c.direction101&&!c.direction116&&!c.shortSpan116&&!input(p,f,t).direction)return c.direction101;const o=input(p,f,t);if(o.slabType==='CS'){if(['left','right'].includes(o.csFixedEdge))return 'X';if(['top','bottom'].includes(o.csFixedEdge))return 'Y';return null;}if(['X','Y'].includes(c.direction116))return c.direction116;if(c.netBoundary120&&['X','Y'].includes(o.direction))return o.direction;model??=E.floorModel(E.generate(p),f);const [sx,sy]=slabAutoDimensions184(c,model);if(c.netBoundary120&&Math.abs(sx-sy)<tol)return null;const short=sx<=sy?'X':'Y',other=short==='X'?'Y':'X';if(c.shortSpan116||c.netBoundary120)return short;model??=E.floorModel(E.generate(p),f);return oppositeSupports(model,c,short)?short:oppositeSupports(model,c,other)?other:short;}
  // Slab inspection has no upper-floor dependencies; only expose its slab row,
  // never the partial column/beam accumulation from this single-floor preview.
  // Inspect every current member without changing the user's Check/report selections.

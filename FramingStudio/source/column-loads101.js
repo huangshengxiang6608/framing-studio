@@ -75,6 +75,25 @@ const ColumnLoads101=(()=>{
   return {rects:occupied,segments,weighted:data.weighted,fillOpacity:.76,boundaryWidth:3};
  }
 
+ // Foreground dimensions share the exact highlighted area bounds and follow pan/zoom.
+ function dimensionLines(ctx,plot,w,h,data){
+  const d=dimensions(data);if(!d||!Number.isFinite(plot.scale)||plot.scale<=0)return [];
+  const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v)),x0=plot.ox+d.x0*plot.scale,x1=plot.ox+d.x1*plot.scale,y0=plot.oy+d.y0*plot.scale,y1=plot.oy+d.y1*plot.scale,boxes=[];
+  if(x1<0||x0>w||y1<0||y0>h)return boxes;
+  const colour='#b83b32';ctx.save();ctx.setLineDash([]);ctx.lineCap='round';
+  const stroke=draw=>{ctx.beginPath();draw();ctx.strokeStyle='#fff';ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle=colour;ctx.lineWidth=1.8;ctx.stroke();};
+  const label=(value,x,y,vertical=false)=>{ctx.font='600 13px "Segoe UI", "Microsoft YaHei", sans-serif';const tw=ctx.measureText(value).width+12,th=22,bw=vertical?th:tw,bh=vertical?tw:th;x=clamp(x,bw/2+4,w-bw/2-4);y=clamp(y,bh/2+4,h-bh/2-4);boxes.push({x:x-bw/2,y:y-bh/2,w:bw,h:bh});ctx.save();ctx.translate(x,y);if(vertical)ctx.rotate(-Math.PI/2);ctx.fillStyle='#fff';ctx.fillRect(-tw/2,-th/2,tw,th);ctx.fillStyle=colour;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(value,0,0);ctx.restore();};
+  const left=clamp(x0,6,w-6),right=clamp(x1,6,w-6),top=clamp(y0,6,h-6),bottom=clamp(y1,6,h-6),dy=clamp(y0-22,32,h-32),dx=clamp(x0-22,32,w-32);
+  if(right-left>12){stroke(()=>{ctx.moveTo(left,dy);ctx.lineTo(right,dy);for(const x of [left,right]){ctx.moveTo(x,Math.min(top,dy)-5);ctx.lineTo(x,Math.max(top,dy)+5);ctx.moveTo(x-4,dy+4);ctx.lineTo(x+4,dy-4);}});label('X = '+num(d.x)+' m'+(x0<0||x1>w?'（全長）':''),(left+right)/2,dy-15);}
+  if(bottom-top>12){stroke(()=>{ctx.moveTo(dx,top);ctx.lineTo(dx,bottom);for(const y of [top,bottom]){ctx.moveTo(Math.min(left,dx)-5,y);ctx.lineTo(Math.max(left,dx)+5,y);ctx.moveTo(dx-4,y+4);ctx.lineTo(dx+4,y-4);}});label('Y = '+num(d.y)+' m'+(y0<0||y1>h?'（全長）':''),dx-15,(top+bottom)/2,true);}
+  ctx.restore();return boxes;
+ }
+ function foreground(ctx,plot,w,h,data){
+  if(!data)return null;const dimensionBoxes=dimensionLines(ctx,plot,w,h,data),paint=plot.columnAreaPaint;
+  plot.columnAreaDimensions=dimensionBoxes;
+  return plot.columnAreaBadge=badge(ctx,plot,w,h,data,{...paint,rects:[...(paint?.rects||[]),...dimensionBoxes]});
+ }
+
  function badge(ctx,plot,w,h,data,paint){
   if(!data||w<80||h<60)return null;
   const dims=dimensions(data);const margin=12,bw=Math.min(w<700?242:280,w-2*margin),bh=Math.min(data.compact?(dims?104:44):(dims?158:98),h-2*margin),overlap=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
@@ -95,5 +114,5 @@ const ColumnLoads101=(()=>{
   return {...box,title,caption,dimensions:dims,area:data.area,floor:data.floor,targetFloor:data.targetFloor,overlayOverlap:overlays.reduce((n,t)=>n+overlap(box,t),0)};
  }
 
- return {dimensions,select,clear,table,wallTable,schedule,highlights,viewData,region,badge,outline,issueCaption,browsing:()=>sourceView,matches:(t,f)=>target?.floor===f&&target?.token===t};
+ return {foreground,dimensionLines,dimensions,select,clear,table,wallTable,schedule,highlights,viewData,region,badge,outline,issueCaption,browsing:()=>sourceView,matches:(t,f)=>target?.floor===f&&target?.token===t};
 })();

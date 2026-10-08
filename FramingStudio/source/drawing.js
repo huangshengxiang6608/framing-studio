@@ -81,7 +81,7 @@ const Drawing=(()=>{
   const loadAreaLabels=[],loadLabelCuts=[...m.ts.filter(t=>t.state===2),...(m.slabVoids||[])];
   for(const area of opt.loadAreas||[]){if(area.unassigned||!area.overview&&!area.draft)continue;ctx.save();if(area.draft){ctx.strokeStyle=area.colour;ctx.lineWidth=3;ctx.beginPath();for(const [a,z]of LoadRegions83.boundary(area.outlineRects||area.rects)){ctx.moveTo(...xy(...a));ctx.lineTo(...xy(...z));}ctx.stroke();ctx.restore();continue;}const rects=LoadRegions83.difference(area.rects||[],loadLabelCuts),badge=loadAreaLabel(ctx,area,rects,{ox,oy,scale},w,h);if(badge){const {x,y,width,height,lines}=badge;ctx.fillStyle='#ffffff';ctx.globalAlpha=.94;ctx.fillRect(x,y,width,height);ctx.globalAlpha=1;lines.forEach((line,i)=>text(ctx,line,x+6,y+15+i*16,12,area.colour));loadAreaLabels.push({...badge,name:area.name,number:area.number});}ctx.restore();}
   checkLegend(ctx,opt,checkHighlights.length,20,h-18);
-  const columnAreaBadge=opt.columnLoadArea&&typeof ColumnLoads101!=='undefined'?ColumnLoads101.badge(ctx,areaPlot,w,h,opt.columnLoadArea,columnAreaPaint):null;
+  const columnAreaBadge=!opt.deferAreaOverlay188&&opt.columnLoadArea&&typeof ColumnLoads101!=='undefined'?ColumnLoads101.foreground(ctx,{...areaPlot,columnAreaPaint},w,h,opt.columnLoadArea):null;
   return {scale,ox,oy,hits,loadAreaLabels,csMarkers,checkHighlights,columnAreaPaint,columnAreaBadge,slabs:opt.membersOnly?[]:m.slabs,world:(x,y)=>[(x-ox)/scale,(y-oy)/scale]};
  }
  function elevationData(p,result,direction,opt={}){

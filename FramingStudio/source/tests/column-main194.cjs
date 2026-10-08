@@ -15,5 +15,5 @@ const results=c.run(`(()=>{
  return {cases,unchanged,two:Engine.model(two,'F1').beams.find(v=>v.id==='S1').kind};
 })()`);
 for(const x of results.cases){assert.equal(x.kind,'MB');assert.equal(x.status,'connected');assert.equal(x.token,x.oldToken);assert(x.actions);assert.equal(x.input[0].dl,10);assert.equal(x.reload,'MB');assert.equal(x.frozen,x.oldToken);assert.equal(x.edited,x.oldToken);assert(x.reportA&&x.reportB);assert.equal(x.undo,'SB');if(!x.auto)assert.equal(x.width,.25);}
-for(const [reason,kind]of results.unchanged)assert.equal(kind,'SB',reason);assert.equal(results.two,'MB');
-console.log('PASS: new column + wall/column promotes manual and saved automatic SB; locked/remote/free/beam-only spans preserved; connected reactions, saved load/support identity, report selections, reload, refreeze, resize and undo baseline');
+for(const [reason,kind]of results.unchanged)assert.equal(kind,reason==='fixed'?'MB':'SB',reason);assert.equal(results.two,'MB');
+console.log('PASS: new column + wall/column promotes manual and saved automatic SB; legacy locks ignored; remote/free/beam-only spans preserved; connected reactions, saved load/support identity, report selections, reload, refreeze, resize and undo baseline');

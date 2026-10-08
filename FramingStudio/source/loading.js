@@ -19,7 +19,7 @@ const Loading=(()=>{
   if(!E.on(point,b))return null;const x=distance(point,b);return x>=-tol&&x<=len+tol?{x:Math.max(0,Math.min(len,x)),section:true}:null;
  }
  function columnLoadPoint(p,model,c){return E.columnLoadPoint(c);}
- function token(kind,c){if((c.autoTransfer||c.autoCantilever173)&&kind===c.kind)kind=c.baseKind;if(kind==='COL')return 'COL|'+pos(c).map(nice);if(kind==='SLAB')return 'SLAB|'+JSON.stringify(c.rects.map(r=>[r.x0,r.x1,r.y0,r.y1].map(nice)));return kind+'|'+[c.cantileverOrigin173?.rawA||a(c),c.cantileverOrigin173?.rawZ||z(c)].map(p=>p.map(nice).join(',')).sort().join('|');}
+ function token(kind,c){if((c.autoTransfer||c.autoCantilever173)&&kind===c.kind)kind=c.baseKind;if(c.loadKind194==='SB'&&['MB','SB','CB','TB'].includes(kind))kind=c.loadKind194;if(kind==='COL')return 'COL|'+pos(c).map(nice);if(kind==='SLAB')return 'SLAB|'+JSON.stringify(c.rects.map(r=>[r.x0,r.x1,r.y0,r.y1].map(nice)));return kind+'|'+[c.cantileverOrigin173?.rawA||a(c),c.cantileverOrigin173?.rawZ||z(c)].map(p=>p.map(nice).join(',')).sort().join('|');}
  const defaults={fcu:45,fire:2,columnFcu:60,columnFire:2,tbFcu:60,tbFire:2,columnRatio:2.5,columnFactor:1,columnProject:1.25,wallFcu:60};
  function settings(p){const cfg={...defaults,...p.explorer?.settings};if(cfg.wallFcu===null||cfg.wallFcu===undefined||cfg.wallFcu==='')cfg.wallFcu=defaults.wallFcu;return cfg;}
  function init(p){p.explorer??={};p.explorer.settings??={};p.explorer.floors??={};p.explorer.members??={};p.explorer.selected??={};return p.explorer;}

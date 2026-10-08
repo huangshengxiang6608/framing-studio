@@ -1,6 +1,6 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前网页版本为 **E2.192**（保留 E2.172–E2.191 更新，禁柱區預設與 CB 出圖支承線），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前网页版本为 **E2.193**（保留 E2.172–E2.192 更新，出圖梁柱多選及完整框選），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 
@@ -41,6 +41,8 @@ E2.188 在受荷區上方／左側顯示 X／Y 尺寸線，面積卡及尺寸置
 E2.189 新增量距：選兩點、放置尺寸線，支援斜距／水平／垂直及捕捉。量距不存入專案。[使用及修改說明](FramingStudio/docs/changes-e2189.md)。
 
 E2.191 可在「幾何與出圖」多選梁並按 m 移動出圖位置，一鍵恢復 Functional Framing；計算及 Section A／B 保持原樣。[使用說明](FramingStudio/docs/changes-e2191.md)。
+
+E2.193 出圖調整表只列已選梁／柱；框選只加入完整包住的構件。[使用說明](FramingStudio/docs/changes-e2193.md)。
 
 ## 运行
 

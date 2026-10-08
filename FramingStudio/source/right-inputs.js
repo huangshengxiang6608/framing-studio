@@ -30,14 +30,14 @@ const RightInputPreview=(()=>{
   if(tab==='loading'){
    const overview=side.querySelector('#lg-overview');fold(side,'本层荷载图例',[overview],'load-overview',false);
   }
-  side.querySelectorAll('input,select,textarea').forEach(e=>{if(['checkbox','range','file','hidden'].includes(e.type)||e.readOnly||e.disabled)return;if(manual.has(fieldKey(e)))e.dataset.inputState='manual';else if(e.id==='lg-dl'&&e.value==='10'||e.dataset.action==='framing-depth')e.dataset.inputState='default';else if(!e.dataset.inputState)e.dataset.inputState=e.value===''?'required':'manual'});
+  side.querySelectorAll('input,select,textarea').forEach(e=>{if(['checkbox','range','file','hidden'].includes(e.type)||e.readOnly||e.disabled)return;if(e.hasAttribute('data-slab-target132'))e.dataset.inputState=e.value?'manual':'default';else if(e.id==='ex-slab-span131')e.dataset.inputState=document.getElementById('ex-slab-span-mode')?.value==='manual'?'manual':'default';else if(manual.has(fieldKey(e)))e.dataset.inputState='manual';else if(e.id==='lg-dl'&&e.value==='10'||e.dataset.action==='framing-depth')e.dataset.inputState='default';else if(!e.dataset.inputState)e.dataset.inputState=e.value===''?'required':'manual'});
   legend(side);
  }
  document.addEventListener('toggle',e=>{if(e.target.matches?.('#side details[data-preview-fold]'))folds.set(e.target.dataset.previewFold,e.target.open)},true);
  document.addEventListener('input',e=>{if(e.target.matches?.('#side input:not([readonly]),#side select,#side textarea')){manual.add(fieldKey(e.target));e.target.dataset.inputState='manual';queueMicrotask(()=>{if(e.target.isConnected)e.target.dataset.inputState='manual'})}},true);
  document.addEventListener('change',e=>{if(e.target.dataset.previewWall){const value=e.target.value,[key,id]=e.target.dataset.previewWall.split('|');StudioHost.transact(()=>{const w=StudioHost.get().p.types[key].walls.find(w=>w.id===id);if(!w)throw Error('墙已不存在');w.axisPosition=value;});}},true);
  document.addEventListener('DOMContentLoaded',()=>{for(const type of ['input','change'])document.addEventListener(type,e=>{if(e.target.closest?.('#side')&&manual.has(fieldKey(e.target)))e.target.dataset.inputState='manual'});});
- document.addEventListener('DOMContentLoaded',()=>{const nav=document.getElementById('nav'),beam=nav.querySelector('[data-tab="beams"]'),loading=nav.querySelector('[data-tab="loading"]');beam.before(loading);[...nav.querySelectorAll('button[data-tab]')].forEach((b,i)=>{const s=b.querySelector('span');if(s)s.textContent=String(i+1).padStart(2,'0')});});
+ document.addEventListener('DOMContentLoaded',()=>{const nav=document.getElementById('nav'),beam=nav.querySelector('[data-tab="beams"]'),loading=nav.querySelector('[data-tab="loading"]');beam.before(loading);[...nav.querySelectorAll('button[data-tab]')].forEach((b,i)=>{const s=b.querySelector('span');if(s)s.textContent=String(nav.querySelector('[data-tab="parameters"]')?i:i+1).padStart(2,'0')});});
 
  return {decorate};
 })();

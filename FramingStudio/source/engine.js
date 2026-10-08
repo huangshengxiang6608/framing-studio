@@ -17,7 +17,7 @@ const Engine=(()=>{
  function columnGridDraft(p,key,x,y){const grid={targetX:x,targetY:y};for(const [d,target]of [['x',x],['y',y]]){if(!Number.isFinite(target)||target<=0||target>500)throw Error('目标柱间距须大于 0 且不超过 500 m');const a=axes(p,d,key),lo=a[0].v,hi=a.at(-1).v,n=Math.max(1,Math.round((hi-lo)/target));if(n>39)throw Error('柱轴线每方向最多 40 条，请增大目标间距');grid[d]=Array.from({length:n+1},(_,i)=>+(lo+(hi-lo)*i/n).toFixed(6));}return grid;}
  function noColumn(t,x,y){return (t.noColumnZones||[]).some(r=>x>r.x0+eps&&x<r.x1-eps&&y>r.y0+eps&&y<r.y1-eps);}
  function columnRecordValid(grid,c){const valid=(d,id)=>grid[d].some(a=>a.id===id)||typeof id==='string'&&new RegExp('^@cg:'+d+':-?\\d+(?:\\.\\d+)?$').test(id)&&Number.isFinite(+id.split(':')[2])&&Math.abs(+id.split(':')[2])<=10000;return valid('x',c.ax)&&valid('y',c.ay);}
- // Preserve load-reference tokens while physical automatic MBs follow their columns.
+ // Preserve load-reference tokens while physical primary beams follow their columns.
  function mainColumnSupports164(p,key,b,columns){
   if(b.columnSupports164)return b.columnSupports164;
   return ['a','z'].map(end=>{const point=b[end],hits=columns.filter(c=>{if(c.status==='上层柱')return false;const r=columnRect(c);return Math.abs(point[0]-r.x)<=r.w/2+eps&&Math.abs(point[1]-r.y)<=r.d/2+eps;});return hits.length===1?{key:columnPositionKey(hits[0]),reference:columnReference(p,key,hits[0])}:null;});
@@ -32,13 +32,13 @@ const Engine=(()=>{
   return {a,z,columnSupports164:links};
  }
  function bindMainColumns164(p,key,m){
-  for(const b of p.types[key].autoBeamSnapshot?.main||[])if(!b.columnSupports164)b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);
+  for(const b of [...p.types[key].autoBeamSnapshot?.main||[],...p.types[key].autoBeamSnapshot?.primary||[],...p.types[key].beams.filter(v=>['MB','CB','TB'].includes(v.kind))])if(!b.columnSupports164){const live=m.beams.find(v=>v.id===b.id&&(v.baseKind||v.kind)===b.kind);if(live)b.columnSupports164=mainColumnSupports164(p,key,live,m.columns);}
  }
- // Move connected automatic spans together, including column-to-beam spans.
+ // Move connected unlocked spans together, including column-to-beam spans.
  // Logical reference lines remain stable for loads, saved regions and member IDs.
  function followBeamNetwork165(p,key,beams,columns,walls,ts){
   const horizontal=b=>near(b.rawA[1],b.rawZ[1]),axis=b=>horizontal(b)?0:1;
-  const automatic=b=>b.source==='auto'&&b.kind==='MB'&&b.widthMode!=='manual'&&p.types[key].beamWidths83?.[sig(b.rawA,b.rawZ)]==null;
+  const automatic=b=>['MB','CB','TB'].includes(b.kind)&&b.positionMode175!=='fixed';
   const mains=beams.filter(automatic),groups=[],groupOf=new Map(),findColumn=link=>{if(!link)return null;const cs=columns.filter(c=>c.status!=='上层柱'),exact=cs.find(c=>columnPositionKey(c)===link.key);if(exact)return exact;const match=cs.filter(c=>columnReference(p,key,c).every((v,i)=>near(v,link.reference[i])));return match.length===1?match[0]:null;};
   const links=new Map(mains.map(b=>[b,mainColumnSupports164(p,key,b,columns).map(findColumn)]));
   for(const first of mains){if(groupOf.has(first))continue;const group=[first];groupOf.set(first,group);for(let i=0;i<group.length;i++)for(const b of mains){if(groupOf.has(b)||horizontal(b)!==horizontal(first))continue;const a=axis(b),cross=1-a;if(!near(b.rawA[cross],first.rawA[cross]))continue;if(![group[i].rawA,group[i].rawZ].some(q=>[b.rawA,b.rawZ].some(v=>near(q[a],v[a]))))continue;group.push(b);groupOf.set(b,group);}groups.push(group);}
@@ -58,16 +58,33 @@ const Engine=(()=>{
   }
   for(const [b,q]of proposals){b.a=q.a;b.z=q.z;}proposals.clear();targetCross.clear();
   // SB spacing stays fixed; endpoints follow only the accepted receiving beams.
-  for(const b of beams.filter(b=>b.source==='auto'&&b.kind==='SB')){const a=axis(b),ends=['a','z'].map((end,i)=>{const q=[...b[end]],v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;return q;}),q={...b,a:ends[0],z:ends[1]};if(valid(b,q)){b.a=q.a;b.z=q.z;}}
+  for(const b of beams.filter(b=>b.kind==='SB'&&b.positionMode175!=='fixed')){const a=axis(b),ends=['a','z'].map((end,i)=>{const q=[...b[end]],v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;return q;}),q={...b,a:ends[0],z:ends[1]};if(valid(b,q)){b.a=q.a;b.z=q.z;}}
 
  }
  function freezeAutoBeams(p,key,m){
   const snapshot={main:[],primary:[],secondary:[]};
-  for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,kind:source.baseKind||source.kind};if(b.kind==='SB'&&m.panels){const bay=beamBay171(b,m.panels);if(bay)b.bay171=bay;}if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':b.kind==='SB'?'secondary':'primary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164','bay171'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
+  for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,...(source.autoCantilever173?source.cantileverOrigin173:{}),kind:source.baseKind||source.kind};if(source.autoCantilever173)delete b.fixedEnd101;if(b.kind==='SB'&&m.panels){const bay=beamBay171(b,m.panels);if(bay)b.bay171=bay;}if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':b.kind==='SB'?'secondary':'primary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164','bay171','positionMode175','fixedA175','fixedZ175','loadKind194','depthOverride184','extendToBoundary173'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
   p.types[key].autoBeamSnapshot=snapshot;
  }
- function addColumn(p,key,x,y){const t=p.types[key],m=model(p,key);if(![x,y].every(Number.isFinite))throw Error('请填写有效柱坐标');if(noColumn(t,x,y))throw Error('禁柱区内部不能补柱；边界和角点可以');if(![-eps,eps].some(dx=>[-eps,eps].some(dy=>inside(m.ts,x+dx,y+dy,true))))throw Error('柱须放在建筑范围内或边界上');if(m.columns.some(c=>{const ref=columnReference(p,key,c);return Math.hypot(ref[0]-x,ref[1]-y)<Math.min(c.b,c.d)/2;}))throw Error('此位置已有柱');let n=1;while([...t.columns,...m.columns].some(c=>c.id==='C'+n))n++;const c={id:'C'+n,x,y,b:p.defaults.cb,d:p.defaults.cd,status:'上下贯通',on:true,...(t.mode==='auto'?{autoAdded:true}:{})};t.columnPlacements=(t.columnPlacements||[]).filter(v=>v.key!=='id:'+c.id);t.columnAxisPositions=(t.columnAxisPositions||[]).filter(v=>v.key!=='id:'+c.id);t.columns.push(c);const built=baseModel(p,key).columns.find(q=>q.id===c.id);if(!built||!rectAllowed(m.ts,columnRect(built).x,columnRect(built).y,built.b,built.d,true)||m.columns.some(q=>overlap(columnRect(q),columnRect(built)))){t.columns.pop();throw Error('此位置与柱、墙或边界冲突，不能补柱');}freezeAutoBeams(p,key,m);return c;}
- function setColumnMode(p,key,mode){const t=p.types[key];if(!['auto','manual'].includes(mode))throw Error('柱模式无效');if(t.mode==='auto'&&mode==='manual'){const drawn=model(p,key).columns,hidden=t.columns.filter(c=>!drawn.some(d=>d.id===c.id));const positions=[],placements=[],columns=drawn.map(c=>{const ref=columnReference(p,key,c),r=columnRect(c),id='id:'+c.id,position=c.axisPosition;if(position)positions.push({key:id,position});const offset=columnDirections[position];if(!offset||Math.abs(ref[0]+offset[0]*c.b/2-r.x)>eps||Math.abs(ref[1]+offset[1]*c.d/2-r.y)>eps)placements.push({key:id,x:r.x,y:r.y});return {id:c.id,x:ref[0],y:ref[1],b:c.b*1000,d:c.d*1000,status:c.status,on:true,transferColumn:!!c.transferManual};});const hiddenKeys=new Set(hidden.map(c=>'id:'+c.id));t.columnAxisPositions=[...(t.columnAxisPositions||[]).filter(r=>hiddenKeys.has(r.key)),...positions];t.columnPlacements=[...(t.columnPlacements||[]).filter(r=>hiddenKeys.has(r.key)),...placements];t.columns=[...columns,...hidden];}t.mode=mode;}
+ // Adding a real column can turn an existing secondary span into a primary span.
+ // Retain its logical load identity so saved inputs and support references survive.
+ function promoteColumnBeams194(p,key,m,column){
+  if(!column||column.status==='上层柱')return 0;
+  const t=p.types[key],columns=m.columns.some(c=>c.id===column.id)?m.columns:[...m.columns,column];let count=0;
+  const contains=(q,c)=>{const v=columnRect(c);return Math.abs(q[0]-v.x)<=v.w/2+eps&&Math.abs(q[1]-v.y)<=v.d/2+eps;};
+  const direct=q=>columns.some(c=>c.status!=='上层柱'&&contains(q,c))||m.walls.some(w=>on(q,w)||on(q,{a:w.rawA,z:w.rawZ})||(()=>{const v=rect(w);return Math.abs(q[0]-v.x)<=v.w/2+eps&&Math.abs(q[1]-v.y)<=v.d/2+eps;})());
+  for(const b of m.beams){
+   if(b.kind!=='SB'||b.secondaryCantilever101||![b.a,b.z].some(q=>contains(q,column))||![b.a,b.z].every(direct))continue;
+   if(b.splitSecondaryParent200&&b.source==='manual')materializeColumnSpans170(p,key,m);
+   const snap=t.autoBeamSnapshot,row=b.source==='auto'?snap.secondary.find(v=>v.id===b.id):t.beams.find(v=>v.id===b.id&&v.kind==='SB');if(!row)continue;
+   row.kind='MB';row.loadKind194='SB';delete row.bay171;count++;
+   row.columnSupports164=mainColumnSupports164(p,key,{...b,columnSupports164:undefined},columns);
+   if(b.source==='auto'){snap.secondary=snap.secondary.filter(v=>v!==row);snap.main.push(row);}
+  }
+  return count;
+ }
+ function addColumn(p,key,x,y){const t=p.types[key],m=model(p,key);if(![x,y].every(Number.isFinite))throw Error('请填写有效柱坐标');if(noColumn(t,x,y))throw Error('禁柱区内部不能补柱；边界和角点可以');if(![-eps,eps].some(dx=>[-eps,eps].some(dy=>inside(m.ts,x+dx,y+dy,true))))throw Error('柱须放在建筑范围内或边界上');if(m.columns.some(c=>{const ref=columnReference(p,key,c);return Math.hypot(ref[0]-x,ref[1]-y)<Math.min(c.b,c.d)/2;}))throw Error('此位置已有柱');let n=1;while([...t.columns,...m.columns].some(c=>c.id==='C'+n))n++;const c={id:'C'+n,x,y,b:t.columnDefaults101?.cb??p.defaults.cb,d:t.columnDefaults101?.cd??p.defaults.cd,bMode201:'default',dMode201:'default',status:'上下贯通',on:true,...(t.mode==='auto'?{autoAdded:true}:{})};t.columnPlacements=(t.columnPlacements||[]).filter(v=>v.key!=='id:'+c.id);t.columnAxisPositions=(t.columnAxisPositions||[]).filter(v=>v.key!=='id:'+c.id);t.columns.push(c);const built=baseModel(p,key).columns.find(q=>q.id===c.id);if(!built||!rectAllowed(m.ts,columnRect(built).x,columnRect(built).y,built.b,built.d,true)||m.columns.some(q=>overlap(columnRect(q),columnRect(built)))){t.columns.pop();throw Error('此位置与柱、墙或边界冲突，不能补柱');}freezeAutoBeams(p,key,m);promoteColumnBeams194(p,key,m,built);return c;}
+ function setColumnMode(p,key,mode){const t=p.types[key];if(!['auto','manual'].includes(mode))throw Error('柱模式无效');if(t.mode==='auto'&&mode==='manual'){const drawn=model(p,key).columns,hidden=t.columns.filter(c=>!drawn.some(d=>d.id===c.id));const positions=[],placements=[],columns=drawn.map(c=>{const ref=columnReference(p,key,c),r=columnRect(c),id='id:'+c.id,position=c.axisPosition;if(position)positions.push({key:id,position});const offset=columnDirections[position];if(!offset||Math.abs(ref[0]+offset[0]*c.b/2-r.x)>eps||Math.abs(ref[1]+offset[1]*c.d/2-r.y)>eps)placements.push({...clone((t.columnPlacements||[]).find(v=>v.key===columnPositionKey(c))||{}),key:id,x:r.x,y:r.y});return {id:c.id,x:ref[0],y:ref[1],b:c.b*1000,d:c.d*1000,bMode201:c.bMode201??'manual',dMode201:c.dMode201??'manual',status:c.status,on:true,transferColumn:!!c.transferManual};});const hiddenKeys=new Set(hidden.map(c=>'id:'+c.id));t.columnAxisPositions=[...(t.columnAxisPositions||[]).filter(r=>hiddenKeys.has(r.key)),...positions];t.columnPlacements=[...(t.columnPlacements||[]).filter(r=>hiddenKeys.has(r.key)),...placements];t.columns=[...columns,...hidden];}t.mode=mode;}
 
  function structuralHeight(g,maxStructuralHeightMm=10000){const hr=g.headroom,em=g.em,has=v=>v!==null&&v!==undefined&&v!=='';if(!has(hr)&&!has(em))return g.sh;if(!has(hr)||!has(em))throw Error('请同时填写 Headroom 和 E&M Zone（没有 E&M Zone 可填 0）');if(![g.h,hr,em].every(Number.isFinite)||hr<0||em<0)throw Error('层高、Headroom 和 E&M Zone 须为有效非负数');const sh=Math.round((g.h-hr-em)*1e6)/1000;if(sh<1||sh>maxStructuralHeightMm)throw Error('层高 − Headroom − E&M Zone 须为 0.001–'+(maxStructuralHeightMm/1000)+' m');return sh;}
  function applyClearances(p,values){const draft=clone(p),groups=[];let from=1;for(const g of draft.groups){const to=g.end==='顶层'?draft.total:g.end;for(let f=from;f<=to;f++){const c={...g,...(values[f]||{}),end:f};c.sh=structuralHeight(c);const last=groups.at(-1),same=last&&JSON.stringify({...last,end:0})===JSON.stringify({...c,end:0});if(same)last.end=f;else groups.push(c);}from=to+1;}groups.at(-1).end='顶层';draft.groups=groups;validate(draft);p.groups=groups;}
@@ -84,17 +101,17 @@ const Engine=(()=>{
   const keys=Object.keys(p.types||{});if(!keys.length||keys.length>30||keys.some(k=>!/^F[0-9A-Za-z_-]{1,20}$/.test(k)))fail('类型名称须以 F 开头，最多 30 种');
   if(!Array.isArray(p.groups)||!p.groups.length||p.groups.length>100)fail('须填写楼层分组');
   let end=0;const heights={};
-  for(const g of p.groups){if(!keys.includes(g.type))fail('分组的 Framing 类型不存在');const e=g.end==='顶层'?p.total:g.end;num(e,1,500,'结束层须为整数或“顶层”');if(!Number.isInteger(e)||(end<p.total&&e<=end))fail('结束层须递增');end=Math.max(end,e);num(g.h,.1,30,'层高须为 0.1–30 m');const effectiveSH=structuralHeight(g);num(effectiveSH,1,10000,'Structural Height 须为 1–10000 mm');num(g.min,0,500,'最小柱距须为 0–500 m');if(p.types[g.type].beamDepth!=null)num(p.types[g.type].beamDepth,1,10000,'Framing 默认梁深须为 1–10000 mm');}
+  for(const g of p.groups){if(!keys.includes(g.type))fail('分组的 Framing 类型不存在');const e=g.end==='顶层'?p.total:g.end;num(e,1,500,'结束层须为整数或“顶层”');if(!Number.isInteger(e)||(end<p.total&&e<=end))fail('结束层须递增');end=Math.max(end,e);num(g.h,.1,30,'层高须为 0.1–30 m');const effectiveSH=structuralHeight(g);num(effectiveSH,1,10000,'Structural Height 须为 1–10000 mm');num(g.min,0,500,'最小柱距须为 0–500 m');if(p.types[g.type].beamDepth!=null)num(p.types[g.type].beamDepth,1,10000,'Framing SB 深度須為 1–10000 mm');}
   if(end<p.total)fail('楼层分组未覆盖到顶层');
   for(const k of ['cb','cd','gap','mb','sb','tb','tbd','slab','wall'])num(p.defaults?.[k],k==='gap'?100:1,20000,'默认尺寸无效：'+k);
   if(!['自动','X','Y'].includes(p.defaults.direction))fail('次梁方向无效');
   const point=(a,key)=>{if(!a||typeof a!=='object')fail('端点缺失');const v=resolve(p,a,key);v.forEach(n=>num(n,-5000,10000,'轴线引用或坐标无效'));};
-  for(const [key,t] of Object.entries(p.types)){if(t.cbColumnWidth171!==true&&Array.isArray(t.beams)){for(const b of [...t.beams,...t.autoBeamSnapshot?.secondary||[],...t.autoBeamSnapshot?.primary||[]])if(b.kind==='CB'){b.widthMode='column';if(t.beamWidths83){const a=Array.isArray(b.rawA)?b.rawA:resolve(p,b.a,key),z=Array.isArray(b.rawZ)?b.rawZ:resolve(p,b.z,key);delete t.beamWidths83[sig(a,z)];}}t.cbColumnWidth171=true;}if(t.columnDefaults101)for(const k of ['cb','cd'])num(t.columnDefaults101[k],1,20000,'Framing 默认柱尺寸无效：'+k);if(t.autoBeams101!==undefined&&typeof t.autoBeams101!=='boolean')fail('自动排梁设置无效');
-   if(t.autoBeamSnapshot!==undefined){const snap=t.autoBeamSnapshot;if(!snap||typeof snap!=='object'||Array.isArray(snap)||Object.keys(snap).some(k=>!['main','primary','secondary'].includes(k)))fail('已保存梁布置無效');const ids=new Set();for(const group of ['main','primary','secondary']){if(snap[group]===undefined)continue;if(!Array.isArray(snap[group])||snap[group].length>5000)fail('已保存梁布置過多');for(const b of snap[group]){if(!b||typeof b.id!=='string'||!b.id||ids.has(b.id)||!(group==='main'?['MB']:group==='primary'?['CB','TB']:['SB','CB']).includes(b.kind))fail('已保存梁資料無效');ids.add(b.id);for(const field of ['a','z','rawA','rawZ'])if(!Array.isArray(b[field])||b[field].length!==2||!b[field].every(Number.isFinite))fail('已保存梁座標無效');if(!near(b.a[0],b.z[0])&&!near(b.a[1],b.z[1])||Math.hypot(b.a[0]-b.z[0],b.a[1]-b.z[1])<eps)fail('已保存梁方向無效');if(b.bay171!==undefined&&(!Array.isArray(b.bay171)||b.bay171.length!==4||!b.bay171.every(Number.isFinite)||b.bay171[1]<=b.bay171[0]||b.bay171[3]<=b.bay171[2]))fail('已保存次梁 bay 無效');num(b.b,.001,20,'已保存梁寬無效');num(b.d,.001,30,'已保存梁深無效');}}}
+  for(const [key,t] of Object.entries(p.types)){for(const row of [...t.beams||[],...t.autoBeamSnapshot?.main||[],...t.autoBeamSnapshot?.secondary||[],...t.autoBeamSnapshot?.primary||[]])delete row.typeMode175;if(t.cbColumnWidth171!==true&&Array.isArray(t.beams)){for(const b of [...t.beams,...t.autoBeamSnapshot?.secondary||[],...t.autoBeamSnapshot?.primary||[]])if(b.kind==='CB'){b.widthMode='column';if(t.beamWidths83){const a=Array.isArray(b.rawA)?b.rawA:resolve(p,b.a,key),z=Array.isArray(b.rawZ)?b.rawZ:resolve(p,b.z,key);delete t.beamWidths83[sig(a,z)];}}t.cbColumnWidth171=true;}if(t.columnDefaults101)for(const k of ['cb','cd'])num(t.columnDefaults101[k],1,20000,'Framing 默认柱尺寸无效：'+k);if(t.autoBeams101!==undefined&&typeof t.autoBeams101!=='boolean')fail('自动排梁设置无效');
+   if(t.autoBeamSnapshot!==undefined){const snap=t.autoBeamSnapshot;if(!snap||typeof snap!=='object'||Array.isArray(snap)||Object.keys(snap).some(k=>!['main','primary','secondary'].includes(k)))fail('已保存梁布置無效');const ids=new Set();for(const group of ['main','primary','secondary']){if(snap[group]===undefined)continue;if(!Array.isArray(snap[group])||snap[group].length>5000)fail('已保存梁布置過多');for(const b of snap[group]){if(!b||typeof b.id!=='string'||!b.id||ids.has(b.id)||!(group==='main'?['MB']:group==='primary'?['CB','TB']:['SB','CB']).includes(b.kind))fail('已保存梁資料無效');ids.add(b.id);for(const field of ['a','z','rawA','rawZ'])if(!Array.isArray(b[field])||b[field].length!==2||!b[field].every(Number.isFinite))fail('已保存梁座標無效');if(!near(b.a[0],b.z[0])&&!near(b.a[1],b.z[1])||Math.hypot(b.a[0]-b.z[0],b.a[1]-b.z[1])<eps)fail('已保存梁方向無效');if(b.bay171!==undefined&&(!Array.isArray(b.bay171)||b.bay171.length!==4||!b.bay171.every(Number.isFinite)||b.bay171[1]<=b.bay171[0]||b.bay171[3]<=b.bay171[2]))fail('已保存次梁 bay 無效');if(b.widthMode!==undefined&&!['column','default','manual'].includes(b.widthMode))fail('已保存梁寬模式無效');if(b.depthOverride184!=null)num(b.depthOverride184,1,20000,'指定梁深無效');num(b.b,.001,20,'已保存梁寬無效');num(b.d,.001,30,'已保存梁深無效');}}}
    if(t.autoBeamSnapshot?.secondary?.some(b=>b.kind==='CB')){const snap=t.autoBeamSnapshot;snap.primary=[...snap.primary||[],...snap.secondary.filter(b=>b.kind==='CB')];snap.secondary=snap.secondary.filter(b=>b.kind!=='CB');}
    if(t.beamLayout116!==undefined){const v=t.beamLayout116;if(!v||typeof v!=='object'||typeof v.main!=='boolean'||typeof v.secondary!=='boolean'||v.columnsOnly!==undefined&&typeof v.columnsOnly!=='boolean'||v.shortSpanMain!==undefined&&typeof v.shortSpanMain!=='boolean'||!['XY','X','Y'].includes(v.mainDirection)||!['自动','X','Y'].includes(v.secondaryDirection)||!['all','selected'].includes(v.scope))fail('梁布置设置无效');num(v.gap,100,20000,'次梁间距须为 100–20000 mm');}
    if(t.slabDirections116!==undefined){const v=t.slabDirections116;if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).length>4000||Object.entries(v).some(([k,d])=>!k.startsWith('SLAB|')||!['X','Y'].includes(d)))fail('板受力方向设置无效');}
-   if(t.beamWidths83!==undefined){if(!t.beamWidths83||typeof t.beamWidths83!=='object'||Array.isArray(t.beamWidths83))fail('自动梁宽记录无效');for(const value of Object.values(t.beamWidths83))num(value,1,20000,'自动梁宽无效');}const grid=axisData(p,key);validateAxes(grid);validateColumnPositions(t,grid);if(t.columnPlacements!==undefined){if(!Array.isArray(t.columnPlacements)||t.columnPlacements.length>2000)fail('柱对齐记录无效');const seen=new Set();for(const r of t.columnPlacements){if(typeof r.key!=='string'||seen.has(r.key))fail('柱对齐定位重复');seen.add(r.key);num(r.x,-5000,10000,'柱对齐 X 无效');num(r.y,-5000,10000,'柱对齐 Y 无效');}}
+   if(t.beamDepths201!==undefined){if(!t.beamDepths201||typeof t.beamDepths201!=='object'||Array.isArray(t.beamDepths201))fail('指定梁深記錄無效');for(const value of Object.values(t.beamDepths201))num(value,1,20000,'指定梁深無效');}if(t.beamWidths83!==undefined){if(!t.beamWidths83||typeof t.beamWidths83!=='object'||Array.isArray(t.beamWidths83))fail('自动梁宽记录无效');for(const value of Object.values(t.beamWidths83))num(value,1,20000,'自动梁宽无效');}const grid=axisData(p,key);validateAxes(grid);validateColumnPositions(t,grid);if(t.columnPlacements!==undefined){if(!Array.isArray(t.columnPlacements)||t.columnPlacements.length>2000)fail('柱对齐记录无效');const seen=new Set();for(const r of t.columnPlacements){if(typeof r.key!=='string'||seen.has(r.key))fail('柱对齐定位重复');seen.add(r.key);num(r.x,-5000,10000,'柱对齐 X 无效');num(r.y,-5000,10000,'柱对齐 Y 无效');if(r.resize174){num(r.resize174.x,-5000,10000,'柱基準 X 無效');num(r.resize174.y,-5000,10000,'柱基準 Y 無效');for(const d of ['dx','dy'])if(![-1,0,1].includes(r.resize174[d]))fail('柱定位方向無效');}if(r.resizeOrigin174){num(r.resizeOrigin174.x,-5000,10000,'柱原中心 X 無效');num(r.resizeOrigin174.y,-5000,10000,'柱原中心 Y 無效');}}}
    if(t.columnGrid){for(const d of ['x','y']){const ar=t.columnGrid[d];if(!Array.isArray(ar)||ar.length<2||ar.length>40)fail('柱轴线每方向须为 2–40 条');ar.forEach((v,i)=>{num(v,-5000,10000,'柱轴线坐标无效');if(i&&v-ar[i-1]<.001)fail('柱轴线坐标须递增且间距至少 0.001 m');});}for(const d of ['targetX','targetY'])num(t.columnGrid[d],.001,500,'目标柱间距无效');}
    if(t.secondaryAreas!==undefined){if(!Array.isArray(t.secondaryAreas)||t.secondaryAreas.length>100)fail('次梁区域最多 100 个');const ids=new Set(),all=[];for(const z of t.secondaryAreas){if(typeof z.id!=='string'||!z.id||ids.has(z.id)||typeof z.name!=='string'||!z.name.trim()||z.name.length>80)fail('次梁区域名称／编号无效');ids.add(z.id);if(!['X','Y'].includes(z.direction))fail('次梁区域方向须为 X 或 Y');if(z.gap!==null)num(z.gap,100,20000,'区域次梁间距须为 100–20000 mm');if(!Array.isArray(z.rects)||!z.rects.length||z.rects.length>400)fail('次梁区域梁格记录无效');for(const r of z.rects){for(const k of ['x0','x1','y0','y1'])num(r[k],-5000,10000,'次梁区域坐标无效');if(r.x1<=r.x0||r.y1<=r.y0)fail('次梁区域范围无效');if(all.some(q=>intersectArea(r,q)>eps))fail('次梁区域不能重叠');all.push(r);if(all.length>400)fail('次梁区域最多覆盖 400 个梁格');}}}
    if(t.noColumnZones!==undefined){if(!Array.isArray(t.noColumnZones)||t.noColumnZones.length>400)fail('禁柱区最多 400 个');for(const r of t.noColumnZones){for(const k of ['x0','x1','y0','y1'])num(r[k],-5000,10000,'禁柱区坐标无效');if(r.x1-r.x0<.001||r.y1-r.y0<.001)fail('禁柱区须有有效宽度和高度');}}
@@ -102,12 +119,12 @@ const Engine=(()=>{
    if(t.alignmentMinSpacing!==undefined)num(t.alignmentMinSpacing,0,500,'对齐柱距限制无效');
    if(!['manual','auto'].includes(t.mode))fail('柱模式无效');
    for(const layer of ['building','opening']){if(!t[layer]||typeof t[layer]!=='object'||Object.keys(t[layer]).length>400)fail('区域数据无效');for(const [k,v] of Object.entries(t[layer]))if(!/^\d+,\d+$/.test(k)||typeof v!=='boolean')fail('区域格数据无效');}
-   for(const list of ['columns','walls','beams']){if(!Array.isArray(t[list])||t[list].length>2000)fail('构件数过多');const ids=new Set();for(const c of t[list]){if(typeof c.id!=='string'||!c.id||c.id.length>50||ids.has(c.id))fail(key+' 构件编号重复或无效');ids.add(c.id);num(c.b,1,20000,'构件宽度无效');if(typeof c.on!=='boolean')fail('启用状态无效');if(list==='columns'){if(c.transferColumn!==undefined&&typeof c.transferColumn!=='boolean')fail('Transfer column 标记无效');point(c,key);num(c.d,1,20000,'柱 D 无效');if(!['上下贯通','下层柱','上层柱'].includes(c.status))fail('柱状态无效');}else{point(c.a,key);point(c.z,key);if(list==='walls'&&c.axisPosition!==undefined){const a=resolve(p,c.a,key),z=resolve(p,c.z,key);if(!(near(a[1],z[1])?['auto','up','center','down']:['auto','left','center','right']).includes(c.axisPosition))fail('墙轴线位置与方向不符');}if(list==='beams'){if(c.widthMode!==undefined&&!['column','manual'].includes(c.widthMode))fail('梁宽模式无效');if(!['MB','SB','TB','CB'].includes(c.kind))fail('梁种类无效');if(c.d!==null)num(c.d,1,20000,'梁深无效');}}}}
+   for(const list of ['columns','walls','beams']){if(!Array.isArray(t[list])||t[list].length>2000)fail('构件数过多');const ids=new Set();for(const c of t[list]){if(typeof c.id!=='string'||!c.id||c.id.length>50||ids.has(c.id))fail(key+' 构件编号重复或无效');ids.add(c.id);num(c.b,1,20000,'构件宽度无效');if(typeof c.on!=='boolean')fail('启用状态无效');if(list==='columns'){for(const field of ['bMode201','dMode201'])if(c[field]!==undefined&&!['default','manual'].includes(c[field]))fail('柱尺寸模式無效');if(c.transferColumn!==undefined&&typeof c.transferColumn!=='boolean')fail('Transfer column 标记无效');point(c,key);num(c.d,1,20000,'柱 D 无效');if(!['上下贯通','下层柱','上层柱'].includes(c.status))fail('柱状态无效');}else{point(c.a,key);point(c.z,key);if(list==='walls'&&c.axisPosition!==undefined){const a=resolve(p,c.a,key),z=resolve(p,c.z,key);if(!(near(a[1],z[1])?['auto','up','center','down']:['auto','left','center','right']).includes(c.axisPosition))fail('墙轴线位置与方向不符');}if(list==='beams'){if(c.widthMode!==undefined&&!['column','manual','default'].includes(c.widthMode))fail('梁宽模式无效');for(const [field,modes] of [['positionMode175',['fixed','follow']]])if(c[field]!==undefined&&!modes.includes(c[field]))fail('梁跟隨設定無效');for(const field of ['fixedA175','fixedZ175'])if(c[field]!==undefined&&(!Array.isArray(c[field])||c[field].length!==2||!c[field].every(Number.isFinite)))fail('固定梁位置無效');if(!['MB','SB','TB','CB'].includes(c.kind))fail('梁种类无效');if(c.d!==null)num(c.d,1,20000,'梁深无效');if(c.depthOverride184!=null)num(c.depthOverride184,1,20000,'指定梁深無效');}}}}
    if(!Array.isArray(t.suppressed)||t.suppressed.length>2000||t.suppressed.some(s=>typeof s!=='string'))fail('梁覆盖记录无效');
    if(t.suppressedColumns!==undefined){if(!Array.isArray(t.suppressedColumns)||t.suppressedColumns.length>400)fail('柱删除记录无效');for(const c of t.suppressedColumns)if(!columnRecordValid(grid,c))fail('柱删除记录的轴名无效');}
    if(t.slabVoids!==undefined){if(!Array.isArray(t.slabVoids)||t.slabVoids.length>4000)fail('楼板删除记录过多');for(const r of t.slabVoids){for(const k of ['x0','x1','y0','y1'])num(r[k],-5000,10000,'楼板删除坐标无效');if(r.x1<=r.x0||r.y1<=r.y0)fail('楼板删除范围无效');}}
    if(t.transferColumns!==undefined){if(!Array.isArray(t.transferColumns)||t.transferColumns.length>400)fail('Transfer column 记录无效');for(const c of t.transferColumns)if(!columnRecordValid(grid,c))fail('Transfer column 轴名无效');}
-   if(t.columnSizes!==undefined){if(!Array.isArray(t.columnSizes)||t.columnSizes.length>400)fail('柱尺寸记录无效');for(const c of t.columnSizes){if(!columnRecordValid(grid,c))fail('柱尺寸轴名无效');num(c.b,1,20000,'柱 B 无效');num(c.d,1,20000,'柱 D 无效');}}
+   if(t.columnSizes!==undefined){if(!Array.isArray(t.columnSizes)||t.columnSizes.length>400)fail('柱尺寸记录无效');for(const c of t.columnSizes){for(const field of ['bMode201','dMode201'])if(c[field]!==undefined&&!['default','manual'].includes(c[field]))fail('柱尺寸模式無效');if(!columnRecordValid(grid,c))fail('柱尺寸轴名无效');num(c.b,1,20000,'柱 B 无效');num(c.d,1,20000,'柱 D 无效');}}
    if(t.slabSizes!==undefined){if(!Array.isArray(t.slabSizes)||t.slabSizes.length>4000)fail('板厚记录无效');for(const s of t.slabSizes){if(typeof s.signature!=='string')fail('板厚范围无效');num(s.value,1,20000,'板厚无效');}}
   }
   if(typeof LocalHeights96!=="undefined")LocalHeights96.validate(p);
@@ -144,6 +161,8 @@ const Engine=(()=>{
  const sig=(a,z)=>[a,z].map(v=>v.map(n=>n.toFixed(5)).join(',')).sort().join('|');
  function covered(list,a,z){const h=near(a[1],z[1]),idx=h?0:1,fix=h?1:0;let at=Math.min(a[idx],z[idx]),end=Math.max(a[idx],z[idx]);const intervals=list.filter(m=>near(m.rawA[fix],a[fix])&&near(m.rawZ[fix],a[fix])).map(m=>[Math.min(m.rawA[idx],m.rawZ[idx]),Math.max(m.rawA[idx],m.rawZ[idx])]).sort((a,b)=>a[0]-b[0]);for(const [lo,hi]of intervals){if(lo>at+eps)break;if(hi>at)at=hi;}return at>=end-eps;}
  const columnRect=c=>({x:c.cx??c.x,y:c.cy??c.y,w:c.b,d:c.d});
+ // Vertical column loads act at the physical section centre, independently of its grid reference.
+ const columnLoadPoint=c=>{const r=columnRect(c);return [r.x,r.y];};
  // Optional section offsets. Missing records leave automatic placement byte-for-byte unchanged.
  const columnDirections={center:[0,0],up:[0,-1],down:[0,1],left:[-1,0],right:[1,0],'up-left':[-1,-1],'up-right':[1,-1],'down-left':[-1,1],'down-right':[1,1]};
  const columnPositionKey=c=>c.anchorX!==undefined?'axis:'+c.anchorX+'|'+c.anchorY:'id:'+c.id;
@@ -173,6 +192,36 @@ const Engine=(()=>{
   }
   for(const c of columns){const q=columnRect(c),cross0=horizontal?q.y-q.d/2:q.x-q.w/2,cross1=horizontal?q.y+q.d/2:q.x+q.w/2,a=Math.max(lo,horizontal?q.x-q.w/2:q.y-q.d/2),z=Math.min(hi,horizontal?q.x+q.w/2:q.y+q.d/2);if(cross0<=side0+eps&&cross1>=side1-eps&&z>a+eps)covered.push({lo:a,hi:z,other:c});}
   covered.sort((a,b)=>a.lo-b.lo);let end=lo;for(const part of covered){if(part.lo>end+eps)break;end=Math.max(end,part.hi);if(end>=hi-eps)return part.other;}return null;
+ }
+ // Derived cantilevers retain their original record identity for saved inputs.
+ function beamIdentity173(b){return b.cantileverOrigin173||b;}
+ function extendCantilever173(b,root,ts,beams,columns,issue){
+  if(b.positionMode175==='fixed')return;
+  const free=root==='a'?'z':'a',axis=near(b.a[1],b.z[1])?0:1,sign=Math.sign(b[free][axis]-b[root][axis]);if(!sign)return;
+  const start=b[free][axis],cuts=unique(ts.flatMap(t=>axis?[t.y0,t.y1]:[t.x0,t.x1])).filter(v=>(v-start)*sign>eps).sort((a,z)=>(a-z)*sign);let boundary=start;
+  for(const cut of cuts){const mid=(boundary+cut)/2,q=[...b[free]];q[axis]=mid;const length=Math.abs(cut-boundary);if(!rectAllowed(ts,q[0],q[1],axis?b.b:length,axis?length:b.b,true))break;boundary=cut;}
+  if(near(boundary,start))return;
+  const candidate={...b,a:[...b.a],z:[...b.z]};candidate[free][axis]=boundary;const r=rect(candidate);
+  if(!rectAllowed(ts,r.x,r.y,r.w,r.d)||beamSpaceConflict(candidate,beams.filter(v=>v!==b),columns)){issue(b.id,'CB 自由端延伸至外邊界會穿越 Opening 或與梁重疊，保留原端點待核對');return;}
+  b[free]=candidate[free];b[free==='a'?'rawA':'rawZ']=[...b[free==='a'?'rawA':'rawZ']];b[free==='a'?'rawA':'rawZ'][axis]=boundary;
+ }
+ function resolveCantilevers173(p,key,ts,beams,columns,walls,issue){
+  if(typeof Loading==='undefined')return;
+  const f=floors(p).find(v=>v.type===key)?.n;if(!f)return;
+  for(const b of beams)b.displayKind=b.kind;
+  const model=()=>({key,ts,beams,columns,walls}),result=()=>({floors:floors(p),models:{[key]:model()}});
+  const status=()=>new Map(Loading.supportModel(p,model(),f).beams.map(b=>[b.id,b.supportStatus]));
+  const held=(b,end,states)=>{const choices=Loading.supportOptions(model(),b,end),manual=Loading.manualSupport(p,model(),f,b,end);if(manual)return !manual.invalid&&(manual.type!=='BEAM'||states.get(manual.member.id)==='connected');
+   const direct=choices.filter(v=>v.type!=='BEAM');if(direct.length)return direct.some(v=>v.type==='WALL')||direct.length===1;
+   const q=end==='a'?b.rawA:b.rawZ,hits=choices.filter(v=>{if(v.type!=='BEAM'||states.get(v.member.id)!=='connected')return false;const c=Loading.contact(q,v.member),len=Math.hypot(v.member.rawZ[0]-v.member.rawA[0],v.member.rawZ[1]-v.member.rawA[1]);return c&&c.x>eps&&c.x<len-eps;});return hits.length===1;
+  };
+  for(const b of beams.filter(b=>b.kind==='CB'&&b.extendToBoundary173)){const root=Loading.cbRoot(p,result(),f,b);if(root.fixedEnd)extendCantilever173(b,root.fixedEnd,ts,beams,columns,issue);}
+  let states=status();const candidates=beams.filter(b=>b.kind==='MB'&&states.get(b.id)!=='connected'&&held(b,'a',states)!==held(b,'z',states)),labels=new Map(candidates.map((b,i)=>[b.id,'CB-'+String(i+1).padStart(2,'0')])),used=new Set(beams.map(b=>b.id));
+  candidates.sort((a,b)=>Math.hypot(a.z[0]-a.a[0],a.z[1]-a.a[1])-Math.hypot(b.z[0]-b.a[0],b.z[1]-b.a[1])||a.id.localeCompare(b.id));
+  for(const b of candidates){states=status();if(states.get(b.id)==='connected')continue;const ha=held(b,'a',states),hz=held(b,'z',states);if(ha===hz)continue;
+   const root=ha?'a':'z';b.cantileverOrigin173={a:[...b.a],z:[...b.z],rawA:[...b.rawA],rawZ:[...b.rawZ]};b.baseKind='MB';b.kind=b.displayKind='CB';b.autoCantilever173=true;b.fixedEnd101=root;b.displayId=labels.get(b.id);while(used.has(b.displayId))b.displayId+='A';used.add(b.displayId);
+   extendCantilever173(b,root,ts,beams,columns,issue);
+  }
  }
  // MB / CB / TB form primary bay boundaries; SB never defines a bay.
  function beamBays171(edges,ts,key){
@@ -226,11 +275,35 @@ const Engine=(()=>{
   }
   beams.splice(0,beams.length,...out);
  }
+ // Existing/manual SBs obey the same primary-bay boundaries as newly generated SBs.
+ function splitSecondarySpans200(p,key,beams,receivers,issue){
+  const reserved=new Set(beams.map(b=>b.id)),out=[];
+  for(const b of beams){if(b.kind!=='SB'){out.push(b);continue;}
+   const axis=near(b.a[1],b.z[1])?0:1,cross=1-axis,sign=Math.sign(b.z[axis]-b.a[axis]),cuts=[];
+   for(const support of receivers){if(near(support.a[cross],support.z[cross]))continue;
+    const point=[...b.a];point[axis]=support.a[axis];
+    if((point[axis]-b.a[axis])*sign<=eps||(b.z[axis]-point[axis])*sign<=eps||!on(point,support))continue;
+    cuts.push({value:point[axis],raw:support.rawA[axis]});
+   }
+   cuts.sort((a,z)=>(a.value-z.value)*sign);const uniqueCuts=cuts.filter((v,i)=>!i||!near(v.value,cuts[i-1].value));
+   if(!uniqueCuts.length){out.push(b);continue;}
+   const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null,hasInput=token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length);
+   if(hasInput){issue(b.id,'SB 跨過中間支承，但原跨有構件輸入；保留原梁，請核對並清除原跨輸入後自動分段');out.push(b);continue;}
+   const points=[{value:b.a[axis],raw:b.rawA[axis]},...uniqueCuts,{value:b.z[axis],raw:b.rawZ[axis]}];
+   if(points.some((v,i)=>i&&(v.raw-points[i-1].raw)*sign<=eps)){issue(b.id,'SB 支承中心與參考線次序不一致，請核對後分段');out.push(b);continue;}
+   for(let i=1;i<points.length;i++){const a=[...b.a],z=[...b.z],rawA=[...b.rawA],rawZ=[...b.rawZ];a[axis]=points[i-1].value;z[axis]=points[i].value;rawA[axis]=points[i-1].raw;rawZ[axis]=points[i].raw;
+    if(p.types[key].suppressed.includes(sig(rawA,rawZ)))continue;
+    let id=b.id+'-'+i;while(reserved.has(id))id+='A';reserved.add(id);
+    const part={...b,id,a,z,rawA,rawZ,splitSecondaryParent200:b.id};delete part.columnSupports164;
+    if(part.positionMode175==='fixed'){part.fixedA175=[...a];part.fixedZ175=[...z];}out.push(part);
+   }
+  }beams.splice(0,beams.length,...out);
+ }
  // A user edit/delete of a derived manual span first materializes its siblings.
  function materializeColumnSpans170(p,key,m){
-  const t=p.types[key],parents=new Set(m.beams.filter(b=>b.source==='manual'&&b.splitColumnParent170).map(b=>b.splitColumnParent170));
+  const t=p.types[key],parent=b=>b.splitColumnParent170||b.splitSecondaryParent200,parents=new Set(m.beams.filter(b=>b.source==='manual'&&parent(b)).map(parent));
   if(!parents.size)return;
-  t.beams=t.beams.flatMap(row=>!parents.has(row.id)?[row]:m.beams.filter(b=>b.source==='manual'&&b.splitColumnParent170===row.id).map(b=>({...row,id:b.id,a:{x:b.rawA[0],y:b.rawA[1]},z:{x:b.rawZ[0],y:b.rawZ[1]},b:b.b*1000,d:b.d*1000,edgeInset:true})));
+  t.beams=t.beams.flatMap(row=>!parents.has(row.id)?[row]:m.beams.filter(b=>b.source==='manual'&&parent(b)===row.id).map(b=>({...row,id:b.id,a:{x:b.rawA[0],y:b.rawA[1]},z:{x:b.rawZ[0],y:b.rawZ[1]},b:b.splitSecondaryParent200?row.b:b.b*1000,d:b.splitSecondaryParent200?row.d:b.d*1000,...(b.positionMode175==='fixed'?{fixedA175:clone(b.a),fixedZ175:clone(b.z)}:{}),edgeInset:true})));
  }
  // Resolve crossing automatic MBs in ascending original span order. Only rooted, strictly
  // shorter members can receive a longer member; this gives a directed acyclic load path.
@@ -242,7 +315,7 @@ const Engine=(()=>{
   const held=q=>direct(q)||rooted.filter(x=>interior(q,x.beam)).length===1;
   const ordered=beams.filter(b=>b.kind==='MB').sort((a,b)=>length(a)-length(b)||sig(a.a,a.z).localeCompare(sig(b.a,b.z)));
   for(const b of ordered){const span=length(b),h=horizontal(b),axis=h?0:1,cuts=[];
-   if(b.source==='auto')for(const support of rooted){const s=support.beam;if(support.span>=span-eps||horizontal(s)===h)continue;const q=h?[s.a[0],b.a[1]]:[b.a[0],s.a[1]];if(interior(q,b)&&interior(q,s)&&!direct(q))cuts.push(q[axis]);}
+   if(b.positionMode175!=='fixed')for(const support of rooted){const s=support.beam;if(support.span>=span-eps||horizontal(s)===h)continue;const q=h?[s.a[0],b.a[1]]:[b.a[0],s.a[1]];if(interior(q,b)&&interior(q,s)&&!direct(q))cuts.push(q[axis]);}
    const values=unique([b.a[axis],...cuts,b.z[axis]]);let parts=[b];
    if(values.length>2){const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null,hasInput=token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length);
     if(hasInput)issue(b.id,'交叉長梁已有構件輸入，保留原梁；請先核對輸入後再分段');
@@ -315,35 +388,36 @@ const Engine=(()=>{
   return changed;
  }
  function baseModel(p,key,localRects=[],referenceModel=null){p=scoped(p,key);
-  const t=p.types[key],ts=tiles(p,t).map(tile=>tile.state!==0&&localRects.some(r=>LocalHeights96.overlap(tile,r)>1e-7)?{...tile,state:2}:tile),gs=p.groups.filter(g=>g.type===key),sh=(t.beamDepth??(gs[0]?structuralHeight(gs[0]):600))/1000,min=t.columnGrid?0:t.minColumnSpacing??Math.max(0,...gs.map(g=>g.min)),df={...p.defaults,...t.columnDefaults101},issues=[],walls=[],columns=[],beams=[],panels=[];
+  const t=p.types[key],ts=tiles(p,t).map(tile=>tile.state!==0&&localRects.some(r=>LocalHeights96.overlap(tile,r)>1e-7)?{...tile,state:2}:tile),gs=p.groups.filter(g=>g.type===key),sh=(gs[0]?structuralHeight(gs[0]):600)/1000,sbDepth=(t.beamDepth??600)/1000,min=t.columnGrid?0:t.minColumnSpacing??Math.max(0,...gs.map(g=>g.min)),df={...p.defaults,...t.columnDefaults101},issues=[],walls=[],columns=[],beams=[],panels=[];
   const issue=(id,msg)=>issues.push({type:key,id,msg});
   const layout=t.beamLayout116,autoMain=!t.autoBeamSnapshot?.main&&(layout?.main??(t.autoBeams101!==false)),autoSecondary=!t.autoBeamSnapshot?.secondary&&(layout?.secondary??(t.autoBeams101!==false)),mainDirection=layout?.mainDirection||'XY';
   if(referenceModel)walls.push(...clone(referenceModel.walls));
   for(const c of (referenceModel?[]:t.walls.filter(c=>c.on))){const a=resolve(p,c.a),z=resolve(p,c.z),b=c.b/1000,pos=align(ts,a,z,b,true,c.axisPosition??"auto");if(!pos){issue(c.id,'墙不在有效边界或贴边方向改变，请分段');continue;}walls.push({...c,...pos,b,rawA:a,rawZ:z,kind:'WALL'});}
   const wr=walls.map(rect);
   if(referenceModel){columns.push(...clone(referenceModel.columns));}else{
-  let input=t.columns.filter(c=>c.on).map(c=>({...c,x:resolve(p,c)[0],y:resolve(p,c)[1],b:c.b/1000,d:c.d/1000}));
+  let input=t.columns.filter(c=>c.on).map(c=>({...c,x:resolve(p,c)[0],y:resolve(p,c)[1],b:(c.bMode201==='default'?df.cb:c.b)/1000,d:(c.dMode201==='default'?df.cd:c.d)/1000}));
   {const xx=axes(p,'x'),yy=axes(p,'y');for(const c of input){c.cx=c.x+(near(c.x,xx[0].v)?c.b/2:near(c.x,xx.at(-1).v)?-c.b/2:0);c.cy=c.y+(near(c.y,yy[0].v)?c.d/2:near(c.y,yy.at(-1).v)?-c.d/2:0);}}
-  if(t.mode==='auto'){const added=input.filter(c=>c.autoAdded);input=[];const cx=columnAxes(p,'x',key),cy=columnAxes(p,'y',key);for(const [ix,x]of cx.entries())for(const [iy,y]of cy.entries()){if(noColumn(t,x.v,y.v))continue;if(t.columnGrid&&(t.suppressedColumns||[]).some(q=>q.ax===x.id&&q.ay===y.id))continue;if(added.some(c=>near(c.x,x.v)&&near(c.y,y.v)))continue;const custom=t.columnSizes?.find(q=>q.ax===x.id&&q.ay===y.id),b=(custom?.b??df.cb)/1000,d=(custom?.d??df.cd)/1000;let found=false;for(const dx of [0,b/2,-b/2]){for(const dy of [0,d/2,-d/2]){let id=t.columnGrid?'ACG'+(ix+1)+'_'+(iy+1):'AC'+(input.length+1);while(added.some(c=>c.id===id))id+='A';const c={id,anchorX:x.id,anchorY:y.id,x:x.v+dx,y:y.v+dy,b,d,status:'上下贯通',on:true};const r={...c,w:b};if(!rectAllowed(ts,c.x,c.y,b,d,true)||wr.some(w=>overlap(r,w))||input.some(o=>Math.hypot(c.x-o.x,c.y-o.y)<min-eps||overlap(r,{...o,w:o.b})))continue;input.push(c);found=true;break;}if(found)break;}}input.push(...added);}
-  for(const c of input){const placement=(t.columnPlacements||[]).find(v=>v.key===(c.anchorX!==undefined?'axis:'+c.anchorX+'|'+c.anchorY:'id:'+c.id));if(placement){c.alignmentReference=[c.x,c.y];c.x=c.cx=placement.x;c.y=c.cy=placement.y;c.alignmentNote='已应用柱对齐 · 可撤销';}}
+  if(t.mode==='auto'){const added=input.filter(c=>c.autoAdded);input=[];const cx=columnAxes(p,'x',key),cy=columnAxes(p,'y',key);for(const [ix,x]of cx.entries())for(const [iy,y]of cy.entries()){if(noColumn(t,x.v,y.v))continue;if(t.columnGrid&&(t.suppressedColumns||[]).some(q=>q.ax===x.id&&q.ay===y.id))continue;if(added.some(c=>near(c.x,x.v)&&near(c.y,y.v)))continue;const custom=t.columnSizes?.find(q=>q.ax===x.id&&q.ay===y.id),b=(!custom||custom.bMode201==='default'?df.cb:custom.b)/1000,d=(!custom||custom.dMode201==='default'?df.cd:custom.d)/1000;let found=false;for(const dx of [0,b/2,-b/2]){for(const dy of [0,d/2,-d/2]){let id=t.columnGrid?'ACG'+(ix+1)+'_'+(iy+1):'AC'+(input.length+1);while(added.some(c=>c.id===id))id+='A';const c={id,anchorX:x.id,anchorY:y.id,x:x.v+dx,y:y.v+dy,b,d,bMode201:custom?custom.bMode201??'manual':'default',dMode201:custom?custom.dMode201??'manual':'default',status:'上下贯通',on:true};const r={...c,w:b};if(!rectAllowed(ts,c.x,c.y,b,d,true)||wr.some(w=>overlap(r,w))||input.some(o=>Math.hypot(c.x-o.x,c.y-o.y)<min-eps||overlap(r,{...o,w:o.b})))continue;input.push(c);found=true;break;}if(found)break;}}input.push(...added);}
+  for(const c of input){const placement=(t.columnPlacements||[]).find(v=>v.key===(c.anchorX!==undefined?'axis:'+c.anchorX+'|'+c.anchorY:'id:'+c.id));if(placement){c.alignmentReference=[c.x,c.y];c.x=c.cx=placement.resize174?placement.resize174.x+placement.resize174.dx*c.b/2:placement.x;c.y=c.cy=placement.resize174?placement.resize174.y+placement.resize174.dy*c.d/2:placement.y;c.alignmentNote='已应用柱对齐 · 可撤销';}}
   // Apply only explicit manual section positions after the unchanged auto-column search.
   for(const c of input){const record=columnPositionRecord(t,c);if(record&&!t.columnPlacements?.some(v=>v.key===columnPositionKey(c))){const ref=columnReference(p,key,c),offset=columnDirections[record.position];c.cx=ref[0]+offset[0]*c.b/2;c.cy=ref[1]+offset[1]*c.d/2;c.axisPosition=record.position;}}
-  for(const c of input){if(c.anchorX===undefined&&noColumn(t,c.x,c.y))issue(c.id,'手动柱位于禁柱区内部，请移动或删除；现有柱保留');if(t.mode==='auto'&&c.anchorX!==undefined){const custom=t.columnSizes?.find(o=>o.ax===c.anchorX&&o.ay===c.anchorY);if(custom){c.b=custom.b/1000;c.d=custom.d/1000;}}if(t.mode==='auto'&&c.anchorX!==undefined&&(t.suppressedColumns||[]).some(s=>s.ax===c.anchorX&&s.ay===c.anchorY))continue;const allowed=[-1e-5,1e-5].some(dx=>[-1e-5,1e-5].some(dy=>inside(ts,c.x+dx,c.y+dy,true)));if(!allowed){issue(c.id,'柱位于建筑外，未作为支承');continue;}if(wr.some(w=>overlap(columnRect(c),w))){issue(c.id,'柱与墙重叠，未生成此柱');continue;}columns.push(c);if(!rectAllowed(ts,columnRect(c).x,columnRect(c).y,c.b,c.d,true))issue(c.id,'柱截面跨过建筑边界，请调整坐标');}
+  for(const c of input){if(c.anchorX===undefined&&noColumn(t,c.x,c.y))issue(c.id,'手动柱位于禁柱区内部，请移动或删除；现有柱保留');if(t.mode==='auto'&&c.anchorX!==undefined){const custom=t.columnSizes?.find(o=>o.ax===c.anchorX&&o.ay===c.anchorY);if(custom){c.b=(custom.bMode201==='default'?df.cb:custom.b)/1000;c.d=(custom.dMode201==='default'?df.cd:custom.d)/1000;}}if(t.mode==='auto'&&c.anchorX!==undefined&&(t.suppressedColumns||[]).some(s=>s.ax===c.anchorX&&s.ay===c.anchorY))continue;const allowed=[-1e-5,1e-5].some(dx=>[-1e-5,1e-5].some(dy=>inside(ts,c.x+dx,c.y+dy,true)));if(!allowed){issue(c.id,'柱位于建筑外，未作为支承');continue;}if(wr.some(w=>overlap(columnRect(c),w))){issue(c.id,'柱与墙重叠，未生成此柱');continue;}columns.push(c);if(!rectAllowed(ts,columnRect(c).x,columnRect(c).y,c.b,c.d,true))issue(c.id,'柱截面跨过建筑边界，请调整坐标');}
   }
   for(let i=0;i<columns.length;i++)for(let j=i+1;j<columns.length;j++){const a=columns[i],b=columns[j],limit=Math.max(min,t.alignmentMinSpacing||0),ar=columnRect(a),br=columnRect(b);if(Math.hypot(ar.x-br.x,ar.y-br.y)<limit-eps)issue(a.id+'/'+b.id,'柱距小于 '+limit+' m');if(overlap(ar,br))issue(a.id+'/'+b.id,'柱截面重叠');}
   const support=q=>columns.some(c=>Math.abs(columnRect(c).x-q[0])<=c.b/2+eps&&Math.abs(columnRect(c).y-q[1])<=c.d/2+eps&&c.status!=='上层柱')||walls.some(w=>on(q,{...w,a:w.rawA,z:w.rawZ}));
   // Keep already valid records first: an older, auto-width record must not
   // displace a correctly positioned replacement when its section grows.
   const duplicateCandidates163=[],manualCandidates=t.beams.filter(c=>c.on).map(c=>{
-   const a=resolve(p,c.a),z=resolve(p,c.z),automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?mainBeamWidth(columns,a,z,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??c.b:c.b)/1000;
-   const original=lineAllowed(ts,a,z,b,c.edgeInset===true),pos=original||(automatic?lineAllowed(ts,a,z,b,true):null);
+   const a=resolve(p,c.a),z=resolve(p,c.z),automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?mainBeamWidth(columns,a,z,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??(c.widthMode==='default'?df[c.kind==='SB'?'sb':'mb']:c.b):c.widthMode==='default'?df[c.kind==='TB'?'tb':'mb']:c.b)/1000;
+   const linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns):null,linkedRect=linked&&rect({...linked,b}),fixed=c.positionMode175==='fixed'&&c.fixedA175&&c.fixedZ175?{a:clone(c.fixedA175),z:clone(c.fixedZ175)}:null;
+   const original=fixed||lineAllowed(ts,a,z,b,c.edgeInset===true),pos=linkedRect&&rectAllowed(ts,linkedRect.x,linkedRect.y,linkedRect.w,linkedRect.d)?linked:original||(automatic?lineAllowed(ts,a,z,b,true):null);
    return {c,a,z,b,pos,adjusted:!original&&!!pos};
   }).sort((a,b)=>Number(a.adjusted)-Number(b.adjusted));
   for(const {c,a,z,b,pos,adjusted} of manualCandidates){
-   if(!pos){issue(c.id,'梁越界、穿 Opening 或非正交，未生成');continue;}
+   if(!pos||!rectAllowed(ts,rect({...pos,b}).x,rect({...pos,b}).y,rect({...pos,b}).w,rect({...pos,b}).d)){issue(c.id,'梁越界、穿 Opening 或非正交，未生成');continue;}
    const conflict=beamSpaceConflict({...pos,b},beams,columns);
    if(conflict){const keep=beams.find(v=>v.id===conflict.id),candidate={...c,...pos,b,d:c.d!=null?c.d/1000:sh};if(adjusted&&keep&&sameResizedBeam163(candidate,keep,columns))duplicateCandidates163.push({from:c.id,to:keep.id});issue(c.id,(adjusted?'跟柱寬調整梁截面後，與已存在的 ':'梁截面與 ')+conflict.id+' 重疊，未生成；原記錄保留，請核對重複梁');continue;}
-   beams.push({...c,...pos,b,d:c.d!=null?c.d/1000:c.kind==='SB'?secondaryDepth(Math.hypot(z[0]-a[0],z[1]-a[1]),sh):c.kind==='TB'?df.tbd/1000:sh,rawA:a,rawZ:z,source:'manual',...(adjusted?{sectionAdjusted162:true}:{})});
+   beams.push({...c,...pos,b,d:c.d!=null?c.d/1000:c.kind==='SB'?sbDepth:c.kind==='TB'?df.tbd/1000:sh,rawA:a,rawZ:z,source:'manual',...(adjusted?{sectionAdjusted162:true}:{})});
   }
   // Automatic main beams start/end at actual column section centres, not reference axes or faces.
   const mainColumns=columns.filter(c=>c.status!=='上层柱'),centres=mainColumns.map(c=>({c,r:columnRect(c)}));
@@ -356,17 +430,19 @@ const Engine=(()=>{
    // Snapshots preserve topology; automatic MB and CB widths follow columns.
    // Missing widthMode is a legacy automatic snapshot; explicit widths stay fixed.
    const fixed=t.beamWidths83?.[sig(saved.rawA,saved.rawZ)],automatic=['MB','CB'].includes(saved.kind)&&saved.widthMode!=='manual'&&fixed==null;
-   const followed=automatic&&saved.kind==='MB'?followMainColumns164(p,key,saved,columns):null;
-   const width=automatic?mainBeamWidth(columns,followed?.a||saved.rawA,followed?.z||saved.rawZ,saved.b):fixed!=null?fixed/1000:saved.b;
+   const followed=saved.positionMode175!=='fixed'&&['MB','CB','TB'].includes(saved.kind)?followMainColumns164(p,key,saved,columns):null;
+   const width=automatic?mainBeamWidth(columns,followed?.a||saved.rawA,followed?.z||saved.rawZ,df.mb/1000):fixed!=null?fixed/1000:saved.widthMode!=='manual'?df[saved.kind==='SB'?'sb':saved.kind==='TB'?'tb':'mb']/1000:saved.b;
    const candidate=followed&&{...followed,b:width},box=candidate&&rect(candidate),canFollow=box&&rectAllowed(ts,box.x,box.y,box.w,box.d)&&!beamSpaceConflict(candidate,beams,columns);
-   const pos=canFollow?followed:automatic?lineAllowed(ts,saved.rawA,saved.rawZ,width,true):{a:saved.a,z:saved.z},beam={...clone(saved),...pos,b:width,...(automatic?{widthMode:'column'}:{})};
+   const prior=rect({...saved,b:width}),pos=saved.positionMode175==='fixed'?{a:saved.a,z:saved.z}:canFollow?followed:automatic||!rectAllowed(ts,prior.x,prior.y,prior.w,prior.d)?lineAllowed(ts,saved.rawA,saved.rawZ,width,true):{a:saved.a,z:saved.z},beam={...clone(saved),...pos,b:width,widthMode:fixed!=null?'manual':automatic?'column':saved.widthMode??'default'};
    // Saved automatic candidates outside the current model are dormant records, not current members.
    if(!pos)continue;const r=rect(beam);if(!rectAllowed(ts,r.x,r.y,r.w,r.d)||beamSpaceConflict(beam,beams,columns))continue;
-   beams.push({...beam,d:saved.kind==='SB'?secondaryDepth(Math.hypot(saved.rawZ[0]-saved.rawA[0],saved.rawZ[1]-saved.rawA[1]),sh):sh,source:'auto'});}
-  const add=(a,z,kind)=>{if(exists(a,z)||kind==='MB'&&(exists(legacyPoint(a),legacyPoint(z))||covered(beams.filter(b=>b.source==='manual').map(b=>({...b,rawA:b.a,rawZ:b.z})),a,z)))return;const b=['MB','CB'].includes(kind)?mainBeamWidth(columns,a,z,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(t.beamWidths83?.[sig(a,z)]??df.sb)/1000,pos=kind==='MB'?{a:[...a],z:[...z]}:lineAllowed(ts,a,z,b);if(kind==='MB'){const r=rect({...pos,b});if(!rectAllowed(ts,r.x,r.y,r.w,r.d))return;}if(pos&&!beamSpaceConflict({...pos,b},beams,columns)){let number=1+beams.filter(b=>b.kind===kind&&b.source==='auto').length;while(beams.some(v=>v.id===kind+number))number++;beams.push({id:kind+number,...pos,b,d:kind==='SB'?secondaryDepth(Math.hypot(z[0]-a[0],z[1]-a[1]),sh):sh,kind,rawA:a,rawZ:z,source:'auto'});}};
+   beams.push({...beam,d:saved.kind==='SB'?sbDepth:sh,depthOverride184:t.beamDepths201?.[sig(saved.rawA,saved.rawZ)]??saved.depthOverride184,source:'auto'});}
+  const add=(a,z,kind)=>{if(exists(a,z)||kind==='MB'&&(exists(legacyPoint(a),legacyPoint(z))||covered(beams.filter(b=>b.source==='manual').map(b=>({...b,rawA:b.a,rawZ:b.z})),a,z)))return;const fixed=t.beamWidths83?.[sig(a,z)],b=fixed!=null?fixed/1000:['MB','CB'].includes(kind)?mainBeamWidth(columns,a,z,df.mb/1000):df.sb/1000,pos=kind==='MB'&&fixed==null?{a:[...a],z:[...z]}:lineAllowed(ts,a,z,b,true);if(!pos)return;if(kind==='MB'){const r=rect({...pos,b});if(!rectAllowed(ts,r.x,r.y,r.w,r.d))return;}if(pos&&!beamSpaceConflict({...pos,b},beams,columns)){let number=1+beams.filter(b=>b.kind===kind&&b.source==='auto').length;while(beams.some(v=>v.id===kind+number))number++;beams.push({id:kind+number,...pos,b,d:kind==='SB'?sbDepth:sh,kind,rawA:a,rawZ:z,widthMode:fixed!=null?'manual':['MB','CB'].includes(kind)?'column':'default',depthOverride184:t.beamDepths201?.[sig(a,z)],source:'auto'});}};
   if(autoMain)for(let i=0;i<xs.length;i++)for(let j=0;j<ys.length;j++){const a=[xs[i],ys[j]];if(!mainSupport(a))continue;for(let k=i+1;k<xs.length;k++)if(mainSupport([xs[k],ys[j]])){if(mainDirection!=='Y')add(a,[xs[k],ys[j]],'MB');break;}for(let k=j+1;k<ys.length;k++)if(mainSupport([xs[i],ys[k]])){if(mainDirection!=='X')add(a,[xs[i],ys[k]],'MB');break;}}
   splitColumnMainBeams170(p,key,beams,columns,issue);
-  if(autoMain&&layout?.shortSpanMain)splitLongMainBeams(p,key,beams,columns,walls,issue);
+  if(layout?.shortSpanMain)splitLongMainBeams(p,key,beams,columns,walls,issue);
+  followBeamNetwork165(p,key,beams,columns,walls,ts);
+  resolveCantilevers173(p,key,ts,beams,columns,walls,issue);
   // Rooted CBs are valid receivers for SBs. Use the same directed support graph as Loading.
   const supported=new Set(),primary=beams.filter(b=>b.kind!=='SB');
   const held=q=>support(q)||[...supported].some(b=>on(q,b)||on(q,{...b,a:b.rawA,z:b.rawZ}));
@@ -376,10 +452,11 @@ const Engine=(()=>{
   }else{
    let changed=true;while(changed){changed=false;for(const b of primary){if(supported.has(b))continue;const root=b.fixedEnd101,cb=b.kind==='CB',ok=cb?root==='a'?held(b.rawA):root==='z'?held(b.rawZ):support(b.rawA)!==support(b.rawZ):held(b.rawA)&&held(b.rawZ);if(ok){supported.add(b);changed=true;}}}
   }
+  splitSecondarySpans200(p,key,beams,[...walls,...supported],issue);
   const edges=[...walls,...supported],currentBays171=beamBays171(bayEdges171(edges,columns),ts,key),savedSB171=(t.autoBeamSnapshot?.secondary||[]).filter(b=>b.kind==='SB'),oldBays171=savedSB171.some(b=>!b.bay171)?beamBays171(edges,ts,key):[],changedBays171=new Set();
   // Repair only bays whose primary boundaries changed, retaining other saved spacing.
   for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=b.bay171||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
-   const customized=affected.some(b=>{const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null;return token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length)||t.beamWidths83?.[sig(b.rawA,b.rawZ)]!=null;});
+   const customized=affected.some(b=>{const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null;return token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length)||t.beamWidths83?.[sig(b.rawA,b.rawZ)]!=null||t.beamDepths201?.[sig(b.rawA,b.rawZ)]!=null||b.depthOverride184!=null;});
    if(customized){issue('SB','主梁 bay 已改變，但原次梁有構件輸入；請核對後重新布置該 bay');continue;}changedBays171.add(key171);
   }
   const removedSB171=beams.filter(b=>b.source==='auto'&&b.kind==='SB'&&currentBays171.some(bay=>changedBays171.has(bayKey171(bay))&&beamBay171(b,[bay])));
@@ -393,15 +470,15 @@ const Engine=(()=>{
   for(const area of t.secondaryAreas||[])if(autoSecondary&&area.cbSupported106){const r=area.rects[0],horizontal=area.direction==='X',cb=[...supported].filter(b=>b.kind==='CB'),sides=horizontal?[[[r.x0,r.y0],[r.x0,r.y1]],[[r.x1,r.y0],[r.x1,r.y1]]]:[[[r.x0,r.y0],[r.x1,r.y0]],[[r.x0,r.y1],[r.x1,r.y1]]];if(!sides.every(([a,z])=>covered(cb,a,z))){issue(area.name,'次梁分区的 CB 支承已失效，请核对根部或重画');continue;}if(!panels.some(p=>intersectArea(panelRect(p),r)>eps))panels.push([r.x0,r.x1,r.y0,r.y1]);const first=horizontal?r.y0:r.x0,last=horizontal?r.y1:r.x1,n=Math.ceil((last-first)/((area.gap??layout?.gap??df.gap)/1000));if(n>500)throw Error('次梁间距过小');for(let q=1;q<n;q++){const v=first+(last-first)*q/n;add(horizontal?[r.x0,v]:[v,r.y0],horizontal?[r.x1,v]:[v,r.y1],'SB');}}
   for(const area of t.secondaryAreas||[])if(autoSecondary&&area.cantilever101){const r=area.rects[0],horizontal=area.direction==='X',root=area.root101,first=horizontal?r.y0:r.x0,last=horizontal?r.y1:r.x1,n=Math.ceil((last-first)/((area.gap??layout?.gap??df.gap)/1000));if(n>500)throw Error('次梁间距过小');const rootA=root==='left'?[r.x0,r.y0]:root==='right'?[r.x1,r.y0]:root==='top'?[r.x0,r.y0]:[r.x0,r.y1],rootZ=root==='left'?[r.x0,r.y1]:root==='right'?[r.x1,r.y1]:root==='top'?[r.x1,r.y0]:[r.x1,r.y1];if(!covered(edges,rootA,rootZ)){issue(area.name,'悬挑分区固定边支承已失效，请重画');continue;}for(let q=0;q<=n;q++){const v=first+(last-first)*q/n,a=horizontal?[r.x0,v]:[v,r.y0],z=horizontal?[r.x1,v]:[v,r.y1];add(a,z,'CB');const b=beams.find(b=>sig(b.rawA,b.rawZ)===sig(a,z));if(b&&b.source==='auto'){b.fixedEnd101=['left','top'].includes(root)?'a':'z';b.secondaryCantilever101=area.id;}}}
   for(const area of t.secondaryAreas||[])if(!area.cantilever101&&!area.cbSupported106&&!panels.some(p=>area.rects.some(r=>intersectArea(panelRect(p),r)>eps)))issue(area.name,'次梁区域已无对应的完整梁格，请删除或重画');
-  let cbNumber=0;const reservedIds=new Set(beams.map(b=>b.id));
+  // Actual member kinds and display labels now agree after directed classification.
   for(const b of beams){
    const ok=b.kind==='SB'?held(b.rawA)&&held(b.rawZ):supported.has(b);
    b.supportStatus=ok?'connected':'unverified';
    // An explicit member type wins over the preliminary geometry inference.
    // Loading resolves CB-supported endpoints using the same rules as force transfer.
-   b.displayKind=b.kind==='CB'||b.source!=='manual'&&b.kind!=='SB'&&!ok&&held(b.rawA)!==held(b.rawZ)?'CB':b.kind;
-   b.displayId=b.id;if(b.displayKind==='CB'&&b.kind!=='CB'){do{b.displayId='CB-'+String(++cbNumber).padStart(2,'0');}while(reservedIds.has(b.displayId));}
-   b.supportText=b.kind==='CB'?'Cantilever Beam（手动指定）：固定端在 Member Check 确认，cover 默认随梁 FRR；根部抗弯约束未验算':ok?'两端已有连接到柱／墙的几何支承路径；未验算':b.displayKind==='CB'?'Cantilever Beam（悬臂梁）：一端外伸，根部抗弯约束尚未确认；默认不采用，输入保留': '未建立两端有效支承路径：悬空或互相依赖；默认不采用，输入保留';
+   b.displayKind=b.kind;
+   b.displayId=b.autoCantilever173?b.displayId:b.id;
+   b.supportText=b.autoCantilever173?'CB（自動辨識）：固定端已有幾何支承路径；节点抗弯约束未验算':b.kind==='CB'?'Cantilever Beam（手动指定）：固定端在 Member Check 确认，cover 默认随梁 FRR；根部抗弯约束未验算':ok?'两端已有连接到柱／墙的几何支承路径；未验算':b.displayKind==='CB'?'Cantilever Beam（悬臂梁）：一端外伸，根部抗弯约束尚未确认；默认不采用，输入保留': '未建立两端有效支承路径：悬空或互相依赖；默认不采用，输入保留';
    if(!ok)issue(b.displayId,b.supportText);
   }
   for(const b of beams)if(b.kind==='SB'&&b.displayKind==='CB')b.d=sh;
@@ -528,15 +605,16 @@ const Engine=(()=>{
  function applyFloorBeamDepths(p,result){
   const cache=new WeakMap();
   for(const f of result.floors){const source=floorModel(result,f.n),zones=typeof LocalHeights96!=='undefined'?LocalHeights96.zones(p,f.n):[],signature=JSON.stringify([f.sh,zones.map(z=>[z.rect.x0,z.rect.x1,z.rect.y0,z.rect.y1,z.sh])]);let profiles=cache.get(source);if(!profiles){profiles=new Map();cache.set(source,profiles);}let m=profiles.get(signature);
-   if(!m){const beams=source.beams.map(b=>{if(!['MB','TB','CB'].includes(b.displayKind||b.kind))return b;const r=rect(b),box={x0:r.x-r.w/2,x1:r.x+r.w/2,y0:r.y-r.d/2,y1:r.y+r.d/2},hits=zones.filter(z=>LocalHeights96.overlap(z.rect,box)>eps),mm=hits.length?Math.min(...hits.map(z=>z.sh??0)):f.sh;if(!Number.isFinite(mm)||mm<=0)throw Error(FloorLevels.name(p,f.n)+' · '+b.id+'：結構高度未完整設定');return {...b,d:mm/1000,structuralDepthMm:mm};});m={...source,sh:f.sh/1000,beams};profiles.set(signature,m);}
+   if(!m){const beams=source.beams.map(b=>{if(!['MB','TB','CB','SB'].includes(b.displayKind||b.kind))return b;const r=rect(b),box={x0:r.x-r.w/2,x1:r.x+r.w/2,y0:r.y-r.d/2,y1:r.y+r.d/2},hits=zones.filter(z=>LocalHeights96.overlap(z.rect,box)>eps),mm=hits.length?Math.min(...hits.map(z=>z.sh??0)):f.sh;if(!Number.isFinite(mm)||mm<=0)throw Error(FloorLevels.name(p,f.n)+' · '+b.id+'：結構高度未完整設定');const secondary=(b.displayKind||b.kind)==='SB',requested=b.requestedDepthMm180??b.d*1000;return {...b,d:(b.depthOverride184>0?Math.min(b.depthOverride184,mm):secondary?Math.min(requested,mm):mm)/1000,structuralDepthMm:mm,...(secondary?{requestedDepthMm180:requested,depthCapped180:requested>mm+1e-6}:{})};});m={...source,sh:f.sh/1000,beams};profiles.set(signature,m);}
    result.floorModels[f.n]=m;
   }
   return result;
  }
 
  // One landing resolver is shared by classification, area transfer and point-load transfer.
+ // A column centre may lie off the beam axis within its width; its longitudinal projection sets the station.
  function transferBeamAt(p,m,f,point){
-  const contact=b=>{const a=b.rawA||b.a,z=b.rawZ||b.z,dx=z[0]-a[0],dy=z[1]-a[1],len=Math.hypot(dx,dy);if(len<eps)return false;const t=((point[0]-a[0])*dx+(point[1]-a[1])*dy)/(len*len);return t>=-eps&&t<=1+eps&&Math.abs((point[0]-a[0])*dy-(point[1]-a[1])*dx)<=eps*len;};
+  const contact=b=>{const a=b.rawA||b.a,z=b.rawZ||b.z,dx=z[0]-a[0],dy=z[1]-a[1],len=Math.hypot(dx,dy);if(len<eps)return false;const t=((point[0]-a[0])*dx+(point[1]-a[1])*dy)/(len*len);return t>=-eps&&t<=1+eps&&Math.abs((point[0]-a[0])*dy-(point[1]-a[1])*dx)<=(Math.max(0,b.b||0)/2+eps)*len;};
   const endpoint=b=>[b.rawA||b.a,b.rawZ||b.z].findIndex(q=>Math.hypot(q[0]-point[0],q[1]-point[1])<eps),hits=m.beams.filter(contact);
   if(hits.length===1)return hits[0];
   const through=hits.filter(b=>endpoint(b)<0);if(through.length!==1)return null;const target=through[0];
@@ -548,7 +626,7 @@ const Engine=(()=>{
   for(let i=1;i<result.floors.length;i++){
    const lower=result.floors[i-1],upper=result.floors[i],dn=floorModel(result,lower.n),up=floorModel(result,upper.n);let resolved=null;
    for(const c of up.columns.filter(c=>c.status!=='上层柱')){
-    const matches=dn.columns.filter(d=>d.status!=='上层柱'&&overlap(columnRect(c),columnRect(d))),point=columnReference(p,up.key,c);
+    const matches=dn.columns.filter(d=>d.status!=='上层柱'&&overlap(columnRect(c),columnRect(d))),point=columnLoadPoint(c);
     if(matches.length||dn.walls.some(w=>on(point,w)))continue;
     resolved??=typeof Loading!=='undefined'?Loading.supportModel(p,dn,lower.n):dn;
     const target=transferBeamAt(p,resolved,lower.n,point);
@@ -572,10 +650,10 @@ const Engine=(()=>{
    result.floorModels[f.n]={...m,beams};
   }
  }
- function generate(p){for(const t of Object.values(p.types)){if(t.alignmentMinSpacing!=null){t.minColumnSpacing=Math.max(t.minColumnSpacing||0,t.alignmentMinSpacing);delete t.alignmentMinSpacing;}}validate(p);for(const [key,t]of Object.entries(p.types))if(t.beamDepth==null){const g=p.groups.find(g=>g.type===key);t.beamDepth=g?structuralHeight(g):600;}const fs=floors(p),models=alignedModels(p,fs),floorModels=typeof FloorColumns101!=='undefined'?FloorColumns101.models(p,fs):{},issues=[];const result={models,floorModels,issues,floors:fs};const final=typeof LocalHeights96!=="undefined"?LocalHeights96.build(p,result,baseModel):result;for(const f of fs)final.issues.push(...floorModel(final,f.n).issues.map(q=>({...q,floor:f.n})));applyAutoTransferBeams(p,final);nameTransferBeams(final);
+ function generate(p){for(const t of Object.values(p.types)){if(t.alignmentMinSpacing!=null){t.minColumnSpacing=Math.max(t.minColumnSpacing||0,t.alignmentMinSpacing);delete t.alignmentMinSpacing;}}validate(p);for(const t of Object.values(p.types))if(t.beamDepth==null)t.beamDepth=600;const fs=floors(p),models=alignedModels(p,fs),floorModels=typeof FloorColumns101!=='undefined'?FloorColumns101.models(p,fs):{},issues=[];const result={models,floorModels,issues,floors:fs};const final=typeof LocalHeights96!=="undefined"?LocalHeights96.build(p,result,baseModel):result;for(const f of fs)final.issues.push(...floorModel(final,f.n).issues.map(q=>({...q,floor:f.n})));applyAutoTransferBeams(p,final);nameTransferBeams(final);
   for(let i=1;i<fs.length;i++){
    const up=floorModel(final,fs[i].n),dn=floorModel(final,fs[i-1].n),supports=[...dn.walls,...dn.beams.filter(b=>b.kind==='TB')];
-   for(const c of up.columns.filter(c=>c.status!=='上层柱')){const matches=dn.columns.filter(d=>d.status!=='上层柱'&&overlap(columnRect(c),columnRect(d))),point=columnReference(p,up.key,c),beam=transferBeamAt(p,dn,fs[i-1].n,point);if(matches.length!==1&&(matches.length||!dn.walls.some(w=>on(point,w))&&beam?.kind!=='TB'))final.issues.push({type:up.key,floor:fs[i].n,id:c.id,msg:fs[i].n+'/F 上層柱與下層支承關係待確認；請核對柱、牆及 TB'});}
+   for(const c of up.columns.filter(c=>c.status!=='上层柱')){const matches=dn.columns.filter(d=>d.status!=='上层柱'&&overlap(columnRect(c),columnRect(d))),point=columnLoadPoint(c),beam=transferBeamAt(p,dn,fs[i-1].n,point);if(matches.length!==1&&(matches.length||!dn.walls.some(w=>on(point,w))&&beam?.kind!=='TB'))final.issues.push({type:up.key,floor:fs[i].n,id:c.id,msg:fs[i].n+'/F 上層柱與下層支承關係待確認；請核對柱、牆及 TB'});}
    for(const w of up.walls){const r=rect(w),horizontal=near(w.a[1],w.z[1]),eligible=supports.filter(s=>{const rr=rect(s);return horizontal?Math.abs(rr.y-r.y)+r.d/2<=rr.d/2+eps:Math.abs(rr.x-r.x)+r.w/2<=rr.w/2+eps;}).map(s=>({...s,rawA:s.a,rawZ:s.z}));if(!covered(eligible,w.a,w.z))final.issues.push({type:up.key,id:w.id,msg:fs[i].n+'/F 墙与下层墙／TB 不连续，请核对支承'});}
   }
   applyFloorBeamDepths(p,final);for(const f of final.floors){const m=floorModel(final,f.n),local=typeof LocalHeights96!=='undefined'&&LocalHeights96.hasClearance(p,f.n),deep=m.beams.filter(b=>b.d*1000>(local?LocalHeights96.beamAllowance(p,f.n,b):f.sh)+1e-6);if(deep.length)final.issues.push({type:f.type,floor:f.n,id:deep.map(b=>b.displayId||b.id).join('、'),msg:FloorLevels.name(p,f.n)+'：'+deep.length+' 根梁深超过'+(local?'本层／局部结构预留高度':'本层结构预留高度 '+f.sh+' mm')+'；Framing 截面保持不变，请检查净高安排'});}if(reconcileResizedBeams163(p,final))return generate(p);slabGeometry.migrate(p,final);return final;}
@@ -638,19 +716,36 @@ const Engine=(()=>{
  function removeBeam(p,key,id,kind,f){
   const t=p.types[key];if(!t)throw Error('Framing 类型不存在');
   const b=(f?floorModel(generate(p),f,key):model(p,key)).beams.find(b=>b.id===id&&b.kind===kind);if(!b)throw Error('所选梁已不存在');
-  if(b.splitMainParent){const m=f?floorModel(generate(p),f,key):model(p,key);materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}
+  if(b.splitMainParent||b.splitSecondaryParent200){const m=f?floorModel(generate(p),f,key):model(p,key);materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}
   if(b.source==='manual'){const i=t.beams.findIndex(c=>c.id===id&&c.kind===(b.baseKind||kind));if(i<0)throw Error('原始梁已不存在');t.beams.splice(i,1);}
-  const signature=sig(b.rawA,b.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);
+  const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);
  }
  const slabSignature=s=>s.rects.map(r=>[r.x0,r.x1,r.y0,r.y1].map(v=>v.toFixed(6)).join(',')).sort().join('|');
  function editSize(p,key,hit,size){
-  const t=p.types[key],m=hit.f?floorModel(generate(p),hit.f,key):model(p,key),number=(v,name)=>{if(v!==null&&(!Number.isFinite(v)||v<1||v>20000))throw Error(name+' 须为 1–20000 mm，或留空恢复默认');};number(size.b,'B / 厚度');if(!['MB','TB','CB'].includes(size.kind??hit.kind))number(size.d,'D');
+  const t=p.types[key],m=hit.f?floorModel(generate(p),hit.f,key):model(p,key),number=(v,name)=>{if(v!==null&&(!Number.isFinite(v)||v<1||v>20000))throw Error(name+' 须为 1–20000 mm，或留空恢复默认');};number(size.b,'B / 厚度');if(size.depthOverride184||!['MB','TB','CB'].includes(size.kind??hit.kind))number(size.d,'D');
   if(hit.kind==='SLAB'){const s=m.slabs.find(s=>s.id===hit.slabId);if(!s)throw Error('板块已不存在');const signature=slabSignature(s);t.slabSizes=(t.slabSizes||[]).filter(s=>s.signature!==signature);if(size.b!==null)t.slabSizes.push({signature,value:size.b});return;}
-  if(hit.kind==='COL'){const c=m.columns.find(c=>c.id===hit.id);if(!c)throw Error('柱已不存在');if(t.mode==='auto'&&c.anchorX!==undefined){t.columnSizes=(t.columnSizes||[]).filter(o=>o.ax!==c.anchorX||o.ay!==c.anchorY);if(size.b!==null||size.d!==null)t.columnSizes.push({ax:c.anchorX,ay:c.anchorY,b:size.b??p.defaults.cb,d:size.d??p.defaults.cd});}else{const row=t.columns.find(c=>c.id===hit.id);row.b=size.b??p.defaults.cb;row.d=size.d??p.defaults.cd;}return;}
+  if(hit.kind==='COL'){const c=m.columns.find(c=>c.id===hit.id);if(!c)throw Error('柱已不存在');if(t.mode==='auto'&&c.anchorX!==undefined){t.columnSizes=(t.columnSizes||[]).filter(o=>o.ax!==c.anchorX||o.ay!==c.anchorY);if(size.b!==null||size.d!==null)t.columnSizes.push({ax:c.anchorX,ay:c.anchorY,b:size.b??t.columnDefaults101?.cb??p.defaults.cb,d:size.d??t.columnDefaults101?.cd??p.defaults.cd,bMode201:size.b==null?'default':'manual',dMode201:size.d==null?'default':'manual'});}else{const row=t.columns.find(c=>c.id===hit.id);row.b=size.b??t.columnDefaults101?.cb??p.defaults.cb;row.d=size.d??t.columnDefaults101?.cd??p.defaults.cd;row.bMode201=size.b==null?'default':'manual';row.dMode201=size.d==null?'default':'manual';}return;}
   if(hit.kind==='WALL'){const row=t.walls.find(w=>w.id===hit.id);if(!row)throw Error('墙已不存在');row.b=size.b??p.defaults.wall;return;}
-  const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)throw Error('梁已不存在');const requestedKind=size.kind??b.kind,nextKind=b.autoTransfer&&requestedKind===b.kind?b.baseKind:requestedKind;if(!['MB','SB','TB','CB'].includes(nextKind))throw Error('梁类型须为 MB、SB、TB 或 CB');if(nextKind!==b.kind&&m.beams.some(other=>other!==b&&other.kind===nextKind&&sig(other.rawA,other.rawZ)===sig(b.rawA,b.rawZ)))throw Error('同位置已存在该类型的梁，请先检查重复构件');if(b.splitMainParent){materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}let row=t.beams.find(c=>c.id===b.id&&c.kind===(b.baseKind||b.kind)&&b.source==='manual');
-  if(!row){let n=1;while(t.beams.some(b=>b.id==='EDIT_'+n))n++;const signature=sig(b.rawA,b.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);row={id:'EDIT_'+n,kind:b.kind,a:{x:b.rawA[0],y:b.rawA[1]},z:{x:b.rawZ[0],y:b.rawZ[1]},on:true,original:signature};t.beams.push(row);}
-  if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;row.widthMode=["MB","CB"].includes(nextKind)&&size.b===null?"column":"manual";row.kind=nextKind;row.b=size.b??p.defaults[nextKind==='SB'?'sb':nextKind==='TB'?'tb':'mb'];row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;return {id:row.id,kind:row.kind,rawA:b.rawA,rawZ:b.rawZ};
+  const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)throw Error('梁已不存在');if(size.depthOverride184&&size.d!==null){for(const f of floors(p).filter(f=>f.type===key)){const limit=LocalHeights96.beamAllowance(p,f.n,b);if(size.d>limit+1e-6)throw Error(b.id+' 梁深 '+size.d+' mm 超過 '+FloorLevels.name(p,f.n)+' Structural Zone 上限 '+limit+' mm；未套用');}}const requestedKind=size.kind??b.kind,nextKind=(b.autoTransfer||b.autoCantilever173)&&requestedKind===b.kind?b.baseKind:requestedKind;if(!['MB','SB','TB','CB'].includes(nextKind))throw Error('梁类型须为 MB、SB、TB 或 CB');if(nextKind!==b.kind&&m.beams.some(other=>other!==b&&other.kind===nextKind&&sig(other.rawA,other.rawZ)===sig(b.rawA,b.rawZ)))throw Error('同位置已存在该类型的梁，请先检查重复构件');if(b.splitMainParent||b.splitSecondaryParent200){materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}let row=t.beams.find(c=>c.id===b.id&&c.kind===(b.baseKind||b.kind)&&b.source==='manual');
+  const autoEdit201=b.source==='auto';
+  if(autoEdit201){freezeAutoBeams(p,key,m);const original=beamIdentity173(b);row={...clone(b),id:b.id,kind:nextKind,a:{x:original.rawA[0],y:original.rawA[1]},z:{x:original.rawZ[0],y:original.rawZ[1]},b:b.b*1000,d:null,on:true};}
+  if(!row){let n=1;while(t.beams.some(b=>b.id==='EDIT_'+n))n++;const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);row={id:'EDIT_'+n,kind:nextKind,a:{x:original.rawA[0],y:original.rawA[1]},z:{x:original.rawZ[0],y:original.rawZ[1]},on:true,original:signature};t.beams.push(row);}
+  if(b.loadKind194)row.loadKind194=b.loadKind194;
+  row.columnSupports164=clone(b.columnSupports164||mainColumnSupports164(p,key,b,m.columns));
+  row.positionMode175=size.positionMode175??b.positionMode175??'follow';delete row.typeMode175;
+  if(row.positionMode175==='fixed'){row.fixedA175=clone(b.a);row.fixedZ175=clone(b.z);}else{delete row.fixedA175;delete row.fixedZ175;}
+  if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;if(nextKind==='CB'&&(b.kind!=='CB'||b.autoCantilever173))row.extendToBoundary173=true;row.widthMode=size.preserveWidth199?(b.widthMode??(b.source==='auto'?(b.kind==='SB'?'default':['MB','CB'].includes(b.kind)?'column':'manual'):'manual')):size.b===null?(["MB","CB"].includes(nextKind)?"column":"default"):"manual";row.kind=nextKind;row.b=size.b??p.defaults[nextKind==='SB'?'sb':nextKind==='TB'?'tb':'mb'];if(size.depthOverride184){if(size.d===null)delete row.depthOverride184;else row.depthOverride184=size.d;}row.d??=null;if(requestedKind!==b.kind&&!size.depthOverride184){delete row.depthOverride184;row.d=null;}else if(!size.preserveDepth184)row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;if(autoEdit201){
+   const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ),snap=t.autoBeamSnapshot;
+   for(const group of ['main','secondary','primary'])snap[group]=(snap[group]||[]).filter(v=>!(v.id===b.id&&sig(v.rawA,v.rawZ)===signature));
+   const saved={id:row.id,kind:row.kind,rawA:clone(original.rawA),rawZ:clone(original.rawZ),a:clone(original.a),z:clone(original.z),b:row.b/1000,d:row.d==null?b.d:row.d/1000};
+   for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','fixedEnd101','secondaryCantilever101','extendToBoundary173'])if(row[k]!==undefined)saved[k]=clone(row[k]);
+   if(!size.depthOverride184&&!size.preserveDepth184&&row.kind==='SB'&&size.d!=null)saved.depthOverride184=size.d;
+   if(b.autoCantilever173&&row.kind==='MB')delete saved.fixedEnd101;
+   if(t.beamWidths83)delete t.beamWidths83[signature];if(saved.widthMode==='manual')(t.beamWidths83??={})[signature]=row.b;
+   if(t.beamDepths201)delete t.beamDepths201[signature];if(saved.depthOverride184!=null)(t.beamDepths201??={})[signature]=saved.depthOverride184;
+   snap[row.kind==='MB'?'main':row.kind==='SB'?'secondary':'primary'].push(saved);
+  }
+  return model(p,key).beams.find(v=>v.id===row.id||v.splitSecondaryParent200===row.id)||{id:row.id,kind:row.kind,rawA:resolve(p,row.a,key),rawZ:resolve(p,row.z,key)};
  }
  // Resolve every target before mutation: generated member IDs may change after deletion.
  function removeMembers(p,key,hits,f){
@@ -666,7 +761,7 @@ const Engine=(()=>{
   const targets=[...unique.values()];
   if(targets.some(h=>h.kind!=='SLAB')){materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}
   const manual=new Set(),walls=new Set(),signatures=new Set(t.suppressed||[]),voids=[];
-  for(const {kind,target}of targets){if(kind==='SLAB')voids.push(...clone(target.rects));else if(kind==='WALL')walls.add(target.id);else{if(target.source==='manual')manual.add((target.baseKind||kind)+':'+target.id);signatures.add(sig(target.rawA,target.rawZ));}}
+  for(const {kind,target}of targets){if(kind==='SLAB')voids.push(...clone(target.rects));else if(kind==='WALL')walls.add(target.id);else{if(target.source==='manual')manual.add((target.baseKind||kind)+':'+target.id);signatures.add(sig(beamIdentity173(target).rawA,beamIdentity173(target).rawZ));}}
   t.beams=t.beams.filter(b=>!manual.has(b.kind+':'+b.id));t.walls=t.walls.filter(w=>!walls.has(w.id));t.suppressed=[...signatures];if(voids.length)t.slabVoids=[...(t.slabVoids||[]),...voids];return targets.length;
  }
  function removeMember(p,key,hit){
@@ -685,6 +780,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
+ return {promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

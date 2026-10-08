@@ -17,13 +17,13 @@ const InputFeedback172=(()=>{
   if(rest.length)e.setAttribute('aria-describedby',rest.join(' '));else e.removeAttribute('aria-describedby');
   e.removeAttribute('aria-invalid');delete e.dataset.feedback172;
  }
- function reject(snapshot,message){
+ function reject(snapshot,message,focus=true){
   if(!snapshot)return;const matches=document.querySelectorAll(snapshot.selector);if(matches.length!==1)return;
   const e=matches[0];clear(e);e.value=snapshot.value;
   const note=document.createElement('span'),id='input-error172-'+(++serial);
   note.id=id;note.className='input-error172';note.setAttribute('role','alert');note.textContent=message+'；此输入尚未应用。';
   e.dataset.feedback172=id;e.setAttribute('aria-invalid','true');e.setAttribute('aria-describedby',[snapshot.description,id].filter(Boolean).join(' '));e.after(note);
-  e.focus({preventScroll:true});
+  if(focus)e.focus({preventScroll:true});
  }
  function ready(){const e=document.querySelector('[data-feedback172][aria-invalid=true]');if(e){e.focus({preventScroll:false});return false;}return true;}
  if(typeof document!=='undefined'){

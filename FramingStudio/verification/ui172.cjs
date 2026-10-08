@@ -24,7 +24,9 @@ const uiChanged=new Set(['app.js','FramingStudio.cs','app.manifest','sync-web.py
 for(const p of tracked){if(p.startsWith('FramingStudio/source/')&&uiChanged.has(p.slice('FramingStudio/source/'.length)))continue;const file=path.join(repo,p);if(fs.existsSync(file)){assert(fs.readFileSync(file).equals(cp.execFileSync('git',['show',baseline+':'+p],{cwd:repo,maxBuffer:20*1024*1024})),p+' unchanged from PR #2');unchanged++;}}
 let before=original('assets/index.html').toString('utf8').replace(/\r\n/g,'\n'),after=html;
 before=before.replace(original('source/app.js').toString('utf8').replace(/\r\n/g,'\n').trim(),'APP_BODY');after=after.replace(app.trim(),'APP_BODY');
-after=after.replace(/<style>\/\* studio-source:input-feedback172.css:start \*\/[\s\S]*?input-feedback172.css:end \*\/<\/style>\n/,'').replace(/<script>\/\* studio-source:input-feedback172.js:start \*\/[\s\S]*?input-feedback172.js:end \*\/<\/script>\n/,'');
+after=after.replace(/<style>\/\* studio-source:input-feedback172.css:start \*\/[\s\S]*?input-feedback172.css:end \*\/<\/style>\n/,'').replace(/<script>\/\* studio-source:input-feedback172.js:start \*\/[\s\S]*?input-feedback172.js:end \*\/<\/script>\n/,'')
+// E2.173 presentation-only modules (verified separately by ui173.cjs).
+after=after.replace(/<style>\/\* studio-source:ui-polish173.css:start \*\/[\s\S]*?ui-polish173.css:end \*\/<\/style>\n/,'').replace(/<script>\/\* studio-source:ui-polish173.js:start \*\/[\s\S]*?ui-polish173.js:end \*\/<\/script>\n/,'');
 function neutralize(s){return s.replace(/<title>Framing Studio[^<]*<\/title>/,'TITLE').replace(/探索版 · E2\.\d+/,'BADGE').replace(/(<div class="nav-bottom">)E2\.\d+/,'$1VERSION').replace(/<dialog id="helpdialog">[\s\S]*?<\/dialog>/,'HELP');}
 assert.equal(neutralize(after),neutralize(before),'Other page markup, modules and styles unchanged');
 const version=JSON.parse(fs.readFileSync(path.join(root,'version.json'),'utf8'));

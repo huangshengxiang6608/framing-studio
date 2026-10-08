@@ -60,8 +60,8 @@ const LoadRegions83=(()=>{
  // Partition beam footprints once. Receiving beams own intersections before
  // supported beams; independent crossings use depth, kind and stable geometry.
  // This is surface-load bookkeeping, not a new frame/joint analysis.
- function beamSurface(p,f,model,beams){
-  let free=difference(surface(model),[...model.slabs.flatMap(s=>s.rects),...columnBoxes(model)]);const assigned=surfaceRegions(p,f,model),out=[],ordered=[],seen=new Set();
+ function beamSurface(p,f,model,beams,claimed=[]){
+  let free=difference(surface(model),[...model.slabs.flatMap(s=>s.rects),...columnBoxes(model),...claimed]);const assigned=surfaceRegions(p,f,model),out=[],ordered=[],seen=new Set();
   const rank={TB:0,MB:1,CB:2,SB:3},sorted=[...beams].sort((a,b)=>b.member.d-a.member.d||(rank[a.member.displayKind||a.kind]??4)-(rank[b.member.displayKind||b.kind]??4)||a.token.localeCompare(b.token));
   function visit(b){if(seen.has(b))return;seen.add(b);for(const s of b.sinks||[])if(s?.type==='BEAM')visit(s.target);ordered.push(b);}sorted.forEach(visit);
   for(const b of ordered){const footprint=box(Engine.rect(b.member)),rs=free.map(r=>intersect(r,footprint)).filter(Boolean);if(!rs.length)continue;const errors=[];

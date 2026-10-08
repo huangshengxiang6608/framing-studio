@@ -14,8 +14,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8",FrameworkDisplayName=".NET Framework 4.8")]
 
 [assembly: System.Reflection.AssemblyTitle("Framing Studio")]
-[assembly: System.Reflection.AssemblyVersion("2.172.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.172.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.203.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.203.0.0")]
 
 static class Program {
     [STAThread] static int Main(string[] args) {
@@ -46,7 +46,9 @@ sealed class Studio : Form {
     readonly List<string> Passed = new List<string>();
     readonly ToolStripStatusLabel Status = new ToolStripStatusLabel("正在启动…");
     readonly string TestDir, Profile, Data;
-    bool Ready, ClosingConfirmed;
+    bool Ready, ClosingConfirmed, ClosingReview203;
+    // Set by each autosave (project edit); cleared only after a confirmed .framing.json save.
+    bool Unsaved;
     string SavedDownload;
     int TestNavigation;
     public Studio(string[] args) {
@@ -56,7 +58,7 @@ sealed class Studio : Form {
         Data = TestDir == null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FramingStudio") : Path.Combine(TestDir, "isolated-user-data");
         Profile = Path.Combine(Data, "WebView2"); Directory.CreateDirectory(Data);
         if (TestDir != null) { Directory.CreateDirectory(TestDir); Opacity = .01; ShowInTaskbar = false; }
-        Text = "Framing Studio · E2.172 Desktop"; Width = 1500; Height = 950;
+        Text = "Framing Studio · E2.203 Desktop"; Width = 1500; Height = 950;
         MinimumSize = new Size(900, 650); StartPosition = FormStartPosition.CenterScreen;
         if (File.Exists(Path.Combine(Root,"FramingStudio.ico"))) Icon = new Icon(Path.Combine(Root,"FramingStudio.ico"));
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("项目");
@@ -83,10 +85,21 @@ sealed class Studio : Form {
             Location=new Point(Math.Max(area.Left,Math.Min(Left,area.Right-Width)),Math.Max(area.Top,Math.Min(Top,area.Bottom-Height)));
             await Start();
         };
-        FormClosing += delegate(object s, FormClosingEventArgs e) {
+        FormClosing += async delegate(object s, FormClosingEventArgs e) {
             if (TestDir != null || ClosingConfirmed || !Ready) return;
-            if (MessageBox.Show(this,"是否关闭？自动备份保留在本机；需要交付或长期保留的项目，请先点「保存项目」。", "Framing Studio", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) e.Cancel = true;
-            else ClosingConfirmed = true;
+            e.Cancel = true;
+            if (ClosingReview203) return;
+            ClosingReview203 = true;
+            try {
+                bool pending = await JS("Boolean(window.hasPendingFramingInputs203 && window.hasPendingFramingInputs203())") != "false";
+                if (!Unsaved && !pending) { ClosingConfirmed = true; Close(); return; }
+                var answer = MessageBox.Show(this,"项目有未保存或未应用的修改。\n\n是：先保存项目（保存完成后请再关闭）\n否：不保存，直接关闭（已应用修改的自动备份保留在本机）\n取消：返回继续编辑", "Framing Studio", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1);
+                if (answer == DialogResult.No) { ClosingConfirmed = true; Close(); return; }
+                if (answer == DialogResult.Yes) await JS("document.getElementById('save').click()");
+            } catch (Exception ex) {
+                Log("Close review: " + ex.Message);
+                MessageBox.Show(this,"暂时无法确认保存状态，请保存项目后再关闭。", "Framing Studio");
+            } finally { ClosingReview203 = false; }
         };
     }
     void Add(ToolStripMenuItem menu, string label, Keys key, EventHandler handler) {
@@ -118,7 +131,7 @@ sealed class Studio : Form {
             await web.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(Path.Combine(Root,"desktop-bridge.js")));
             web.NavigationCompleted += async delegate(object s, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { Log("Navigation: " + e.WebErrorStatus); Status.Text = "页面加载失败：" + e.WebErrorStatus; return; }
-                Ready = true; Status.Text = "离线模式 · E2.172 · 项目请保存为 .framing.json";
+                Ready = true; Status.Text = "离线模式 · E2.203 · 项目请保存为 .framing.json";
                 if (TestDir != null && TestNavigation++ == 0) await SelfTest();
             };
             if (TestDir != null) web.ScriptDialogOpening += delegate(object s, CoreWebView2ScriptDialogOpeningEventArgs e) { e.Accept(); };
@@ -270,6 +283,7 @@ sealed class Studio : Form {
                 File.WriteAllText(tmp, content, new UTF8Encoding(false));
                 if (File.Exists(target)) File.Replace(tmp, target, Path.Combine(Data,"Backups","previous.framing.json"));
                 else File.Move(tmp, target);
+                Unsaved = true;
             }
         } catch (Exception ex) { Log("Backup/message: " + ex.Message); Status.Text = "自动备份未完成，请立即保存项目文件。"; }
     }
@@ -285,7 +299,7 @@ sealed class Studio : Form {
             else using(var dialog=new SaveFileDialog{Title="保存 Framing Studio 文件",FileName=name,Filter="导出文件 (*"+extension+")|*"+extension,OverwritePrompt=true,AddExtension=true}) {
                 if(dialog.ShowDialog(this)!=DialogResult.OK){SetSaveStatus("已取消文件保存");return;}target=dialog.FileName;
             }
-            File.WriteAllBytes(target,bytes);SavedDownload=target;Status.Text="已保存："+target;SetSaveStatus("文件已保存 · "+Path.GetFileName(target));
+            File.WriteAllBytes(target,bytes);SavedDownload=target;if(name.EndsWith(".framing.json",StringComparison.OrdinalIgnoreCase))Unsaved=false;Status.Text="已保存："+target;SetSaveStatus("文件已保存 · "+Path.GetFileName(target));
         }catch(Exception e){Log("Export: "+e.Message);SetSaveStatus("保存未完成："+e.Message);}
     }
 
@@ -305,7 +319,7 @@ sealed class Studio : Form {
         } else e.ResultFilePath = Path.Combine(TestDir, name);
         var operation = e.DownloadOperation; string destination = e.ResultFilePath;
         operation.StateChanged += delegate {
-            if (operation.State == CoreWebView2DownloadState.Completed) { SavedDownload = destination; Status.Text = "已保存：" + destination; SetSaveStatus("文件已保存 · " + Path.GetFileName(destination)); }
+            if (operation.State == CoreWebView2DownloadState.Completed) { SavedDownload = destination; if (destination.EndsWith(".framing.json", StringComparison.OrdinalIgnoreCase)) Unsaved = false; Status.Text = "已保存：" + destination; SetSaveStatus("文件已保存 · " + Path.GetFileName(destination)); }
             if (operation.State == CoreWebView2DownloadState.Interrupted) { Status.Text = "保存未完成：" + operation.InterruptReason; SetSaveStatus("文件保存失败 · 请重试"); Log(Status.Text); }
         };
         } catch (Exception ex) { e.Cancel = true; Log("Download: " + ex.Message); Status.Text = "保存未完成：" + ex.Message; }

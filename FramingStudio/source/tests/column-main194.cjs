@@ -1,0 +1,19 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{context}=require('../../verification/integration143.cjs'),c=context(path.resolve(__dirname,'../..'));
+c.run(fs.readFileSync(path.join(__dirname,'loading115-browser.js'),'utf8'));
+const results=c.run(`(()=>{
+ const seed=loading115Tests().projects.slab;
+ function fixture(auto=false){const p=Engine.clone(seed),t=p.types.F1;p.axes={x:[{id:'1',gap:0},{id:'2',gap:10}],y:[{id:'A',gap:0},{id:'B',gap:8}]};t.columns=[];t.walls=[{id:'W1',a:{x:10,y:0},z:{x:10,y:8},b:300,on:true}];t.beams=[{id:'S1',kind:'SB',a:{x:1,y:4},z:{x:10,y:4},b:250,d:350,on:true,edgeInset:true}];p.explorer={reportA:{},reportB:{}};Loading.init(p);if(auto){const m=Engine.model(p,'F1');m.beams.forEach(b=>b.source='auto');Engine.freezeAutoBeams(p,'F1',m);t.beams=[];}return p;}
+ const cases=[];
+ for(const auto of [false,true]){const p=fixture(auto),before=Engine.clone(p),m=Engine.model(p,'F1'),b=m.beams.find(b=>b.id==='S1'),token=Loading.token(b.kind,b);if(!b)throw Error('Missing fixture beam');p.explorer.members['1|'+token]={mode:'manual',beamLoadMode:'manual',beamLoads:[{name:'P',type:'point',a:3,dl:10,ll:2}],beamSelfWeight:true};p.explorer.selected['1|'+token]=true;p.explorer.reportA['1|'+token]=true;p.explorer.reportB['1|'+token]=true;
+ FloorColumns101.mutate(p,'F1',1,q=>Engine.addColumn(q,'F1',1,4));Engine.validate(p);let r=Engine.generate(p),live=Engine.floorModel(r,1).beams.find(v=>v.id==='S1');if(!live)throw Error('Promoted beam missing '+JSON.stringify(r.issues));const out=Loading.run(p,r,'B'),row=out.rows.find(v=>v.member.id==='S1');
+ const saved=Engine.clone(p),reload=Engine.floorModel(Engine.generate(saved),1).beams.find(v=>v.id==='S1');Engine.freezeAutoBeams(saved,'F1',Engine.model(saved,'F1'));const frozen=Engine.floorModel(Engine.generate(saved),1).beams.find(v=>v.id==='S1');
+ Engine.editSize(saved,'F1',{kind:'MB',id:'S1'},{b:300});const edited=Engine.model(saved,'F1').beams.find(v=>v.loadKind194==='SB');
+ cases.push({auto,kind:live.kind,status:live.supportStatus,token:Loading.token(live.kind,live),oldToken:token,input:row.input.beamLoads,actions:!!row.actions,reload:reload.kind,frozen:Loading.token(frozen.kind,frozen),edited:Loading.token(edited.kind,edited),reportA:p.explorer.reportA['1|'+token],reportB:p.explorer.reportB['1|'+token],width:live.b,undo:Engine.model(before,'F1').beams.find(v=>v.id==='S1').kind});}
+ const unchanged=[];
+ for(const reason of ['fixed','remote','free','beamOnly']){const p=fixture(),t=p.types.F1;if(reason==='fixed')t.beams[0].typeMode175='fixed';if(reason==='free')t.walls=[];if(reason==='beamOnly'){t.walls=[];t.beams.push({id:'R',kind:'MB',a:{x:10,y:0},z:{x:10,y:8},b:250,d:350,on:true,edgeInset:true});}Engine.addColumn(p,'F1',1,reason==='remote'?2:4);unchanged.push([reason,Engine.model(p,'F1').beams.find(v=>v.id==='S1').kind]);}
+ const two=fixture();two.types.F1.walls=[];two.types.F1.beams[0].z={x:9,y:4};two.types.F1.columns=[{id:'R',x:9,y:4,b:500,d:500,on:true,status:'上下贯通'}];Engine.addColumn(two,'F1',1,4);
+ return {cases,unchanged,two:Engine.model(two,'F1').beams.find(v=>v.id==='S1').kind};
+})()`);
+for(const x of results.cases){assert.equal(x.kind,'MB');assert.equal(x.status,'connected');assert.equal(x.token,x.oldToken);assert(x.actions);assert.equal(x.input[0].dl,10);assert.equal(x.reload,'MB');assert.equal(x.frozen,x.oldToken);assert.equal(x.edited,x.oldToken);assert(x.reportA&&x.reportB);assert.equal(x.undo,'SB');if(!x.auto)assert.equal(x.width,.25);}
+for(const [reason,kind]of results.unchanged)assert.equal(kind,reason==='fixed'?'MB':'SB',reason);assert.equal(results.two,'MB');
+console.log('PASS: new column + wall/column promotes manual and saved automatic SB; legacy locks ignored; remote/free/beam-only spans preserved; connected reactions, saved load/support identity, report selections, reload, refreeze, resize and undo baseline');

@@ -29,7 +29,7 @@ const Drawing=(()=>{
   ctx.clearRect(0,0,w,h);ctx.fillStyle='#fbfcfd';ctx.fillRect(0,0,w,h);
   const bounds=opt.viewBounds||{x0:0,x1:maxX,y0:0,y1:maxY},scale=Math.min((w-125)/(bounds.x1-bounds.x0+2),(h-120)/(bounds.y1-bounds.y0+2))*(opt.zoom||1),ox=(w-(bounds.x1-bounds.x0)*scale)/2+20-bounds.x0*scale+(opt.panX||0),oy=(h-(bounds.y1-bounds.y0)*scale)/2+20-bounds.y0*scale+(opt.panY||0);
   const xy=(x,y)=>[ox+x*scale,oy+y*scale],box=(x,y,b,d,fill,stroke)=>{const [px,py]=xy(x,y);ctx.fillStyle=fill;ctx.fillRect(px,py,b*scale,d*scale);if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.strokeRect(px,py,b*scale,d*scale);}};
-  if(!opt.membersOnly)for(const t of m.ts){box(t.x0,t.y0,t.x1-t.x0,t.y1-t.y0,t.state===0?'#edf0f3':t.state===2||opt.loadAreas?.length||(opt.columnLoadArea?.rects.length||opt.columnLoadArea?.polygons?.length)?'#ffffff':'#f3edd6','#d9e0e4');if(t.state===2){const a=xy(t.x0,t.y0),b=xy(t.x1,t.y1);ctx.strokeStyle='#b1bec5';ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.moveTo(a[0],b[1]);ctx.lineTo(b[0],a[1]);ctx.stroke();if(scale>6)text(ctx,'OP',(a[0]+b[0])/2-9,(a[1]+b[1])/2);}}
+  if(!opt.membersOnly)for(const t of m.ts){box(t.x0,t.y0,t.x1-t.x0,t.y1-t.y0,t.state===0?'#edf0f3':t.state===2||opt.loadAreas?.length||(opt.columnLoadArea?.rects.length||opt.columnLoadArea?.polygons?.length)?'#ffffff':opt.visible?.SLAB===false?'#fbfcfd':'#f3edd6','#d9e0e4');if(t.state===2){const a=xy(t.x0,t.y0),b=xy(t.x1,t.y1);ctx.strokeStyle='#b1bec5';ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.moveTo(a[0],b[1]);ctx.lineTo(b[0],a[1]);ctx.stroke();if(scale>6)text(ctx,'OP',(a[0]+b[0])/2-9,(a[1]+b[1])/2);}}
   if(!opt.membersOnly)for(const t of m.slabVoids){box(t.x0,t.y0,t.x1-t.x0,t.y1-t.y0,'#ffffff','#c9d3d9');const a=xy(t.x0,t.y0),b=xy(t.x1,t.y1);ctx.strokeStyle='#b1bec5';ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.moveTo(a[0],b[1]);ctx.lineTo(b[0],a[1]);ctx.stroke();text(ctx,'无楼板',(a[0]+b[0])/2-18,(a[1]+b[1])/2,11);}
   for(const area of opt.loadAreas||[]){ctx.save();ctx.fillStyle=area.colour;ctx.globalAlpha=(area.unassigned?1:area.draft?.15:area.overview?.32:area.active?.25:.13)*Math.min(1,area.fraction??1);for(const t of area.rects||[])ctx.fillRect(ox+t.x0*scale,oy+t.y0*scale,(t.x1-t.x0)*scale,(t.y1-t.y0)*scale);ctx.globalAlpha=1;ctx.strokeStyle=area.unassigned?'#dce3e6':area.colour;ctx.lineWidth=area.draft?3:area.active?3:1;if(!area.draft){ctx.beginPath();for(const [a,z]of LoadRegions83.boundary(area.rects||[])){ctx.moveTo(...xy(...a));ctx.lineTo(...xy(...z));}ctx.stroke();}ctx.restore();}
   if(opt.loadAreaView&&opt.loadBeamReference){ctx.save();ctx.strokeStyle='#839397';ctx.lineWidth=1;ctx.setLineDash([4,3]);for(const b of m.beams){ctx.beginPath();ctx.moveTo(...xy(...b.a));ctx.lineTo(...xy(...b.z));ctx.stroke();}ctx.restore();}
@@ -81,7 +81,7 @@ const Drawing=(()=>{
   const loadAreaLabels=[],loadLabelCuts=[...m.ts.filter(t=>t.state===2),...(m.slabVoids||[])];
   for(const area of opt.loadAreas||[]){if(area.unassigned||!area.overview&&!area.draft)continue;ctx.save();if(area.draft){ctx.strokeStyle=area.colour;ctx.lineWidth=3;ctx.beginPath();for(const [a,z]of LoadRegions83.boundary(area.outlineRects||area.rects)){ctx.moveTo(...xy(...a));ctx.lineTo(...xy(...z));}ctx.stroke();ctx.restore();continue;}const rects=LoadRegions83.difference(area.rects||[],loadLabelCuts),badge=loadAreaLabel(ctx,area,rects,{ox,oy,scale},w,h);if(badge){const {x,y,width,height,lines}=badge;ctx.fillStyle='#ffffff';ctx.globalAlpha=.94;ctx.fillRect(x,y,width,height);ctx.globalAlpha=1;lines.forEach((line,i)=>text(ctx,line,x+6,y+15+i*16,12,area.colour));loadAreaLabels.push({...badge,name:area.name,number:area.number});}ctx.restore();}
   checkLegend(ctx,opt,checkHighlights.length,20,h-18);
-  const columnAreaBadge=opt.columnLoadArea&&typeof ColumnLoads101!=='undefined'?ColumnLoads101.badge(ctx,areaPlot,w,h,opt.columnLoadArea,columnAreaPaint):null;
+  const columnAreaBadge=!opt.deferAreaOverlay188&&opt.columnLoadArea&&typeof ColumnLoads101!=='undefined'?ColumnLoads101.foreground(ctx,{...areaPlot,columnAreaPaint},w,h,opt.columnLoadArea):null;
   return {scale,ox,oy,hits,loadAreaLabels,csMarkers,checkHighlights,columnAreaPaint,columnAreaBadge,slabs:opt.membersOnly?[]:m.slabs,world:(x,y)=>[(x-ox)/scale,(y-oy)/scale]};
  }
  function elevationData(p,result,direction,opt={}){
@@ -184,8 +184,8 @@ const Drawing=(()=>{
    const t=m.slabs.find(t=>t.id===hit.slabId);if(!t)return null;
    const xx=Engine.axes(p,'x',m.key),yy=Engine.axes(p,'y',m.key);title='楼板 · '+hit.id;if(typeof Loading!=='undefined'){const o=Loading.input(p,f,Loading.token('SLAB',t));rows.push(['板类型',o.slabType==='CS'?'CS · 悬臂板':'普通单向板']);if(o.slabType==='CS')rows.push(['固定边',({left:'左',right:'右',top:'上',bottom:'下'}[o.csFixedEdge]||'未选择')]);}
    const location=t.tileKeys.map(k=>{const [i,j]=k.split(',').map(Number);return 'X '+xx[i].id+'–'+xx[i+1].id+' / Y '+yy[j].id+'–'+yy[j+1].id;}).join('；');
-   rows.push(['板厚',t.thickness+' mm'],['所在轴线格',location],['板块形状',t.rectangular?'矩形':'不规则／含洞板块'],[t.rectangular?'板块尺寸':'外包尺寸',fmt(t.x1-t.x0)+' × '+fmt(t.y1-t.y0)+' m'],['板块面积',t.area.toFixed(2)+' m²'],['X 范围',fmt(t.x0)+' → '+fmt(t.x1)+' m'],['Y 范围',fmt(t.y0)+' → '+fmt(t.y1)+' m']);size={b:t.thickness,d:null};
-   note='按主梁、次梁、墙的参考线及建筑／Opening 边界分隔。面积扣除 Opening，未扣梁墙宽度；几何尺寸不等于净跨或计算跨度。';
+   rows.push(['板厚',t.thickness+' mm'],['所在轴线格',location],['板块形状',t.rectangular?'矩形':'不规则／含洞板块'],['板尺寸 X × Y（支承中心距）',(()=>{const x=Loading.slabSpan(t,'X',m,null,{},true).effective,y=Loading.slabSpan(t,'Y',m,null,{},true).effective;return x>0&&y>0?fmt(x)+' × '+fmt(y)+' m':'待確認支承／非矩形板';})()],['板淨面積',t.area.toFixed(2)+' m²'],['淨板 X 範圍',fmt(t.x0)+' → '+fmt(t.x1)+' m'],['淨板 Y 範圍',fmt(t.y0)+' → '+fmt(t.y1)+' m']);size={b:t.thickness,d:null};
+   note='板尺寸採支承中心距；自由邊至實際板邊。淨面積及淨板範圍保留實際幾何，扣除梁牆及 Opening，不能用來比較中心跨度。';
   }else if(['MB','SB','TB','CB'].includes(hit.kind)){
    const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)return null;
    title=({'MB':'主梁 MB','SB':'次梁 SB','TB':'转换梁 TB','CB':'悬臂梁 CB'}[b.kind])+' · '+(b.displayId||b.id);
@@ -193,7 +193,7 @@ const Drawing=(()=>{
    if(b.a.some((v,i)=>Math.abs(v-b.rawA[i])>1e-6)||b.z.some((v,i)=>Math.abs(v-b.rawZ[i])>1e-6))rows.push(['贴边后中心线',point(b.a)+' → '+point(b.z)]);
    note='参考线长度不是净跨或设计计算跨度。仅检查几何支承路径，未核实连接刚度、荷载及承载力。';
    if(b.supportStatus==='unverified')title=b.displayKind==='CB'?(b.kind==='CB'?'悬臂梁 CB · '+b.id:b.displayId):'⚠ 支承未确认 · '+(b.displayId||b.id);
-   if(b.displayKind==='CB'){const input=rows.find(r=>r[0]==='输入类型');if(input){input[0]='类型';input[1]=b.kind==='CB'?'CB · 悬臂梁（手动指定）':'CB · 悬臂梁（按外伸几何识别）';}}
+   if(b.displayKind==='CB'){const input=rows.find(r=>r[0]==='输入类型');if(input){input[0]='类型';input[1]=b.autoCantilever173?'CB · 懸臂梁（自動識別）':b.kind==='CB'?'CB · 悬臂梁（手动指定）':'CB · 悬臂梁（按外伸几何识别）';}}
    if(b.autoTransfer){rows.push(['TB 識別','自動 · 承托 '+b.transferLandings.map(c=>FloorLevels.name(p,c.floor)+' '+c.id).join('、')]);note+=' 原梁 '+b.id+' 的荷載及勾選保留。';}
    size={b:b.b*1000,d:b.d*1000};
   }else if(hit.kind==='COL'){

@@ -1,10 +1,66 @@
 # Framing Studio
 
-Windows 结构建模与工程检查工具。当前版本为 **E2.172**（完整保留 E2.171 及 Transfer Truss，仅增加已确认的四项界面小修），包含源码、可运行程序、离线浏览器资源及原生 Excel 模板。
+Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.203**，以 E2.202 为基准合并界面单位提示、工具提示、简体操作提示及未保存关闭确认。保留 E2.202 的全部建模、计算和报表功能，包含源码、重新编译的 Windows 程序、离线浏览器资源及原生 Excel 模板。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 
 E2.172 统一网页与桌面版本、更新帮助、清理显示数字的浮点尾数，并为事务校验失败的输入保留错误值和就近提示。布局与计算不变。桌面宿主仅更新版本标识并重建；ExcelBridge、Excel 模板及 Section A/B 抄保持 E2.171 原样。完整更新见 `CHANGELOG.md`。
+
+E2.173 保留 E2.172 的版本／帮助／输入提示更新，并修正移位梁支承与短 CB 分类。Windows 套件沿用 E2.172 桌面宿主 EXE，网页 App 为 E2.173；未重新编译 EXE。
+
+E2.174 讓手動畫柱保留原貼齊軸線的邊，放大／縮小不再以最後一次中心作新基準；轉換桁架移到 Scheme 2。已存舊中心的柱可重新套用尺寸修正。套件仍沿用 E2.172 EXE，網頁 App／源碼為 E2.174。
+
+E2.175 的板尺寸與計算 L/B 採實際梁中心距，手動梁與自動梁共用跟隨支承及 CB 識別；位置、類型可獨立固定。[修改前後差異表](FramingStudio/docs/changes-e2175.md)。套件沿用 E2.172 EXE。
+
+E2.176 集中板 L/h 輸入、逐格支承覆寫、L/h 結果及鋼筋率；共同預設移至「00 參數」。[八項修改差異表](FramingStudio/docs/changes-e2176.md)。
+
+E2.177 板反力使用相同 L，梁頂荷載與板層自重同步去重。[跨度傳荷差異表](FramingStudio/docs/changes-e2177.md)。
+
+E2.178 分清 SB 預設深度與主梁 Structural Zone，板資料及列表顯示中心距；柱維持 tributary area。[逐項差異](FramingStudio/docs/changes-e2178.md)。
+
+E2.179 按構件獨立計算梁自重，板反力以原線荷載強度施加全梁跨；柱仍採 tributary area。[修改差異](FramingStudio/docs/changes-e2179.md)。
+
+E2.180 限制 SB 不超過當層／局部 Structural Zone，並顯示加係數荷載及支承反力箭頭。[修改差異](FramingStudio/docs/changes-e2180.md)。
+
+E2.181 將支承標示移至各端反力旁，縮短箭嘴並避免文字重疊。[修改差異](FramingStudio/docs/changes-e2181.md)。
+
+E2.182 拒絕超過 Structural Zone 的 SB 預設輸入，移除實際深度欄，並直接標示 Factored 荷載。[修改差異](FramingStudio/docs/changes-e2182.md)。
+
+E2.183 的 Factored 荷載／反力按計算階段向上取兩位，後續直接採用取整結果。[修改差異](FramingStudio/docs/changes-e2183.md)。
+
+E2.184 新增梁深 D 輸入、移除梁設計額外梁頂面荷載，並修正板自動方向與反力圖。[修改差異](FramingStudio/docs/changes-e2184.md)。
+
+E2.185 在完整 Factored 自重公式結尾取整，後續反力沿用畫面顯示值。[修改差異](FramingStudio/docs/changes-e2185.md)。
+
+E2.186 按柱截面中心定位轉換梁集中荷載，操作介面統一 DL／LL。[修改差異](FramingStudio/docs/changes-e2186.md)。
+
+E2.187 顯示受荷區 X／Y 尺寸，並按每塊板支承中心線區段傳荷。[修改差異](FramingStudio/docs/changes-e2187.md)。
+
+E2.188 在受荷區上方／左側顯示 X／Y 尺寸線，面積卡及尺寸置於畫布最前層。[修改差異](FramingStudio/docs/changes-e2188.md)。
+
+E2.189 新增量距：選兩點、放置尺寸線，支援斜距／水平／垂直及捕捉。量距不存入專案。[使用及修改說明](FramingStudio/docs/changes-e2189.md)。
+
+E2.191 可在「幾何與出圖」多選梁並按 m 移動出圖位置，一鍵恢復 Functional Framing；計算及 Section A／B 保持原樣。[使用說明](FramingStudio/docs/changes-e2191.md)。
+
+E2.193 出圖調整表只列已選梁／柱；框選只加入完整包住的構件。[使用說明](FramingStudio/docs/changes-e2193.md)。
+
+E2.194 補柱接到 SB 端點、另一端已有柱或牆支承時，自動轉為 MB。[使用說明](FramingStudio/docs/changes-e2194.md)。
+
+E2.195 加入 Shift 取消出圖選取，修正 Member Check 焦點清除，Column above 跟隨上層出圖位移。[使用說明](FramingStudio/docs/changes-e2195.md)。
+
+E2.196 單支／批量複製柱後也會自動識別 MB；已複製的柱可再按複製修正梁類型，不會重複加柱。[使用說明](FramingStudio/docs/changes-e2196.md)。
+
+E2.197 出圖移柱時梁端跟隨伸縮，梁身遮線及交接線裁切同步打印／SVG。[使用說明](FramingStudio/docs/changes-e2197.md)。
+
+E2.198 補上 CB 出圖支承連動，保留 CB 支承實線，其他梁線停在 CB 邊界。[使用說明](FramingStudio/docs/changes-e2198.md)。
+
+E2.199 取消梁類型鎖定，修正轉 SB 後尺寸及唯讀 D 的儲存，增加恢復預設尺寸。[使用說明](FramingStudio/docs/changes-e2199.md)。
+
+E2.200 手動或已儲存 SB 跨過有效主支承時自動分跨，可分別選取及編輯。[使用說明](FramingStudio/docs/changes-e2200.md)。
+
+E2.201 把構件布置來源與尺寸模式分開：自動梁改尺寸保留自動布置，柱可逐項跟參數。[使用說明](FramingStudio/docs/changes-e2201.md)。
+
+E2.202 切換梁類型直接顯示預設 B／D，保留跟參數模式。[使用說明](FramingStudio/docs/changes-e2202.md)。
 
 ## 运行
 

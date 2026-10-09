@@ -6,10 +6,10 @@ const BeamLoadUI=(()=>{
  // Read-only sectional equilibrium of the displayed ULS loads. Coordinates run
  // left-to-right (top-to-bottom in plan); positive M is sagging, dM/dx = V.
  // Do not integrate rounded reaction labels: that would leave a residual at B.
- function diagram207(L,rows,{reverse=false,cb=false,fixedEnd=null}={}){
+ function diagram207(L,rows,{reverse=false,cb=false,fixedEnd=null,service=false}={}){
   if(!Number.isFinite(L)||L<=0||cb&&!['a','z'].includes(fixedEnd))throw Error('跨度／固定端待確認');
   const points=[],lines=[],position=x=>reverse?L-x:x;
-  for(const r of rows){const f=BeamLoads.factored(r),v=f.g+f.q;
+  for(const r of rows){const f=service?r:BeamLoads.factored(r),v=f.g+f.q;
    if(!Number.isFinite(v)||v<0)throw Error('荷載待確認');
    if(r.x!=null){if(!Number.isFinite(r.x)||r.x<0||r.x>L)throw Error('荷載位置待確認');points.push({x:position(r.x),v});}
    else{if(!Number.isFinite(r.start)||!Number.isFinite(r.end)||r.start<0||r.end>L+1e-8||r.end<=r.start)throw Error('荷載位置待確認');const a=position(r.start),b=position(Math.min(L,r.end));lines.push({a:Math.min(a,b),b:Math.max(a,b),v});}
@@ -22,9 +22,41 @@ const BeamLoadUI=(()=>{
   const sections=critical.sort((a,b)=>a-b).map(at),shears=sections.flatMap(s=>[...(s.x>0?[{x:s.x,value:s.before}]:[]),...(s.x<L?[{x:s.x,value:s.after}]:[])]),moments=sections.map(s=>({x:s.x,value:s.M})),extreme=values=>({min:values.reduce((a,b)=>a.value<b.value?a:b),max:values.reduce((a,b)=>a.value>b.value?a:b)});
   return {L,RA,RB,M0,cb,fixedLeft,cuts,sections,segments,at,V:extreme(shears),M:extreme(moments)};
  }
+ // HK Concrete COP 2013 (2020), Table 3.2, For general use, kN/mm².
+ // Use the published table values, not the overall-building column or an equation approximation.
+ const elastic210=Object.freeze({20:18.7,25:20.5,30:22.2,35:23.7,40:25.1,45:26.4,50:27.7,55:28.9,60:30,65:31.1,70:32.2,75:33.2,80:34.2,85:35.1,90:36,95:36.9,100:37.8});
+ function material210(p,c){const cfg=Loading.settings(p),fcu=(c.displayKind||c.kind)==='TB'?cfg.tbFcu:cfg.fcu;return {fcu,E:elastic210[fcu]};}
+ // Exact piecewise double integration of characteristic G+Q bending moments.
+ // Geometry in m, loads in kN, E in kN/mm²; output displacement mm, positive down.
+ // Constant gross rectangular EI: no cracking, creep, shrinkage or RC pass/fail inference.
+ function deflection210(L,rows,{B,D,E,...support}={}){
+  if(![B,D,E].every(v=>Number.isFinite(v)&&v>0))throw Error('請補齊梁 B／D 及 Table 3.2 混凝土等級');
+  const d=diagram207(L,rows,{...support,service:true}),I=B*D**3/12,EI=E*1e6*I;
+  if(!Number.isFinite(EI)||EI<=0)throw Error('梁剛度 EI 無效');
+  let theta=0,y=0;
+  const pieces=d.segments.map(s=>{const length=s.b.x-s.a.x,q=(s.a.after-s.b.before)/length,m=s.a.M,v=s.a.after;
+   const part={a:s.a.x,b:s.b.x,at(t){return {theta:part.theta+m*t+v*t*t/2-q*t**3/6,y:part.y+part.theta*t+m*t*t/2+v*t**3/6-q*t**4/24};},theta,y};
+   const end=part.at(length);theta=end.theta;y=end.y;return part;});
+  const C1=d.cb?(d.fixedLeft?0:-theta):-y/L,C2=d.cb&&!d.fixedLeft?-y-C1*L:0;
+  function at(x){x=Math.max(0,Math.min(L,x));const p=pieces.find(s=>x<=s.b)||pieces.at(-1),r=p.at(x-p.a),delta=-(r.y+C1*x+C2)/EI*1000,slope=-(r.theta+C1)/EI;
+   return {x,delta:(d.cb?x===(d.fixedLeft?0:L):x===0||x===L)?0:delta,slope:d.cb&&x===(d.fixedLeft?0:L)?0:slope};}
+  // Non-negative downward loads on these two models give a single interior maximum
+  // for simple spans; cantilevers reach their maximum at the free end.
+  const candidates=[at(0),at(L)];
+  if(!d.cb&&at(0).slope*at(L).slope<0){let lo=0,hi=L;for(let i=0;i<70;i++){const mid=(lo+hi)/2;if(at(mid).slope>0)lo=mid;else hi=mid;}candidates.push(at((lo+hi)/2));}
+  const peak=candidates.reduce((a,b)=>Math.abs(a.delta)>=Math.abs(b.delta)?a:b),xs=[...new Set([...d.cuts,...candidates.map(s=>s.x),...Array.from({length:161},(_,i)=>L*i/160)])].sort((a,b)=>a-b),samples=xs.map(at);
+  if(samples.some(s=>!Number.isFinite(s.delta)||!Number.isFinite(s.slope)))throw Error('撓度超出可計算範圍');
+  return {L,E,I,EI,B,D,peak,samples,at};
+ }
+ function deflectionPlot210(d,rows,cb,fe,o,w){
+  delete d.deflection210;const c=d.h.selected.member,{fcu,E}=material210(d.h.p,c);let v;
+  try{v=deflection210(d.L,rows,{B:c.b,D:c.d,E,cb,fixedEnd:fe,reverse:o.reverse});}catch(e){return '<p class="bl-note" data-deflection-error210 role="status">撓度圖待確認：'+esc(e.message)+'</p>';}
+  d.deflection210=v;const a=32,b=w-32,base=56,scale=Math.abs(v.peak.delta)>0?102/Math.abs(v.peak.delta):0,xx=x=>a+(b-a)*x/v.L,yy=delta=>base+delta*scale,path=v.samples.map((s,i)=>(i?'L':'M')+xx(s.x)+','+yy(s.delta)).join(' ');
+  return '<section class="bl-diagram207" data-kind="D"><h4>撓度圖 · DL＋LL <small>mm</small></h4><p class="bl-note">短期未開裂彈性撓度 · 雙重積分<br>C'+esc(fcu)+' · E = '+E.toFixed(1)+' kN/mm²（'+(E*1000)+' N/mm²）<br>HK Concrete COP Table 3.2 · For general use<br>B × D = '+precise207(c.b*1000)+' × '+precise207(c.d*1000)+' mm<br>I = BD³/12 = '+v.I.toExponential(6)+' m⁴<br>'+(cb?'固定端懸臂':'簡支梁')+' · 向下為正；圖形變形已放大。</p><svg role="img" aria-label="短期彈性撓度圖，單位 mm" viewBox="0 0 '+w+' 204" data-plot207="D" data-left="'+a+'" data-right="'+b+'" data-scale="'+scale+'" data-base="'+base+'"><title>撓度圖；最大絕對撓度 '+precise207(Math.abs(v.peak.delta))+' mm</title><path d="M'+a+','+base+'H'+b+'" stroke="#7d919e" stroke-dasharray="4 3"/><path d="'+path+' L'+b+','+base+' L'+a+','+base+' Z" fill="#e1f1e7"/><path d="'+path+'" stroke="#28714e" stroke-width="2" fill="none"/><circle cx="'+xx(v.peak.x)+'" cy="'+yy(v.peak.delta)+'" r="3" fill="#28714e"/><path class="bl-cursor207" stroke="#c97724" stroke-dasharray="4 3"/><circle class="bl-dot207" r="4" fill="#c97724"/><text x="8" y="60" font-size="11" fill="#637d8b">0</text><text x="'+a+'" y="192" font-size="12" fill="#244558">'+o.start+' · 0 m</text><text x="'+b+'" y="192" text-anchor="end" font-size="12" fill="#244558">'+o.end+' · '+fmt(v.L)+' m</text></svg><p class="bl-extrema207">最大 |δ| = '+precise207(Math.abs(v.peak.delta))+' mm · x = '+precise207(v.peak.x)+' m</p><p class="bl-note">未計開裂、徐變、收縮或支承位移；不取代 Section B 撓度驗算。</p></section>';
+ }
  function diagrams207(d,el,rows,reaction,cb,fe,o){
   const host=el.querySelector('.bl-diagrams207');if(!host)return;
-  delete d.diagram207;
+  delete d.diagram207;delete d.deflection210;
   if(!reaction){host.innerHTML='<p class="bl-note" role="status">剪力／彎矩圖待確認：請先完成有效荷載、跨度及支承。</p>';return;}
   let data;try{data=diagram207(d.L,rows,{reverse:o.reverse,cb,fixedEnd:fe});}catch(e){host.innerHTML='<p class="bl-note" role="status">'+esc(e.message)+'</p>';return;}
   d.diagram207=data;const w=Math.max(260,el.querySelector('.bl-plot').clientWidth),a=32,b=w-32,xx=x=>a+(b-a)*x/data.L,model=cb?(data.fixedLeft?o.start:o.end)+' 端固定懸臂':'簡支梁';
@@ -38,11 +70,12 @@ const BeamLoadUI=(()=>{
    for(const e of [ext.min,ext.max])html+='<circle cx="'+xx(e.x)+'" cy="'+yy(e.value)+'" r="3" fill="'+(shear?'#176b80':'#78529d')+'"><title>'+kind+' = '+precise207(e.value)+' '+unit+'；x = '+fmt(e.x)+' m</title></circle>';
    html+='<path class="bl-cursor207" stroke="#c97724" stroke-dasharray="4 3"/><circle class="bl-dot207" r="4" fill="#c97724"/><text x="8" y="104" font-size="11" fill="#637d8b">0</text><text x="'+a+'" y="192" font-size="12" fill="#244558">'+o.start+' · 0 m</text><text x="'+b+'" y="192" text-anchor="end" font-size="12" fill="#244558">'+o.end+' · '+fmt(data.L)+' m</text></svg><p class="bl-extrema207">最小 '+precise207(ext.min.value)+' '+unit+' · x = '+fmt(ext.min.x)+' m<br>最大 '+precise207(ext.max.value)+' '+unit+' · x = '+fmt(ext.max.x)+' m</p></section>';
   }
+  html+=deflectionPlot210(d,rows,cb,fe,o,w);
   html+='<div class="bl-station207"><label class="bl-station-number209">截面位置 x · m<input type="number" min="0" max="'+data.L+'" step="any" data-station-number209 aria-label="截面位置 x · m" aria-describedby="bl-station-error209"></label><small>範圍 0–'+data.L+' m</small><input type="range" min="0" max="'+data.L+'" step="any" data-station207 aria-label="剪力彎矩截面位置"><small id="bl-station-error209" class="bl-error" data-station-error209 role="status" hidden></small></div><output class="bl-readout207" aria-live="polite"></output><p class="bl-note">輸入 x、移動圖上游標或滑桿查看截面；集中力處顯示左右兩側剪力。端點讀值為梁內側。曲線保留計算精度；荷載、反力及彎矩不取整；畫面截示三位小數，有餘數以「…」表示。跟隨目前輸入預覽，保存後生效。</p>';
   host.innerHTML=html;inspect207(d,el,d.station207??0,false,true);
  }
- function inspect207(d,el,x,snapToCuts=false,keepDraft=false){const data=d.diagram207;if(!data||!Number.isFinite(x))return;const snap=snapToCuts?data.cuts.find(a=>Math.abs(a-x)<data.L/250):null;x=snap??Math.max(0,Math.min(data.L,x));d.station207=x;const s=data.at(x),val=x===data.L?s.before:s.after,host=el.querySelector('.bl-diagrams207');host.querySelector('[data-station207]').value=x;if(!keepDraft){delete d.stationDraft209;delete d.stationError209;}stationField209(d,host,x);host.querySelector('output').textContent='x = '+precise207(x)+' m · '+(x>0&&x<data.L&&Math.abs(s.before-s.after)>1e-8?'V 左 = '+precise207(s.before)+' / 右 = '+precise207(s.after):'V = '+precise207(val))+' kN · M = '+precise207(s.M)+' kN·m';
-  for(const svg of host.querySelectorAll('[data-plot207]')){const shear=svg.dataset.plot207==='V',a=Number(svg.dataset.left),b=Number(svg.dataset.right),xx=a+(b-a)*x/data.L,yy=Number(svg.dataset.base)+(shear?-1:1)*(shear?val:s.M)*Number(svg.dataset.scale);svg.querySelector('.bl-cursor207').setAttribute('d','M'+xx+',26V174');svg.querySelector('.bl-dot207').setAttribute('cx',xx);svg.querySelector('.bl-dot207').setAttribute('cy',yy);}
+ function inspect207(d,el,x,snapToCuts=false,keepDraft=false){const data=d.diagram207;if(!data||!Number.isFinite(x))return;const snap=snapToCuts?data.cuts.find(a=>Math.abs(a-x)<data.L/250):null;x=snap??Math.max(0,Math.min(data.L,x));d.station207=x;const s=data.at(x),val=x===data.L?s.before:s.after,host=el.querySelector('.bl-diagrams207');host.querySelector('[data-station207]').value=x;if(!keepDraft){delete d.stationDraft209;delete d.stationError209;}stationField209(d,host,x);host.querySelector('output').textContent='x = '+precise207(x)+' m · '+(x>0&&x<data.L&&Math.abs(s.before-s.after)>1e-8?'V 左 = '+precise207(s.before)+' / 右 = '+precise207(s.after):'V = '+precise207(val))+' kN · M = '+precise207(s.M)+' kN·m（ULS）'+(d.deflection210?' · δ = '+precise207(d.deflection210.at(x).delta)+' mm（DL＋LL）':'');
+  for(const svg of host.querySelectorAll('[data-plot207]')){const shear=svg.dataset.plot207==='V',a=Number(svg.dataset.left),b=Number(svg.dataset.right),xx=a+(b-a)*x/data.L,yy=Number(svg.dataset.base)+(shear?-1:1)*(svg.dataset.plot207==='D'?d.deflection210.at(x).delta:shear?val:s.M)*Number(svg.dataset.scale);svg.querySelector('.bl-cursor207').setAttribute('d','M'+xx+',26V174');svg.querySelector('.bl-dot207').setAttribute('cx',xx);svg.querySelector('.bl-dot207').setAttribute('cy',yy);}
  }
  function stationField209(d,host,x){const input=host.querySelector('[data-station-number209]'),error=host.querySelector('[data-station-error209]');const value=d.stationDraft209??String(x);if(input.value!==value)input.value=value;input.setAttribute('aria-invalid',String(!!d.stationError209));error.textContent=d.stationError209||'';error.hidden=!d.stationError209;}
  function displayRows(rows){const out=[];for(const row of rows){let r={...row};if(r.surface126&&r.x==null){let index;do{index=out.findIndex(q=>q.surface126&&q.x==null&&q.auto===r.auto&&q.label===r.label&&['g','q','sw','dl','sdl','ug183','uq183'].every(k=>q[k]===r[k]||Number.isFinite(q[k])&&Number.isFinite(r[k])&&Math.abs(q[k]-r[k])<1e-9)&&(Math.abs(q.end-r.start)<1e-8||Math.abs(q.start-r.end)<1e-8));if(index>=0){const q=out.splice(index,1)[0];r={...r,start:Math.min(q.start,r.start),end:Math.max(q.end,r.end),merged129:(q.merged129||1)+(r.merged129||1)};}}while(index>=0);}out.push(r);}return out;}
@@ -111,5 +144,5 @@ const BeamLoadUI=(()=>{
  document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b?.closest('.beam-load-editor')||!active)return;const d=active;if(b.dataset.blMode){d.value.mode=b.dataset.blMode;paint(d);}if(b.hasAttribute('data-bl-add')){d.value.rows.push({name:'新荷载',type:'line',dl:0,ll:0,a:0,b:d.L});paint(d);}if(b.dataset.blDelete!==undefined){d.value.rows.splice(Number(b.dataset.blDelete),1);paint(d);}if(b.hasAttribute('data-bl-calc'))calculate(d);});
 
  document.addEventListener('pointermove',e=>{const svg=e.target.closest?.('[data-plot207]');if(!svg||!active)return;const box=svg.getBoundingClientRect(),x=(e.clientX-box.left)*svg.viewBox.baseVal.width/box.width,a=Number(svg.dataset.left),b=Number(svg.dataset.right);inspect207(active,svg.closest('.beam-load-editor'),(x-a)/(b-a)*active.L,true);});
- return {diagram207,render,read,orientation,displayRows,clear(){drafts.clear();active=null;observer?.disconnect();}};
+ return {diagram207,deflection210,elastic210,material210,render,read,orientation,displayRows,clear(){drafts.clear();active=null;observer?.disconnect();}};
 })();

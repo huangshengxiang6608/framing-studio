@@ -52,6 +52,17 @@ const BeamLoadUI=(()=>{
  // loading.lines/points use root-based coordinates for right-root CB; restore raw A
  // before applying the same screen orientation and solver as the member graph.
  // User-approved Summary-only short-term criterion; never changes report/RC results.
+ // Independent axes for Summary filters; unknown inputs are never a pass/fail.
+ function deflectionResult214(d){return d?.state==='available'&&Number.isFinite(d.max)&&d.max>=0&&Number.isFinite(d.L)&&d.L>0?{limit:d.L*1000/250,pass:d.max<d.L*1000/250}:null;}
+ function beamResult214(i){
+  if(!i.checks205||!['MB','SB','TB','CB'].includes(i.kind))return null;
+  const classify=s=>/^OK(?:$|[ (])/.test(s)?'P':s==='NOT OK'?'F':'U',v=deflectionResult214(i.deflection211),a=classify(i.checks205.a.status),d=v?(v.pass?'P':'F'):'U',b=classify(i.checks205.b.status),failed=d==='F'||b==='F';
+  return {a,d,b,failed,key:[a,d,b].includes('U')?(failed?'pending-fail':'pending'):a+d+b};
+ }
+ function auditStatus214(i){const v=beamResult214(i);if(!v)return i.status;if(v.failed)return 'NOT OK';if(v.d==='U'||v.b==='U')return 'INPUT REQUIRED';return auditStatus212(i);}
+ const combinations214=Object.freeze(['PPP','PPF','PFP','PFF','FPP','FPF','FFP','FFF','pending-fail','pending','other']);
+ function defaultCombinations214(){return combinations214.filter(k=>k==='pending-fail'||k.length===3&&(k[1]==='F'||k[2]==='F'));}
+ function combinationKey214(i){return beamResult214(i)?.key||'other';}
  function criterion212(i){
   const a=i.checks205?.a,d=i.deflection211;
   if(!['MB','SB','TB','CB'].includes(i.kind)||!['NOT OK','CALC. REQUIRED'].includes(a?.status)||d?.state!=='available'||!Number.isFinite(d.max)||d.max<0||!Number.isFinite(d.L)||d.L<=0)return null;
@@ -165,5 +176,5 @@ const BeamLoadUI=(()=>{
  document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b?.closest('.beam-load-editor')||!active)return;const d=active;if(b.dataset.blMode){d.value.mode=b.dataset.blMode;paint(d);}if(b.hasAttribute('data-bl-add')){d.value.rows.push({name:'新荷载',type:'line',dl:0,ll:0,a:0,b:d.L});paint(d);}if(b.dataset.blDelete!==undefined){d.value.rows.splice(Number(b.dataset.blDelete),1);paint(d);}if(b.hasAttribute('data-bl-calc'))calculate(d);});
 
  document.addEventListener('pointermove',e=>{const svg=e.target.closest?.('[data-plot207]');if(!svg||!active)return;const box=svg.getBoundingClientRect(),x=(e.clientX-box.left)*svg.viewBox.baseVal.width/box.width,a=Number(svg.dataset.left),b=Number(svg.dataset.right);inspect207(active,svg.closest('.beam-load-editor'),(x-a)/(b-a)*active.L,true);});
- return {criterion212,auditStatus212,summary211,diagram207,deflection210,elastic210,material210,render,read,orientation,displayRows,clear(){drafts.clear();active=null;observer?.disconnect();}};
+ return {deflectionResult214,beamResult214,auditStatus214,combinations214,defaultCombinations214,combinationKey214,criterion212,auditStatus212,summary211,diagram207,deflection210,elastic210,material210,render,read,orientation,displayRows,clear(){drafts.clear();active=null;observer?.disconnect();}};
 })();

@@ -4,11 +4,11 @@ const BeamLoads=(()=>{
  // Round characteristic loads once at each receiving beam, never its dimensions.
  function up(n){if(!valid(n))return n;const x=n*100,near=Math.round(x);return (Math.abs(x-near)<=Number.EPSILON*Math.max(1,Math.abs(x))*8?near:Math.ceil(x))/100;}
  // Explicit factored components survive transfer; never factor them a second time.
- const factored=r=>({g:up(r.ug183??(1.4*up(r.g))),q:up(r.uq183??(1.6*up(r.q)))});
+ const factored=r=>r.reaction207===true&&r.ug183!=null&&r.uq183!=null?{g:r.ug183,q:r.uq183}:({g:up(r.ug183??(1.4*up(r.g))),q:up(r.uq183??(1.6*up(r.q)))});
  // A complete self-weight equation is factored before its single rounding boundary.
  const selfWeight=raw=>({g:up(raw),q:0,ug183:up(1.4*raw),uq183:0});
  const surface=r=>({sw:selfWeight(r.swUnrounded185??r.sw??0).ug183,dl:up(1.4*up(r.dl||0)),sdl:up(1.4*up(r.sdl||0)),ll:up(1.6*up(r.ll||0))});
- const rounded=r=>({...r,g:up(r.g),q:up(r.q),...(r.ug183!=null?{ug183:up(r.ug183),uq183:up(r.uq183)}:{})});
+ const rounded=r=>({...r,g:up(r.g),q:up(r.q),...(r.ug183!=null?{ug183:r.reaction207?r.ug183:up(r.ug183),uq183:r.reaction207?r.uq183:up(r.uq183)}:{})});
  function draft(o,L){
   if(Array.isArray(o.beamLoads))return {mode:o.beamLoadMode|| (o.mode==='manual'?'manual':'extra'),self:o.beamSelfWeight===true,rows:o.beamLoads.map(r=>({...r}))};
   const rows=[];

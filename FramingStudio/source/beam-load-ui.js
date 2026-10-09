@@ -48,6 +48,20 @@ const BeamLoadUI=(()=>{
   if(samples.some(s=>!Number.isFinite(s.delta)||!Number.isFinite(s.slope)))throw Error('撓度超出可計算範圍');
   return {L,E,I,EI,B,D,peak,samples,at};
  }
+ // Summary companion only: consume the completed audit's saved loading snapshot.
+ // loading.lines/points use root-based coordinates for right-root CB; restore raw A
+ // before applying the same screen orientation and solver as the member graph.
+ function summary211(p,row){
+  if(!['MB','SB','TB','CB'].includes(row.kind))return null;
+  const c=row.member,l=row.loading;
+  try{
+   if(!row.actions||!l)throw Error((row.loadErrors||[]).join('；')||'荷載／支承待確認');
+   const cb=l.support==='Cantilever',fixedEnd=l.fixedEnd,o=orientation(c),{fcu,E}=material210(p,c),flip=cb&&fixedEnd==='z';
+   const rows=[{start:0,end:l.L,g:l.udlDead,q:l.udlLive},...(l.lines||[]).map(r=>flip?{...r,start:l.L-r.end,end:l.L-r.start}:r),...(l.points||[]).map(r=>flip?{...r,x:l.L-r.x}:r)];
+   const v=deflection210(l.L,rows,{B:c.b,D:c.d,E,cb,fixedEnd,reverse:o.reverse});
+   return {state:'available',max:Math.abs(v.peak.delta),x:v.peak.x,L:v.L,B:v.B,D:v.D,I:v.I,E,fcu,start:o.start,startSide:o.startSide,model:cb?'固定端懸臂':'簡支梁',fixedEnd:cb?(fixedEnd==='a'?'A':'B'):null,warnings:[...(row.loadErrors||[])]};
+  }catch(e){return {state:'pending',reason:e.message};}
+ }
  function deflectionPlot210(d,rows,cb,fe,o,w){
   delete d.deflection210;const c=d.h.selected.member,{fcu,E}=material210(d.h.p,c);let v;
   try{v=deflection210(d.L,rows,{B:c.b,D:c.d,E,cb,fixedEnd:fe,reverse:o.reverse});}catch(e){return '<p class="bl-note" data-deflection-error210 role="status">撓度圖待確認：'+esc(e.message)+'</p>';}
@@ -144,5 +158,5 @@ const BeamLoadUI=(()=>{
  document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b?.closest('.beam-load-editor')||!active)return;const d=active;if(b.dataset.blMode){d.value.mode=b.dataset.blMode;paint(d);}if(b.hasAttribute('data-bl-add')){d.value.rows.push({name:'新荷载',type:'line',dl:0,ll:0,a:0,b:d.L});paint(d);}if(b.dataset.blDelete!==undefined){d.value.rows.splice(Number(b.dataset.blDelete),1);paint(d);}if(b.hasAttribute('data-bl-calc'))calculate(d);});
 
  document.addEventListener('pointermove',e=>{const svg=e.target.closest?.('[data-plot207]');if(!svg||!active)return;const box=svg.getBoundingClientRect(),x=(e.clientX-box.left)*svg.viewBox.baseVal.width/box.width,a=Number(svg.dataset.left),b=Number(svg.dataset.right);inspect207(active,svg.closest('.beam-load-editor'),(x-a)/(b-a)*active.L,true);});
- return {diagram207,deflection210,elastic210,material210,render,read,orientation,displayRows,clear(){drafts.clear();active=null;observer?.disconnect();}};
+ return {summary211,diagram207,deflection210,elastic210,material210,render,read,orientation,displayRows,clear(){drafts.clear();active=null;observer?.disconnect();}};
 })();

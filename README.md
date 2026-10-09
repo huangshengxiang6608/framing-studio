@@ -1,5 +1,7 @@
 # Framing Studio
 
+E2.211 在 Summary Check 的梁 A／B 結果下並列最大短期彈性撓度、所在位置及可展開的計算假設；保留原 A／B 判定與兩份報表。
+
 E2.210 新增梁的短期未開裂彈性撓度圖：DL＋LL，分段雙重積分；E 嚴格取自香港混凝土守則 Table 3.2「For general use」。顯示採用 E／I、最大撓度及位置，連動 x 輸入、滑桿和游標。保留 Section B 原判定及兩份報表。
 
 E2.209 在剪力／彎矩圖新增截面位置 x（m）輸入框，與滑桿及圖上游標同步。可直接輸入 0 至梁長之間的位置；無效輸入保留原讀值並提示修正。計算、Section A／B 報表及 Excel／VBA 不變。
@@ -8,7 +10,7 @@ E2.208 統一荷載精度：原始 DL／LL、自重、反力及中間傳荷均�
 
 新增 Legend 箭嘴，可收起／展開柱關係、構件顯示及標註選項，並記住本機狀態。保留 E2.205 的 Section A／B 分開檢查結果及手動梁深編輯。
 
-Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.210**，在 E2.204 可编辑梁深的基础上，Summary Check 分开显示 Section A Span/Depth 与 Section B RC Check 的通过状态，补回仅 A 未通过的构件。保留既有支承及 RC 验算规则、Section A／B 抄格式、Excel／VBA 模板，以及界面提示和保存保护。包含源码、重新编译的 Windows 程序及离线浏览器资源。
+Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.211**，在 E2.204 可编辑梁深的基础上，Summary Check 分开显示 Section A Span/Depth 与 Section B RC Check 的通过状态，补回仅 A 未通过的构件。保留既有支承及 RC 验算规则、Section A／B 抄格式、Excel／VBA 模板，以及界面提示和保存保护。包含源码、重新编译的 Windows 程序及离线浏览器资源。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 

@@ -379,11 +379,11 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   if(!/^OK(?:$|[ (])/.test(b.status)&&!b.reasons.length)b.reasons=[result.description||b.status];
   return {a,b};
  }
- function audit(p,r){const steps=auditSteps(p,r);let next;do{next=steps.next();}while(!next.done);return next.value;}
- function* auditSteps(p,r){
+ function audit(p,r,beamSummary=null){const steps=auditSteps(p,r,beamSummary);let next;do{next=steps.next();}while(!next.done);return next.value;}
+ function* auditSteps(p,r,beamSummary=null){
   const q=E.clone(p),ex=init(q);ex.selected={};for(const f of r.floors)for(const m of members(q,r,f.n))if(m.kind!=='COL'||m.member.status!=='上层柱')ex.selected[f.n+'|'+m.token]=true;
   const out=yield* runSteps(q,r,'B'),items=[],zones=new Map();
-  const add=(row,status,reasons,path,recommendation,checks205)=>{if(!reasons.length)return;items.push({...(checks205?{checks205}:{}),floor:row.floor,framing:row.framing||r.floors[row.floor-1]?.type,id:row.id,token:row.token,kind:row.displayType||row.member?.displayKind||row.kind,status,path,reasons:[...new Set(reasons)],...(recommendation?{recommendation,columnKey:E.columnPositionKey(row.member)}:{})});};
+  const add=(row,status,reasons,path,recommendation,checks205)=>{if(!reasons.length)return;items.push({...(checks205?{checks205,...(beamSummary?{deflection211:beamSummary(q,row)}:{})}:{}),floor:row.floor,framing:row.framing||r.floors[row.floor-1]?.type,id:row.id,token:row.token,kind:row.displayType||row.member?.displayKind||row.kind,status,path,reasons:[...new Set(reasons)],...(recommendation?{recommendation,columnKey:E.columnPositionKey(row.member)}:{})});};
   for(const row of out.rows){yield {phase:'汇总',floor:row.floor,id:row.id};if(!row.checked)continue;const checks205=auditChecks205(q,row),a=checks205.a,b=checks205.b,badA=!['OK','N/A'].includes(a.status),badB=!/^OK(?:$|[ (])/.test(b.status);if(badA||badB){const advice=row.kind==='COL'&&badB?S.columnAdvice(row.result):null;add(row,badB?b.status:a.status,[...a.reasons,...(advice?.reasons||b.reasons)],'Check',advice?.recommendation,checks205);}
    const transfer=row.kind==='COL'?row.loading.transferErrors:row.transferErrors;if(transfer?.length)add(row,'TRANSFER PENDING',transfer,'传荷');
    if(['MB','SB','TB','CB'].includes(row.kind)){if(!zones.has(row.floor))zones.set(row.floor,LocalHeights96.zones(q,row.floor));const box=slabGeometry.box(E.rect(row.member)),hits=zones.get(row.floor).filter(z=>LocalHeights96.overlap(z.rect,box)>1e-7),limit=hits.length?Math.min(...hits.map(z=>z.sh??0)):r.floors[row.floor-1].sh,depth=row.member.d*1000;if(Number.isFinite(limit)&&depth>limit+tol)add(row,'HEIGHT',[`梁深 ${depth.toFixed(0)} mm 超过本构件所在区域结构高度 ${limit.toFixed(0)} mm`],'结构高度');}

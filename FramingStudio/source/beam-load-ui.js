@@ -51,6 +51,13 @@ const BeamLoadUI=(()=>{
  // Summary companion only: consume the completed audit's saved loading snapshot.
  // loading.lines/points use root-based coordinates for right-root CB; restore raw A
  // before applying the same screen orientation and solver as the member graph.
+ // User-approved Summary-only short-term criterion; never changes report/RC results.
+ function criterion212(i){
+  const a=i.checks205?.a,d=i.deflection211;
+  if(!['MB','SB','TB','CB'].includes(i.kind)||!['NOT OK','CALC. REQUIRED'].includes(a?.status)||d?.state!=='available'||!Number.isFinite(d.max)||d.max<0||!Number.isFinite(d.L)||d.L<=0)return null;
+  const limit=d.L*1000/250;return {limit,pass:d.max<limit};
+ }
+ function auditStatus212(i){const v=criterion212(i);return v?.pass&&/^OK(?:$|[ (])/.test(i.checks205.b.status)?'OK (SHORT-TERM)':i.status;}
  function summary211(p,row){
   if(!['MB','SB','TB','CB'].includes(row.kind))return null;
   const c=row.member,l=row.loading;
@@ -158,5 +165,5 @@ const BeamLoadUI=(()=>{
  document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b?.closest('.beam-load-editor')||!active)return;const d=active;if(b.dataset.blMode){d.value.mode=b.dataset.blMode;paint(d);}if(b.hasAttribute('data-bl-add')){d.value.rows.push({name:'新荷载',type:'line',dl:0,ll:0,a:0,b:d.L});paint(d);}if(b.dataset.blDelete!==undefined){d.value.rows.splice(Number(b.dataset.blDelete),1);paint(d);}if(b.hasAttribute('data-bl-calc'))calculate(d);});
 
  document.addEventListener('pointermove',e=>{const svg=e.target.closest?.('[data-plot207]');if(!svg||!active)return;const box=svg.getBoundingClientRect(),x=(e.clientX-box.left)*svg.viewBox.baseVal.width/box.width,a=Number(svg.dataset.left),b=Number(svg.dataset.right);inspect207(active,svg.closest('.beam-load-editor'),(x-a)/(b-a)*active.L,true);});
- return {summary211,diagram207,deflection210,elastic210,material210,render,read,orientation,displayRows,clear(){drafts.clear();active=null;observer?.disconnect();}};
+ return {criterion212,auditStatus212,summary211,diagram207,deflection210,elastic210,material210,render,read,orientation,displayRows,clear(){drafts.clear();active=null;observer?.disconnect();}};
 })();

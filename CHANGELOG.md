@@ -1,3 +1,10 @@
+## E2.206 — Legend 展開／收起（2026-10-09）
+
+- 樓層控制旁新增 Legend 箭嘴，一次收起／展開柱關係、構件顯示及 Mark & Size 選項。
+- 收起後擴大圖面；記住本機選擇，保留原有勾選狀態及樓層切換。
+- 保留 E2.205 功能，Section A／B 報表、Excel／VBA、模型及計算不變。
+- 沿用 8783 預覽，重新整理原分頁即可更新。
+
 ## E2.205 — Summary Check 分開顯示 Section A／B（2026-10-09）
 
 - 全樓問題清單按構件分別顯示 Section A Span/Depth 與 Section B RC Check 的狀態。

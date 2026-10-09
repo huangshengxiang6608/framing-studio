@@ -373,12 +373,22 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
  // Slab inspection has no upper-floor dependencies; only expose its slab row,
  // never the partial column/beam accumulation from this single-floor preview.
  // Inspect every current member without changing the user's Check/report selections.
+ // Summary-only classification: reuse the report sizing result and existing RC result.
+ function auditChecks205(p,row){
+  let a={status:'N/A',reasons:[]};
+  if(['MB','SB','TB','CB','SLAB'].includes(row.kind)){
+   try{a={...Reports.sizing(p,row),reasons:[]};if(a.status==='INPUT REQUIRED')a.reasons=['跨度、深度或支承設定待確認'];else if(a.status==='CALC. REQUIRED')a.reasons=['長懸臂須另行計算'];else if(a.status!=='OK')a.reasons=['Section A Span/Depth 超過限值'];}catch(e){a={status:'ERROR',reasons:[e.message]};}
+  }
+  const result=row.result||{},b={status:result.status||'ERROR',reasons:[...(result.fail||[])]};
+  if(!/^OK(?:$|[ (])/.test(b.status)&&!b.reasons.length)b.reasons=[result.description||b.status];
+  return {a,b};
+ }
  function audit(p,r){const steps=auditSteps(p,r);let next;do{next=steps.next();}while(!next.done);return next.value;}
  function* auditSteps(p,r){
   const q=E.clone(p),ex=init(q);ex.selected={};for(const f of r.floors)for(const m of members(q,r,f.n))if(m.kind!=='COL'||m.member.status!=='上层柱')ex.selected[f.n+'|'+m.token]=true;
   const out=yield* runSteps(q,r,'B'),items=[],zones=new Map();
-  const add=(row,status,reasons,path,recommendation)=>{if(!reasons.length)return;items.push({floor:row.floor,framing:row.framing||r.floors[row.floor-1]?.type,id:row.id,token:row.token,kind:row.displayType||row.member?.displayKind||row.kind,status,path,reasons:[...new Set(reasons)],...(recommendation?{recommendation,columnKey:E.columnPositionKey(row.member)}:{})});};
-  for(const row of out.rows){yield {phase:'汇总',floor:row.floor,id:row.id};if(!row.checked)continue;const s=row.result.status||'ERROR';if(!/^OK(?:$|[ (])/.test(s)){const advice=row.kind==='COL'?S.columnAdvice(row.result):null;add(row,s,advice?.reasons||(row.result.fail?.length?row.result.fail:[row.result.description||s]),'Check',advice?.recommendation);}
+  const add=(row,status,reasons,path,recommendation,checks205)=>{if(!reasons.length)return;items.push({...(checks205?{checks205}:{}),floor:row.floor,framing:row.framing||r.floors[row.floor-1]?.type,id:row.id,token:row.token,kind:row.displayType||row.member?.displayKind||row.kind,status,path,reasons:[...new Set(reasons)],...(recommendation?{recommendation,columnKey:E.columnPositionKey(row.member)}:{})});};
+  for(const row of out.rows){yield {phase:'汇总',floor:row.floor,id:row.id};if(!row.checked)continue;const checks205=auditChecks205(q,row),a=checks205.a,b=checks205.b,badA=!['OK','N/A'].includes(a.status),badB=!/^OK(?:$|[ (])/.test(b.status);if(badA||badB){const advice=row.kind==='COL'&&badB?S.columnAdvice(row.result):null;add(row,badB?b.status:a.status,[...a.reasons,...(advice?.reasons||b.reasons)],'Check',advice?.recommendation,checks205);}
    const transfer=row.kind==='COL'?row.loading.transferErrors:row.transferErrors;if(transfer?.length)add(row,'TRANSFER PENDING',transfer,'传荷');
    if(['MB','SB','TB','CB'].includes(row.kind)){if(!zones.has(row.floor))zones.set(row.floor,LocalHeights96.zones(q,row.floor));const box=slabGeometry.box(E.rect(row.member)),hits=zones.get(row.floor).filter(z=>LocalHeights96.overlap(z.rect,box)>1e-7),limit=hits.length?Math.min(...hits.map(z=>z.sh??0)):r.floors[row.floor-1].sh,depth=row.member.d*1000;if(Number.isFinite(limit)&&depth>limit+tol)add(row,'HEIGHT',[`梁深 ${depth.toFixed(0)} mm 超过本构件所在区域结构高度 ${limit.toFixed(0)} mm`],'结构高度');}
   }
@@ -386,6 +396,6 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   return {items:items.sort((a,b)=>a.floor-b.floor||a.id.localeCompare(b.id)),total:out.rows.filter(r=>r.checked).length};
  }
  function inspectSlab(p,r,f,t){if(!Number.isInteger(f)||f<1||f>p.total||!E.floorModel(r,f).slabs.some(s=>token('SLAB',s)===t))throw Error('板块已变化，请重新选择');const preview=E.clone(p);init(preview).selected={[f+'|'+t]:true};return run(preview,r,'B',false,f).rows.find(row=>row.floor===f&&row.kind==='SLAB'&&row.token===t);}
- return {slabTransfer177,slabReaction177,fullSpanSlabLoads179,columnLoadPoint,slabStrips118,slabFace,slabWinner,audit,auditSteps,slabCalculation,beamSpan,beamSpanLoads,slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};
+ return {auditChecks205,slabTransfer177,slabReaction177,fullSpanSlabLoads179,columnLoadPoint,slabStrips118,slabFace,slabWinner,audit,auditSteps,slabCalculation,beamSpan,beamSpanLoads,slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};
 })();
 if(typeof module!=='undefined')module.exports=Loading;

@@ -12,17 +12,17 @@ const {projects}=require('./column-load-centres186.cjs');
   });
   await page.waitForFunction(()=>document.querySelector('.bl-plot')?.textContent.includes('4.00 m'));
   const txt=await page.locator('.bl-plot').textContent();assert(!txt.includes('4.75 m')&&!txt.includes('4.25 m'));
-  assert.equal(Number(await page.locator('.bl-reaction180[data-end="B"]').getAttribute('data-value')),value);
+  assert(Math.abs(Number(await page.locator('.bl-reaction180[data-end="B"]').getAttribute('data-value'))-value)<1e-9);
  }
  await page.evaluate(()=>{
   BeamLoadUI.clear();const base=StudioHost.get(),selected=Loading.members(base.p,base.result,2).find(x=>x.kind==='COL'),h={...base,floor:2,key:'F2',selected,data:Loading.input(base.p,2,selected.token)};
   const host={refresh(){document.querySelector('#side').innerHTML=ColumnPanel123.render(h,host);}};host.refresh();
  });
- await page.waitForFunction(()=>document.querySelector('.cp-current strong')?.textContent==='200.00');
+ await page.waitForFunction(()=>document.querySelector('.cp-current strong')?.textContent==='200.000');
  const txt=await page.locator('.column-panel123').textContent();
  assert(txt.includes('恒载 DL · kN')&&txt.includes('活载 LL · kN'));assert(txt.includes('1.4DL + 1.6LL'));
  assert(!/\b[ GQ]\s*\/\s*[GQ]\b|\bG\b|\bQ\b/.test(txt));
- assert.deepEqual(await page.locator('.cp-current strong').allTextContents(),['200.00','40.00']);
+ assert.deepEqual(await page.locator('.cp-current strong').allTextContents(),['200.000','40.000']);
  const boxes=await page.locator('.cp-plot').evaluate(svg=>[...svg.querySelectorAll('text')].map(e=>{const b=e.getBBox();return {x:b.x,right:b.x+b.width,w:svg.viewBox.baseVal.width};}));
  assert(boxes.every(b=>b.x>=0&&b.right<=b.w),'DL/LL labels fit SVG');
  if(process.env.UI_SCREENSHOT)await page.locator('.column-panel123').screenshot({path:process.env.UI_SCREENSHOT});

@@ -1,14 +1,21 @@
 // Characteristic DL/LL loads, measured from the member's raw A end in metres.
 const BeamLoads=(()=>{
  const valid=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
- // Round characteristic loads once at each receiving beam, never its dimensions.
- function up(n){if(!valid(n))return n;const x=n*100,near=Math.round(x);return (Math.abs(x-near)<=Number.EPSILON*Math.max(1,Math.abs(x))*8?near:Math.ceil(x))/100;}
- // Explicit factored components survive transfer; never factor them a second time.
- const factored=r=>r.reaction207===true&&r.ug183!=null&&r.uq183!=null?{g:r.ug183,q:r.uq183}:({g:up(r.ug183??(1.4*up(r.g))),q:up(r.uq183??(1.6*up(r.q)))});
- // A complete self-weight equation is factored before its single rounding boundary.
- const selfWeight=raw=>({g:up(raw),q:0,ug183:up(1.4*raw),uq183:0});
- const surface=r=>({sw:selfWeight(r.swUnrounded185??r.sw??0).ug183,dl:up(1.4*up(r.dl||0)),sdl:up(1.4*up(r.sdl||0)),ll:up(1.6*up(r.ll||0))});
- const rounded=r=>({...r,g:up(r.g),q:up(r.q),...(r.ug183!=null?{ug183:r.reaction207?r.ug183:up(r.ug183),uq183:r.reaction207?r.uq183:up(r.uq183)}:{})});
+ // Characteristic G/Q are the single source for App and native FullAction73.
+ // Legacy ug183/uq183 caches must never override freshly calculated G/Q.
+ const factored=r=>({g:1.4*r.g,q:1.6*r.q});
+ const selfWeight=raw=>({g:raw,q:0,ug183:1.4*raw,uq183:0});
+ const surface=r=>({sw:1.4*(r.sw??0),dl:1.4*(r.dl??0),sdl:1.4*(r.sdl??0),ll:1.6*(r.ll??0)});
+ const normalized=r=>{const v={...r};if(v.ug183!=null||v.uq183!=null){const f=factored(v);v.ug183=f.g;v.uq183=f.q;}return v;};
+ // Display only: truncate decimal digits, including scientific notation, without
+ // changing the numeric value. Treat machine-scale noise at exact millesimals as zero.
+ function display208(value){
+  if(!Number.isFinite(value))return '—';
+  const scaled=value*1000,integer=Math.round(scaled),close=Number.isSafeInteger(integer)&&Math.abs(scaled-integer)<=Number.EPSILON*Math.max(1,Math.abs(scaled))*2;
+  const n=close?integer/1000:value,negative=n<0,raw=String(Math.abs(n)),[mantissa,exp='0']=raw.split('e'),[whole,fraction='']=mantissa.split('.'),digits=whole+fraction,point=whole.length+Number(exp);
+  const decimal=point<=0?'0.'+'0'.repeat(-point)+digits:point>=digits.length?digits+'0'.repeat(point-digits.length)+'.':digits.slice(0,point)+'.'+digits.slice(point),[a,b='']=decimal.split('.');
+  return (negative?'-':'')+a+'.'+b.padEnd(3,'0').slice(0,3)+(/[1-9]/.test(b.slice(3))?'…':'');
+ }
  function draft(o,L){
   if(Array.isArray(o.beamLoads))return {mode:o.beamLoadMode|| (o.mode==='manual'?'manual':'extra'),self:o.beamSelfWeight===true,rows:o.beamLoads.map(r=>({...r}))};
   const rows=[];
@@ -26,5 +33,5 @@ const BeamLoads=(()=>{
   return {mode:d.mode,selfWeight:d.mode==='manual'&&d.self,errors:err,points:rows.filter(r=>r?.type==='point'&&!errors([r],L).length).map(r=>({x:r.a,g:r.dl,q:r.ll,label:r.name||'手动集中荷载',origin:'manual'})),lines:rows.filter(r=>r?.type==='line'&&!errors([r],L).length).map(r=>({start:r.a,end:r.b,g:r.dl,q:r.ll,label:r.name||'手动线荷载',origin:'manual'}))};
  }
  function pack(d,L){const o={beamLoads:d.rows.map(r=>({...r})),beamLoadMode:d.mode,beamSelfWeight:d.self===true,mode:d.mode==='manual'?'manual':'auto',udlDead:null,udlLive:null,extraDead:0,points:[]},v=resolve(o,L);if(v.errors.length)throw Error(v.errors.join('；'));return o;}
- return {factored,surface,selfWeight,draft,errors,resolve,pack,up,rounded};
+ return {factored,surface,selfWeight,draft,errors,resolve,pack,normalized,display208};
 })();

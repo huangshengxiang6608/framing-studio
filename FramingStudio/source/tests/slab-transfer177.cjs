@@ -10,7 +10,7 @@ const passed=c.run(`(()=>{
  const sx={...s,x0:s.y0,x1:s.y1,y0:s.x0,y1:s.x1,rects:s.rects.map(r=>({x0:r.y0,x1:r.y1,y0:r.x0,y1:r.x1}))},mx={...m,slabs:[sx],beams:m.beams.map(b=>({...b,a:[...b.a].reverse(),z:[...b.z].reverse(),rawA:[...b.rawA].reverse(),rawZ:[...b.rawZ].reverse()}))};const tx=Loading.slabTransfer177(p,1,sx,'X',mx,{},sx,Loading.slabCalculation(sx,'X',mx),[]);near(Loading.slabReaction177(tx,22,false,false,{dir:'X',value:4.9},true).q,9.1875,'X symmetry');
  a=run(s,'Y',m,{slabSpan131:{L:3,width:null,selfWeight:'net'}});for(const r of a.rows){near(r.g,7.35,'manual G');near(r.q,11.25,'manual Q');}passed.push('X/Y symmetry and manual span use the same transfer formula');
  for(const edge of ['top','bottom']){a=run(s,'Y',m,{slabType:'CS',csFixedEdge:edge});const r=a.rows[edge==='bottom'?1:0],L=a.calc.L;near(r.q,7.5*L,'CS Q');near(r.mQ,7.5*L*L/2,'CS root moment');}passed.push('Both cantilever roots use L and q L²/2');
- const area=LoadData.addArea(p,1);Object.assign(area,{dl:10,sdl:2,ll:10,rects:[{x0:21,x1:23.5,y0:.75,y1:1.25}]});a=run(s,'Y',m);const extra=2.5*.5,centroid=.25;near(a.rows[1].q,9.1875+extra*centroid/2.45,'partial B moment');near(a.rows[0].q,9.1875+extra*(1-centroid/2.45),'partial A reaction');passed.push('Exact local load above beam top retains position and asymmetric reactions');
+ const area=LoadData.addArea(p,1);Object.assign(area,{dl:10,sdl:2,ll:10,rects:[{x0:21,x1:23.5,y0:.75,y1:1.25}]});a=run(s,'Y',m);near(a.rows[1].q,9.1875,'winning floor load reaches B');near(a.rows[0].q,9.1875,'winning floor load reaches A');passed.push('E2.223: beam-top-only region does not override the slab winning load');
  return passed;
 })()`);
 console.log(passed);

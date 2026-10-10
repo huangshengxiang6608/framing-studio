@@ -20,12 +20,12 @@ const result=c.run(`(()=>{
 })()`);
 assert.equal(result.raw.status,'NOT OK');assert.equal(result.raw.values.N87,'NOT OKAY');assert.equal(result.raw.values.G87,7.88);assert.equal(result.raw.values.G86,7.56);
 assert.equal(result.checks.a.status,'OK');assert.equal(result.checks.b.status,'OK');assert.equal(result.checks.b.reasons.length,0);assert(result.unchanged);
-assert.equal(result.key,'PFP');assert.equal(result.status,'NOT OK');assert(result.defaults.includes(result.key));
+assert.equal(result.key,'PFP');assert.equal(result.status,'NOT OK');assert(!result.defaults.includes(result.key));
 assert.equal(result.aOnlyKey,'FPP');assert.equal(result.aOnlyStatus,'OK (SHORT-TERM)');assert(!result.defaults.includes(result.aOnlyKey));
 for(const v of result.variants){assert.equal(v.b.status,'NOT OK',v.cell);assert(v.b.reasons.length);assert(!v.b.reasons.includes('挠度'));}
 assert.equal(result.missing.status,'INPUT REQUIRED');for(const key of ['unknown','geometry','width'])assert.equal(result[key].status,'NOT OK',key);
 assert.equal(result.widthHint.status,'OK');assert.equal(result.pending.status,'INPUT REQUIRED');assert.deepEqual(result.slabResult.reasons,result.raw.fail);
-console.log('PASS CB_1: original N87 7.88 > 7.56 unchanged; Summary RC passes; short-term deflection still fails/default visible; all seven structural failures, input/geometry/width/unknown guards, passing-deflection filter, slab preservation and immutability');
+console.log('PASS CB_1: original N87 7.88 > 7.56 unchanged; Summary RC passes; short-term deflection still fails/default hidden; all seven structural failures, input/geometry/width/unknown guards, passing-deflection filter, slab preservation and immutability');
 const ui=fs.readFileSync(path.join(__dirname,'../explorer-ui.js'),'utf8'),render=ui.slice(ui.indexOf(' function auditDeflectionHTML211'),ui.indexOf(' function beamFilterHTML214'));
 const helpers=ui.split('\n').find(line=>line.startsWith(' const $=id=>'));
 const html=c.run(`(()=>{${helpers}\n${render};return auditChecksHTML205(argument,false);})()`,{kind:'CB',checks205:result.checks,deflection211:{state:'available',L:4.5,max:20.0391}});

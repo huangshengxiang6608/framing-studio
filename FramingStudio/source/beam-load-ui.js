@@ -61,7 +61,7 @@ const BeamLoadUI=(()=>{
  }
  function auditStatus214(i){const v=beamResult214(i);if(!v)return i.status;if(v.failed)return 'NOT OK';if(v.d==='U'||v.b==='U')return 'INPUT REQUIRED';return auditStatus212(i);}
  const combinations214=Object.freeze(['PPP','PPF','PFP','PFF','FPP','FPF','FFP','FFF','pending-fail','pending','other']);
- function defaultCombinations214(){return combinations214.filter(k=>k==='pending-fail'||k.length===3&&(k[1]==='F'||k[2]==='F'));}
+ function defaultCombinations214(){return combinations214.filter(k=>k==='pending-fail'||k.length===3&&k!=='PFP'&&(k[1]==='F'||k[2]==='F'));}
  function combinationKey214(i){return beamResult214(i)?.key||'other';}
  function criterion212(i){
   const a=i.checks205?.a,d=i.deflection211;

@@ -12,6 +12,24 @@ const LoadRegions83=(()=>{
   for(const a of assigned){const rs=a.rects||((a.panels||[]).includes(token)?s.rects:[]);for(const r of rs){for(const q of free){const hit=intersect(r,q);if(hit)out.push({...hit,load:{...a,ll:LoadData.live(a),basis:a.basis||base.basis,areaName:a.name,areaId:a.id}});}free=difference(free,[r]);}}
   return out.concat(free.map(r=>({...r,load:{...base,ll:LoadData.live(base),areaName:'整层默认',areaId:null}})));
  }
+ // A slab uses one load set, selected by actual net-plan overlap in m².
+ // The uncovered part is the floor-default candidate. Ties with different
+ // loads remain unresolved; array order must never decide the design load.
+ function slabAssignment223(p,f,s){
+  const rects=union(s.rects),total=rects.reduce((n,r)=>n+area(r),0),base=LoadData.floor(p,f),token=Loading.token('SLAB',s),candidates=[],cuts=[];
+  for(const a of LoadData.areas(p,f)){
+   const regions=a.rects||((a.panels||[]).includes(token)?rects:[]),hits=union(regions.flatMap(r=>rects.map(q=>intersect(r,q)).filter(Boolean))),overlap=hits.reduce((n,r)=>n+area(r),0);
+   cuts.push(...hits);if(overlap>1e-8)candidates.push({area:overlap,load:{...a,ll:LoadData.live(a),basis:a.basis||base.basis,areaName:a.name,areaId:a.id}});
+  }
+  const remainder=difference(rects,union(cuts)).reduce((n,r)=>n+area(r),0);
+  if(remainder>1e-8||!candidates.length)candidates.push({area:remainder,load:{...base,ll:LoadData.live(base),areaName:'整层默认',areaId:null}});
+  candidates.sort((a,b)=>b.area-a.area||String(a.load.areaId??'').localeCompare(String(b.load.areaId??'')));
+  const winner=candidates[0],tol=Math.max(1e-8,total*1e-9),ties=candidates.filter(c=>Math.abs(c.area-winner.area)<=tol),stamp=c=>JSON.stringify([c.load.dl,c.load.sdl,c.load.ll,c.load.basis]),ambiguous=new Set(ties.map(stamp)).size>1;
+  const info={area:winner.area,total,areaId:winner.load.areaId,name:winner.load.areaName,tied:ties.length>1};
+  const inputError=ambiguous?'最大重疊面積相同，但荷載不同（'+ties.map(c=>c.load.areaName).join('／')+'）；請調整 Loading Area 範圍以確認此板荷載':null;
+  return {load:{...winner.load,...(inputError?{dl:null,sdl:null,ll:null,inputError}:{}),slabAssignment223:info},rects};
+ }
+ function slabPieces223(p,f,s){const a=slabAssignment223(p,f,s);return a.rects.map(r=>({...r,load:a.load}));}
  function summary(parts){const total=parts.reduce((n,r)=>n+area(r),0),v={...parts[0]?.load};for(const k of ['dl','sdl','ll'])v[k]=parts.every(r=>Number.isFinite(r.load[k]))?parts.reduce((n,r)=>n+area(r)*r.load[k],0)/total:null;v.mixed=new Set(parts.map(r=>JSON.stringify([r.load.dl,r.load.sdl,r.load.ll,r.load.basis]))).size>1;v.basis=parts.every(r=>r.load.basis==='total')?'total':'legacy-additional';v.areaName=[...new Set(parts.map(r=>r.load.areaName))].join(' / ');return v;}
  // Physical concrete between member faces; crossing members deduct their union.
  function netSelfWeight(s,model){
@@ -83,6 +101,6 @@ const LoadRegions83=(()=>{
  }
  // Reaction per metre along the support, integrated across the original span.
  function reaction(parts,dir,mid,lo,span,right,cs,sw,autoSW){const axis=dir==='X'?'y':'x',cross=dir==='X'?'x':'y';let out={g:0,q:0,sw:0,dl:0,sdl:0,mG:0,mQ:0,good:true};for(const r of parts){if(mid<=r[axis+'0']||mid>=r[axis+'1'])continue;const u=r[cross+'0']-lo,v=r[cross+'1']-lo,len=v-u,moment=right?span*len-(v*v-u*u)/2:(v*v-u*u)/2,weight=cs?len:right?(v*v-u*u)/(2*span):len-(v*v-u*u)/(2*span),load=r.load,dl=autoSW?0:load.dl;if(![dl,load.sdl,load.ll].every(x=>typeof x==='number'&&Number.isFinite(x)&&x>=0)){out.good=false;continue;}out.sw+=sw*weight;out.dl+=dl*weight;out.sdl+=load.sdl*weight;out.g+=(sw+dl+load.sdl)*weight;out.q+=load.ll*weight;out.mG+=(sw+dl+load.sdl)*moment;out.mQ+=load.ll*moment;}return out;}
- return {area,valid,intersect,subtract,difference,union,region,clip,pieces,summary,reaction,netSelfWeight,surface,clipSurface,effectiveAreas,surfaceRegions,columnSurface,beamSurface,axisBox,boundary};
+ return {area,valid,intersect,subtract,difference,union,region,clip,pieces,slabAssignment223,slabPieces223,summary,reaction,netSelfWeight,surface,clipSurface,effectiveAreas,surfaceRegions,columnSurface,beamSurface,axisBox,boundary};
 })();
 if(typeof module!=='undefined')module.exports=LoadRegions83;

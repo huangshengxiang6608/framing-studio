@@ -17,6 +17,14 @@ const ReviewLayout191=(()=>{
  function outsideSegments(a,z,polygons){const d=[z[0]-a[0],z[1]-a[1]],cuts=[0,1];for(const poly of polygons)for(let i=0;i<poly.length;i++){const v=poly[i],w=poly[(i+1)%poly.length],e=[w[0]-v[0],w[1]-v[1]],den=cross(d,e);if(Math.abs(den)<1e-10)continue;const q=[v[0]-a[0],v[1]-a[1]],t=cross(q,e)/den,u=cross(q,d)/den;if(t>0&&t<1&&u>=-1e-8&&u<=1+1e-8)cuts.push(t);}
   cuts.sort((a,b)=>a-b);const point=t=>[a[0]+t*d[0],a[1]+t*d[1]],out=[];for(let i=1;i<cuts.length;i++){const lo=cuts[i-1],hi=cuts[i];if(hi-lo>1e-9&&!polygons.some(p=>insidePolygon(point((lo+hi)/2),p)))out.push([point(lo),point(hi)]);}return out;
  }
+ // Keep the supporting primary beam outline at original T-junctions in drawing mode.
+ // Bind to functional geometry so display offsets do not change which member supports the end.
+ function supportsEnd224(support,attached){
+  if(!['MB','TB','CB'].includes(support.displayKind||support.kind)||(attached.displayKind||attached.kind)==='CB')return false;
+  const a=support.a,z=support.z,dx=z[0]-a[0],dy=z[1]-a[1],L=Math.hypot(dx,dy),ex=attached.z[0]-attached.a[0],ey=attached.z[1]-attached.a[1],E=Math.hypot(ex,ey);
+  if(L<1e-9||E<1e-9||Math.abs(dx*ey-dy*ex)<=1e-6*L*E)return false;
+  return [attached.a,attached.z].some(q=>{const t=((q[0]-a[0])*dx+(q[1]-a[1])*dy)/(L*L);return t*L>1e-6&&(1-t)*L>1e-6&&Math.abs((q[0]-a[0])*dy-(q[1]-a[1])*dx)/L<=1e-6;});
+ }
  function members(m){return [...m.beams,...m.columns.map(c=>({...c,kind:'COL'}))];}
  function column(c,map){const o=offset({...c,kind:'COL'},map);if(!o.dx&&!o.dy)return c;const r=Engine.columnRect(c);return {...c,x:c.x+o.dx,y:c.y+o.dy,cx:r.x+o.dx,cy:r.y+o.dy};}
  function columnEntry(c,map,f){if(c.floor!=null&&c.floor!==f)return c;const o=offset({...c.column,kind:'COL'},map);if(!o.dx&&!o.dy)return c;return {...c,column:column(c.column,map),...(c.rect?{rect:{...c.rect,x:c.rect.x+o.dx,y:c.rect.y+o.dy}}:{})};}
@@ -81,5 +89,5 @@ const ReviewLayout191=(()=>{
   }
   return {render,draw};
  }
- return {offsets,offset,beam,column,columnEntry,columnPlan,beamPolygon,beamRect,insidePolygon,outsideSegments,members,model,contains,move,restore,checkPaper,create};
+ return {supportsEnd224,offsets,offset,beam,column,columnEntry,columnPlan,beamPolygon,beamRect,insidePolygon,outsideSegments,members,model,contains,move,restore,checkPaper,create};
 })();

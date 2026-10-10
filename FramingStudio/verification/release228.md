@@ -1,0 +1,16 @@
+# E2.228 verification — 2026-10-11
+
+Baseline E2.227 e8c2c6962b43d714cc8ac7d880d7ba24f49dd1c3. Official main 5d18359d7110709b14fcecf431e23b88509791f6, release v2.203 and PR #8 checked before editing; no remote-only changes. Remote heads are checked again before publication.
+
+E2.228 lets users apply several beam size recommendations before rechecking. Applying a TB or Framing-wide SB recommendation retains the previous Summary problem list, filters and scroll position, labels results as pending, and disables duplicate application. Undo restores the corresponding application state. Other recommendations remain usable within the recognized batch; arbitrary edits retain the list but disable stale recommendations.
+
+A new Update modified/affected Check button becomes available after an initial full check. The audit compares complete RC design inputs and reuses only identical results. It rechecks load propagation and shared-Framing geometry. When non-Framing/global/load inputs are unchanged, floors above the highest changed Framing/model can reuse their transfer and column-area snapshots; affected floors and all floors below them are recalculated. Global input changes and projects with transfer trusses conservatively rebuild transfer. Candidate sizing runs use the same guarded cache rules. Scoped column-area hashing removes repeated serialization within an immutable calculation snapshot. Full-building Check remains available.
+
+Successful checks publish Summary, Member Check and report data together. Cancelled, failed or stale jobs cannot publish results or replace the last successful cache. No RC equations, reinforcement rules, size-recommendation rules, Section A/B report presentation, or native Excel/VBA files have changed.
+
+Validation:
+- incremental228.cjs: exact incremental/full result parity for shared-Framing dimensions, load, material, reinforcement, support, column dimensions, removed geometry, report scope, TB application and multi-Framing sizing advice; unchanged upper-floor replay; truss fallback; cancellation and immutable previous cache; scoped area calculation matches the original path.
+- batch228.cjs: actual Summary DOM/events using linkedom; two sequential TB applications, SB batch, no automatic audit, list/filter/scroll retention, duplicate prevention, undo, explicit incremental update.
+- Existing check-sync226, rebar227, tb-apply222 and beam-filters214 suites pass, covering synchronized report scope, reinforcement editing, recommendation guards and load/span/support/deflection regressions.
+- The user's 28-floor project (4537 members), on a clone with F03 TB width increased by 50 mm: incremental output exactly equals full audit output; 31 changed/new rows, 4506 unchanged rows, 20 removed geometry keys, 25 upper floors reused. Incremental 15.50 s versus 32.33 s for the following full run on this machine. This benchmark excludes size-advice search and is not a general runtime guarantee. Original project file was untouched.
+- Windows desktop compiled. Bundle/package guards verify embedded sources and byte-for-byte preservation of unrelated tracked app files, report rendering paths and Excel/VBA. Offline tests used; live browser visual validation remains unavailable under the URL policy. Native Excel was not rerun because its files and formulas are unchanged.

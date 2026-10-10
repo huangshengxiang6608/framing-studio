@@ -29,7 +29,7 @@ function ExplorerUI(host){
  function tbAdviceHTML221(i,stale){
   const a=i.tbAdvice221;if(!a)return '';if(stale)return '<div data-tb-advice221>TB 建議梁闊：待更新</div>';
   const depth='現有 D = '+num(a.currentDepth)+' mm；Structural Zone = '+num(a.limit)+' mm';
-  return '<div data-tb-advice221 style="margin:8px 0;padding:8px;background:#eef6f8"><b>TB 建議尺寸</b><br>'+depth+'<br>'+(a.depthFull?'深度已用盡。':'深度未用盡；先按 Structural Zone 試加深。')+'<br>'+(a.reason?'<span style="color:#c65300">未能提供建議：'+esc(a.reason)+'</span>':'<b>建議 B = '+num(a.b)+' mm；D = '+num(a.d)+' mm</b><br><small>已按此尺寸重算自重、傳荷及 RC；同位置共用 '+a.floors+' 層核對。尚未套用。</small>')+'</div>';
+  return '<div data-tb-advice221 style="margin:8px 0;padding:8px;background:#eef6f8"><b>TB 建議尺寸</b><br>'+depth+'<br>'+(a.depthFull?'深度已用盡。':'深度未用盡；先按 Structural Zone 試加深。')+'<br>'+(a.reason?'<span style="color:#c65300">未能提供建議：'+esc(a.reason)+'</span>':'<b>建議 B = '+num(a.b)+' mm；D = '+num(a.d)+' mm</b><br><small>已按此尺寸重算自重、傳荷及 RC；同位置共用 '+a.floors+' 層核對。尚未套用；套用會同步此 Framing 同位置梁，各層 D 跟隨其 Structural Zone。</small><br>'+btn('套用此 TB','audit-tb-apply222','data-floor="'+i.floor+'" data-token="'+esc(i.token)+'" '+(auditBusy131?'disabled':'')))+'</div>';
  }
  function beamFilterHTML214(items){
   const counts=Object.fromEntries(BeamLoadUI.combinations214.map(k=>[k,0]));for(const i of items)counts[BeamLoadUI.combinationKey214(i)]++;
@@ -358,6 +358,11 @@ return html;}
   }
   if(action==='slab-support-save132'||action==='slab-support-auto132'){const h=state();if(h.selected?.kind!=='SLAB')return;const value=action==='slab-support-auto132'?null:SlabSupportUI132.read(h),checkPage=!document.querySelector('.slab-panel121');if(memberSave((o,ex)=>{if(value)o.slabSupports132=value;else delete o.slabSupports132;if(checkPage)ex.selected[h.floor+'|'+h.selected.token]=true;},['slabSupports132'])){if(checkPage)await calculate();host.toast(value?'Slab Support 已保存，传荷及 Check 已更新':'已恢复自动识别 Slab Support');}return;}
 
+  if(action==='audit-tb-apply222'){
+   const h=host.get();if(auditBusy131||!audit131||JSON.stringify(h.p)!==auditStamp131){host.toast('建議已過期，請先更新全樓 Check');return;}
+   const item=audit131.items.find(i=>i.kind==='TB'&&i.floor===Number(b.dataset.floor)&&i.token===b.dataset.token);let outcome;
+   if(host.transact(()=>{outcome=TBApply222.apply(h.p,h.result,item);})){stamp='';auditNotice132='已套用 '+item.id+' 建議尺寸：B = '+outcome.b+' mm；本層 D = '+outcome.d+' mm。同位置共用 '+outcome.floors+' 層，可一次撤銷。請更新全樓 Check。';host.toast(auditNotice132);host.refresh();}return;
+  }
   if(action==='audit-sb-apply220'){
    const h=host.get();if(auditBusy131||!audit131||JSON.stringify(h.p)!==auditStamp131){host.toast('建議已過期，請先更新全樓 Check');return;}
    const key=b.dataset.framing,advice=audit131.items.find(i=>i.framing===key&&i.sbFraming220)?.sbFraming220;let outcome;

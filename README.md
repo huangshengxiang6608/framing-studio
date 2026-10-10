@@ -1,5 +1,7 @@
 # Framing Studio
 
+E2.222 新增「套用此 TB」按鈕，將已核對的建議梁闊及完整 Structural Zone 深度套用至該 Framing 同位置梁，可一次撤銷；套用後更新全樓 Check。
+
 E2.221 為 RC 不通過的 TB 先核對及用盡各層／局部 Structural Zone，再提供建議梁闊；每次試算重算自重、傳荷與 RC，建議不會自動修改模型。
 
 E2.220 在 Summary 為 RC 不通過的 SB 提供優先加深的建議尺寸、共用 Framing 最大建議及一鍵套用；受所有共用樓層與局部 Structural Zone 限制，保留 Section A／B 抄。
@@ -30,7 +32,7 @@ E2.208 統一荷載精度：原始 DL／LL、自重、反力及中間傳荷均�
 
 新增 Legend 箭嘴，可收起／展開柱關係、構件顯示及標註選項，並記住本機狀態。保留 E2.205 的 Section A／B 分開檢查結果及手動梁深編輯。
 
-Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.221**，在 E2.204 可编辑梁深的基础上，Summary Check 分开显示 Section A Span/Depth 与 Section B RC Check 的通过状态，补回仅 A 未通过的构件。保留既有支承及 RC 验算规则、Section A／B 抄格式、Excel／VBA 模板，以及界面提示和保存保护。包含源码、重新编译的 Windows 程序及离线浏览器资源。
+Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.222**，在 E2.204 可编辑梁深的基础上，Summary Check 分开显示 Section A Span/Depth 与 Section B RC Check 的通过状态，补回仅 A 未通过的构件。保留既有支承及 RC 验算规则、Section A／B 抄格式、Excel／VBA 模板，以及界面提示和保存保护。包含源码、重新编译的 Windows 程序及离线浏览器资源。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 

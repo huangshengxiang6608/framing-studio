@@ -161,3 +161,31 @@ const TBAdvice221=(()=>{
  }
  return {analyze};
 })();
+
+// Apply only the recommended physical TB, using the same full-zone mode as its trial.
+const TBApply222=(()=>{
+ function apply(p,r,item){
+  const a=item?.tbAdvice221,eps=1e-6;
+  if(item?.kind!=='TB'||!a||a.reason||![a.b,a.d].every(v=>Number.isFinite(v)&&v>=1&&v<=20000))throw Error('沒有可套用的 TB 建議尺寸');
+  const floor=r.floors.find(f=>f.n===item.floor);
+  if(!floor||floor.type!==item.framing)throw Error('TB 樓層已改變，請更新全樓 Check');
+  const beam=Engine.floorModel(r,floor).beams.find(b=>b.kind==='TB'&&Loading.token(b.kind,b)===item.token);
+  if(!beam)throw Error('TB 已不存在，請更新全樓 Check');
+  const sig=b=>Engine.sig(b.rawA,b.rawZ),signature=sig(beam),zone=LocalHeights96.beamAllowance(p,item.floor,beam);
+  if(Math.abs(a.currentDepth-beam.d*1000)>eps||Math.abs(a.limit-zone)>eps||Math.abs(a.d-zone)>eps||a.b<beam.b*1000-eps)throw Error('TB 建議已過期，請更新全樓 Check');
+  const entries=model=>model.floors.flatMap(f=>Engine.floorModel(model,f).beams.map(b=>({f,b,key:f.n+'|'+b.kind+'|'+sig(b)})));
+  const before=entries(r),trial=Engine.clone(p);
+  Engine.editSize(trial,item.framing,{id:beam.id,kind:beam.kind,f:item.floor},{b:a.b,d:null,kind:beam.kind,depthOverride184:true});
+  const model=Engine.generate(trial),after=entries(model),byKey=new Map(after.map(v=>[v.key,v]));
+  if(before.length!==after.length||before.some(v=>!byKey.has(v.key)))throw Error('尺寸改動會改變梁佈置，未套用');
+  let count=0;
+  for(const old of before){const next=byKey.get(old.key).b,target=old.f.type===item.framing&&sig(old.b)===signature;
+   if(target){const limit=LocalHeights96.beamAllowance(trial,old.f.n,next);count++;
+    if(Math.abs(next.b*1000-a.b)>eps||next.b<old.b.b-eps||next.d<old.b.d-eps||next.d*1000>limit+eps||(next.kind==='TB'&&Math.abs(next.d*1000-limit)>eps))throw Error('共用梁尺寸或 Structural Zone 未能符合建議，未套用');
+   }else if(Math.abs(next.b-old.b.b)>eps||Math.abs(next.d-old.b.d)>eps)throw Error('尺寸改動會影響其他梁尺寸，未套用');
+  }
+  if(count!==a.floors)throw Error('共用樓層已改變，請更新全樓 Check');
+  p.types[item.framing]=trial.types[item.framing];return {floors:count,b:a.b,d:a.d};
+ }
+ return {apply};
+})();

@@ -116,3 +116,48 @@ const SBAdvice220=(()=>{
  }
  return {analyze,apply,groups,next};
 })();
+
+// TB recommendations use the existing depth-following mode before trying width.
+// Only cloned projects are edited. Results are advisory; no live sizing is applied.
+const TBAdvice221=(()=>{
+ const eps=1e-6,step=50,maxWidth=20000;
+ const sig=b=>Engine.sig(b.rawA,b.rawZ);
+ const inventory=r=>r.floors.flatMap(f=>Engine.floorModel(r,f).beams.map(b=>f.n+'|'+b.kind+'|'+sig(b))).sort().join(';');
+ function* analyze(p,r,rows,solve,rc){
+  const answer={},groups=new Map(),baseline=inventory(r);
+  for(const row of rows)if(row.kind==='TB'&&rc(row.result).status==='NOT OK'){
+   const key=row.framing+'|'+sig(row.member);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);
+  }
+  for(const targets of groups.values()){
+   const first=targets[0],signature=sig(first.member),refs=rows.filter(row=>row.framing===first.framing&&['MB','SB','TB','CB'].includes(row.kind)&&sig(row.member)===signature);
+   let width=Math.max(...refs.map(row=>row.member.b*1000)),problem='',candidateRows=null,candidateModel=null;
+   const limits=new Map(targets.map(row=>[row.floor,LocalHeights96.beamAllowance(p,row.floor,row.member)]));
+   try{
+    if(refs.some(row=>!['OK','NOT OK'].includes(rc(row.result).status)))throw Error('共用 Framing 同位置梁有 RC 輸入／傳荷待確認');
+    while(width<=maxWidth+eps){
+     yield {phase:'TB 建議梁闊 · 先用盡 Structural Zone',floor:first.floor,id:first.id+' · '+width+' mm'};
+     const trial=Engine.clone(p);
+     // Clearing an explicit D uses the existing per-floor/local Structural Zone
+     // rule. Auto-identified TBs retain their original underlying beam category.
+     Engine.editSize(trial,first.framing,{id:first.member.id,kind:first.kind,f:first.floor},{b:width,d:null,kind:first.kind,depthOverride184:true});
+     const model=Engine.generate(trial);if(inventory(model)!==baseline)throw Error('試加闊會改變梁佈置或令構件消失，請另行調整');
+     for(const ref of refs){const b=Engine.floorModel(model,ref.floor).beams.find(b=>sig(b)===signature&&b.kind===ref.kind);if(!b||Math.abs(b.b*1000-width)>eps)throw Error('梁闊未能完整套用，請檢查共用梁覆寫');
+      const zone=LocalHeights96.beamAllowance(trial,ref.floor,b);if(b.d*1000>zone+eps||b.d<ref.member.d-eps)throw Error('恢復 Structural Zone 深度會縮小共用梁，請先核對深度');
+      if(ref.kind==='TB'&&Math.abs(b.d*1000-zone)>eps)throw Error('TB 未能用盡 Structural Zone，請先核對深度覆寫');
+     }
+     Loading.init(trial).selected={};for(const ref of refs)trial.explorer.selected[ref.floor+'|'+ref.token]=true;
+     const result=yield* solve(trial,model,'B'),checked=refs.map(ref=>result.rows.find(row=>row.floor===ref.floor&&row.token===ref.token));
+     if(checked.some(row=>!row||!['OK','NOT OK'].includes(rc(row.result).status)))throw Error('試尺寸後有 RC 輸入／傳荷待確認');
+     if(checked.every(row=>rc(row.result).status==='OK')){candidateRows=checked;candidateModel=model;break;}
+     width=Math.round((width+step)*1e6)/1e6;
+    }
+    if(!candidateRows)throw Error('搜尋至梁闊輸入上限 '+maxWidth+' mm，仍未找到 RC 通過尺寸');
+   }catch(e){problem=e.message;}
+   for(const row of targets){const current=row.member.d*1000,limit=limits.get(row.floor),candidate=candidateRows?.find(v=>v.floor===row.floor&&v.token===row.token);
+    answer[row.floor+'|'+row.token]={currentDepth:current,limit,depthFull:Math.abs(current-limit)<=eps,...(problem?{reason:problem}:{b:width,d:candidate.member.d*1000,trialLimit:LocalHeights96.beamAllowance(p,row.floor,candidate.member),floors:refs.length})};
+   }
+  }
+  return answer;
+ }
+ return {analyze};
+})();

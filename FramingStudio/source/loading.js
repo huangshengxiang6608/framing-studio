@@ -369,13 +369,23 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
  // Slab inspection has no upper-floor dependencies; only expose its slab row,
  // never the partial column/beam accumulation from this single-floor preview.
  // Inspect every current member without changing the user's Check/report selections.
- // Summary-only classification: reuse the report sizing result and existing RC result.
+ // Summary-only classification; retain the complete Excel result for reports/Member Check.
+ function beamRC216(result){
+  const original={status:result.status||'ERROR',reasons:[...(result.fail||[])]};
+  if(!['OK','NOT OK'].includes(result.status)||!result.values)return original;
+  const cells=['N40','N44','N52','N59','N69','N77','N78'],labels=['受压面钢筋','受拉面钢筋','最大剪应力','抗剪箍筋','剪扭组合','抗扭箍筋','抗扭纵筋'],v=result.values;
+  // Only a complete structural check can establish RC success. N87 is an independent L/d check.
+  if(cells.some(k=>!['OKAY','NOT OKAY'].includes(v[k])))return result.status==='OK'?{status:'INPUT REQUIRED',reasons:['RC 檢查結果未完整']}:original;
+  const failed=cells.filter(k=>v[k]!=='OKAY').map(k=>labels[cells.indexOf(k)]),ldOnly=!failed.length&&v.N87==='NOT OKAY';
+  const reasons=original.reasons.filter(s=>s!=='挠度'&&!(ldOnly&&s==='Excel 选筋规则内未找到通过的单一直径组合')&&!(ldOnly&&!result.widthViolation&&/^梁宽上限 .*；下一步加宽 50 mm 将超限，仍未通过$/.test(s)));
+  return {status:failed.length||reasons.length?'NOT OK':'OK',reasons:[...new Set([...reasons,...failed])]};
+ }
  function auditChecks205(p,row){
   let a={status:'N/A',reasons:[]};
   if(['MB','SB','TB','CB','SLAB'].includes(row.kind)){
    try{a={...Reports.sizing(p,row),reasons:[]};if(a.status==='INPUT REQUIRED')a.reasons=['跨度、深度或支承設定待確認'];else if(a.status==='CALC. REQUIRED')a.reasons=['長懸臂須另行計算'];else if(a.status!=='OK')a.reasons=['Section A Span/Depth 超過限值'];}catch(e){a={status:'ERROR',reasons:[e.message]};}
   }
-  const result=row.result||{},b={status:result.status||'ERROR',reasons:[...(result.fail||[])]};
+  const result=row.result||{},b=['MB','SB','TB','CB'].includes(row.kind)?beamRC216(result):{status:result.status||'ERROR',reasons:[...(result.fail||[])]};
   if(!/^OK(?:$|[ (])/.test(b.status)&&!b.reasons.length)b.reasons=[result.description||b.status];
   return {a,b};
  }

@@ -371,14 +371,17 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
  // Inspect every current member without changing the user's Check/report selections.
  // Summary-only classification; retain the complete Excel result for reports/Member Check.
  function beamRC216(result){
-  const original={status:result.status||'ERROR',reasons:[...(result.fail||[])]};
+  // Automatic sizing caps are advisory, not a reinforcement/shear/torsion failure.
+  const widthReasons=(result.fail||[]).filter(s=>result.widthViolation&&/^梁宽 [\d.]+ mm 超过(?:相接柱宽| Structural Depth)上限 [\d.]+ mm$/.test(s)||/^梁宽上限 [\d.]+ mm；下一步加宽 50 mm 将超限，仍未通过$/.test(s));
+  const warnings=widthReasons.map(s=>s.replace('超过相接柱宽上限','超過自動加闊上限（柱闊規則）').replace('超过 Structural Depth上限','超過自動加闊上限（Structural Depth 規則）').replace('梁宽上限','自動加闊上限').replace('，仍未通过',''));
+  const original={status:result.status||'ERROR',reasons:(result.fail||[]).filter(s=>!widthReasons.includes(s)),...(warnings.length?{warnings}: {})};
   if(!['OK','NOT OK'].includes(result.status)||!result.values)return original;
   const cells=['N40','N44','N52','N59','N69','N77','N78'],labels=['受压面钢筋','受拉面钢筋','最大剪应力','抗剪箍筋','剪扭组合','抗扭箍筋','抗扭纵筋'],v=result.values;
   // Only a complete structural check can establish RC success. N87 is an independent L/d check.
   if(cells.some(k=>!['OKAY','NOT OKAY'].includes(v[k])))return result.status==='OK'?{status:'INPUT REQUIRED',reasons:['RC 檢查結果未完整']}:original;
   const failed=cells.filter(k=>v[k]!=='OKAY').map(k=>labels[cells.indexOf(k)]),ldOnly=!failed.length&&v.N87==='NOT OKAY';
-  const reasons=original.reasons.filter(s=>s!=='挠度'&&!(ldOnly&&s==='Excel 选筋规则内未找到通过的单一直径组合')&&!(ldOnly&&!result.widthViolation&&/^梁宽上限 .*；下一步加宽 50 mm 将超限，仍未通过$/.test(s)));
-  return {status:failed.length||reasons.length?'NOT OK':'OK',reasons:[...new Set([...reasons,...failed])]};
+  const reasons=original.reasons.filter(s=>!widthReasons.includes(s)&&s!=='挠度'&&!(ldOnly&&s==='Excel 选筋规则内未找到通过的单一直径组合'));
+  return {status:failed.length||reasons.length?'NOT OK':'OK',reasons:[...new Set([...reasons,...failed])],...(warnings.length?{warnings}: {})};
  }
  function auditChecks205(p,row){
   let a={status:'N/A',reasons:[]};
@@ -394,7 +397,7 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   const q=E.clone(p),ex=init(q);ex.selected={};for(const f of r.floors)for(const m of members(q,r,f.n))if(m.kind!=='COL'||m.member.status!=='上层柱')ex.selected[f.n+'|'+m.token]=true;
   const out=yield* runSteps(q,r,'B'),items=[],zones=new Map();
   const add=(row,status,reasons,path,recommendation,checks205)=>{if(!reasons.length&&!checks205)return;items.push({...(checks205?{checks205,...(beamSummary?{deflection211:beamSummary(q,row)}:{})}:{}),floor:row.floor,framing:row.framing||r.floors[row.floor-1]?.type,id:row.id,token:row.token,kind:row.displayType||row.member?.displayKind||row.kind,status,path,reasons:[...new Set(reasons)],...(recommendation?{recommendation,columnKey:E.columnPositionKey(row.member)}:{})});};
-  for(const row of out.rows){yield {phase:'汇总',floor:row.floor,id:row.id};if(!row.checked)continue;const checks205=auditChecks205(q,row),a=checks205.a,b=checks205.b,badA=!['OK','N/A'].includes(a.status),badB=!/^OK(?:$|[ (])/.test(b.status);if(badA||badB||includePassedBeams&&beamSummary&&['MB','SB','TB','CB'].includes(row.kind)){const advice=row.kind==='COL'&&badB?S.columnAdvice(row.result):null;add(row,badB?b.status:a.status,[...a.reasons,...(advice?.reasons||b.reasons)],'Check',advice?.recommendation,checks205);}
+  for(const row of out.rows){yield {phase:'汇总',floor:row.floor,id:row.id};if(!row.checked)continue;const checks205=auditChecks205(q,row),a=checks205.a,b=checks205.b,badA=!['OK','N/A'].includes(a.status),badB=!/^OK(?:$|[ (])/.test(b.status);if(badA||badB||b.warnings?.length||includePassedBeams&&beamSummary&&['MB','SB','TB','CB'].includes(row.kind)){const advice=row.kind==='COL'&&badB?S.columnAdvice(row.result):null;add(row,badB?b.status:a.status,[...a.reasons,...(advice?.reasons||b.reasons)],'Check',advice?.recommendation,checks205);}
    const transfer=row.kind==='COL'?row.loading.transferErrors:row.transferErrors;if(transfer?.length)add(row,'TRANSFER PENDING',transfer,'传荷');
    if(['MB','SB','TB','CB'].includes(row.kind)){if(!zones.has(row.floor))zones.set(row.floor,LocalHeights96.zones(q,row.floor));const box=slabGeometry.box(E.rect(row.member)),hits=zones.get(row.floor).filter(z=>LocalHeights96.overlap(z.rect,box)>1e-7),limit=hits.length?Math.min(...hits.map(z=>z.sh??0)):r.floors[row.floor-1].sh,depth=row.member.d*1000;if(Number.isFinite(limit)&&depth>limit+tol)add(row,'HEIGHT',[`梁深 ${depth.toFixed(0)} mm 超过本构件所在区域结构高度 ${limit.toFixed(0)} mm`],'结构高度');}
   }

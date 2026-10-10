@@ -18,7 +18,8 @@ function ExplorerUI(host){
   const short=BeamLoadUI.criterion212(i),d=i.deflection211,f=BeamLoads.display208;
   const deflection=short?'<div data-audit-short213 style="margin-top:6px"><span style="font-weight:700;color:'+(stale?'#8a6100':short.pass?'#176b46':'#e60000')+'">'+(stale?'短期撓度：待更新':short.pass?'短期撓度 OK':'短期撓度未通過')+'</span>'+(stale?'':'<br><span data-audit-deflection212>δmax = '+f(d.max)+' '+(short.pass?'&lt;':'≥')+' '+f(short.limit)+' mm（L/250）</span>')+'</div>':'';
   const sectionA=block('Section A · Span/Depth',{...a,...(short?.pass&&a.status==='NOT OK'?{colour:'#c65300'}:{})},(a.status==='N/A'?'<br><small>柱不適用跨深比</small>':ratio+reasons(a))+deflection);
-  return sectionA+(short?'':auditDeflectionHTML211(d,stale))+block('Section B · RC Check',b,i.kind==='COL'?reasons({reasons:i.reasons}):b.reasons?.length?'<details><summary>查看原因</summary>'+reasons(b)+'</details>':'');
+  const sizeWarning=b.warnings?.length?'<div data-audit-size219 style="margin-top:6px;color:#c65300"><b>尺寸提示'+(stale?'（待更新）':'')+'</b><br>'+b.warnings.map(esc).join('；')+'<br><small>自動加闊限制，不影響 RC 判定。</small></div>':'';
+  return sectionA+(short?'':auditDeflectionHTML211(d,stale))+sizeWarning+block('Section B · RC Check',b,i.kind==='COL'?reasons({reasons:i.reasons}):b.reasons?.length?'<details><summary>查看原因</summary>'+reasons(b)+'</details>':'');
  }
  function beamFilterHTML214(items){
   const counts=Object.fromEntries(BeamLoadUI.combinations214.map(k=>[k,0]));for(const i of items)counts[BeamLoadUI.combinationKey214(i)]++;

@@ -2,6 +2,15 @@
 const ColumnAreas103=(()=>{
  const eps=1e-7,R=LoadRegions83;
  let stamp='',cache=new Map();
+ // Loading runs use immutable project/model snapshots. Hash that pair once per
+ // scoped run; interactive calls outside the scope still detect in-place edits.
+ const snapshots228=new WeakMap();
+ function snapshot228(p,result){
+  let entries=snapshots228.get(p);if(!entries){entries=new Map();snapshots228.set(p,entries);}
+  let entry=entries.get(result);if(!entry){entry={key:JSON.stringify([p,result]),count:0};entries.set(result,entry);}entry.count++;
+  let released=false;return ()=>{if(released)return;released=true;if(--entry.count===0)entries.delete(result);if(!entries.size)snapshots228.delete(p);};
+ }
+
  const area=R.area,copy=x=>JSON.parse(JSON.stringify(x)),a=b=>b.rawA||b.a,z=b=>b.rawZ||b.z;
  const active=m=>m.columns.filter(c=>c.status!=='上层柱');
  function point(p,m,c){
@@ -120,7 +129,7 @@ const ColumnAreas103=(()=>{
  function footprint(p,m,c){return partition(p,m).get(c)||{rects:[],polygons:[],b:null,d:null,box:null,area:0,errors:[],method:'geometric-half-bay'};}
 
  function calculate(p,result,f,target){
-  const key=JSON.stringify([p,result]);if(key!==stamp){stamp=key;cache=new Map();}const id=f+'|'+target;if(cache.has(id))return copy(cache.get(id));
+  const key=snapshots228.get(p)?.get(result)?.key??JSON.stringify([p,result]);if(key!==stamp){stamp=key;cache=new Map();}const id=f+'|'+target;if(cache.has(id))return copy(cache.get(id));
   const base=Engine.floorModel(result,f),selected=base&&active(base).find(c=>Loading.token('COL',c)===target);
   if(!selected)return {groups:[],errors:['当前楼层未找到所选下层柱'],method:'geometric-half-bay'};
   const memo=new Map(),groups=[],errors=[],shapeCache=new WeakMap();
@@ -181,5 +190,5 @@ const ColumnAreas103=(()=>{
   }
   const answer={groups:[...grouped.values()],errors:[...new Set(errors)],method:'geometric-half-bay'};cache.set(id,answer);return copy(answer);
  }
- return {calculate,footprint,wallShapes,wallSchedule,polygonArea,clipPolygon,subtractPolygon};
+ return {snapshot228,calculate,footprint,wallShapes,wallSchedule,polygonArea,clipPolygon,subtractPolygon};
 })();

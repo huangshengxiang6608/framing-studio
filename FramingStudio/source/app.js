@@ -237,7 +237,7 @@
   }
 
   if(tab==='walls')html=memberSelectionPanel()+html;
-  if(['regions','columns'].includes(tab)&&selected?.kind==='ZONE'&&t.noColumnZones?.[selected.index])html='<div class="notice"><b>已选禁柱区 '+(selected.index+1)+'</b><p>重叠处再次点击切换；Delete 删除；可撤销。</p>'+button('删除所选禁柱区','delete-no-column',selected.index)+'</div>'+html;$('side').innerHTML=InputColours.decorate(html,p);RightInputPreview.decorate(tab,{p,result,key,floor});if(tab==='beamLayout')beamLayoutUI.restore();if(tab==='checks')BeamRebar116.decorate({p,result,floor,key,selected});
+  if(['regions','columns'].includes(tab)&&selected?.kind==='ZONE'&&t.noColumnZones?.[selected.index])html='<div class="notice"><b>已选禁柱区 '+(selected.index+1)+'</b><p>重叠处再次点击切换；Delete 删除；可撤销。</p>'+button('删除所选禁柱区','delete-no-column',selected.index)+'</div>'+html;$('side').innerHTML=InputColours.decorate(html,p);RightInputPreview.decorate(tab,{p,result,key,floor});if(tab==='beamLayout')beamLayoutUI.restore();if(tab==='checks')BeamRebar116.decorate({p,result,floor,key,selected,memberResult:(f,t)=>exploration.getMemberResult227(p,f,t)});
  }
  function calculationView(){return ['checks','loading','deflection'].includes(tab);}
  function refresh(){

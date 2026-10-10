@@ -393,7 +393,7 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   return {a,b};
  }
  function audit(p,r,beamSummary=null,includePassedBeams=false){const steps=auditSteps(p,r,beamSummary,includePassedBeams);let next;do{next=steps.next();}while(!next.done);return next.value;}
- function* auditSteps(p,r,beamSummary=null,includePassedBeams=false,recommendSB=false){
+ function* auditSteps(p,r,beamSummary=null,includePassedBeams=false,recommendSB=false,retainOutput226=false){
   const q=E.clone(p),ex=init(q);ex.selected={};for(const f of r.floors)for(const m of members(q,r,f.n))if(m.kind!=='COL'||m.member.status!=='上层柱')ex.selected[f.n+'|'+m.token]=true;
   const out=yield* runSteps(q,r,'B'),items=[],zones=new Map();
   const add=(row,status,reasons,path,recommendation,checks205)=>{if(!reasons.length&&!checks205)return;items.push({...(checks205?{checks205,...(beamSummary?{deflection211:beamSummary(q,row)}:{})}:{}),floor:row.floor,framing:row.framing||r.floors[row.floor-1]?.type,id:row.id,token:row.token,kind:row.displayType||row.member?.displayKind||row.kind,status,path,reasons:[...new Set(reasons)],...(recommendation?{recommendation,columnKey:E.columnPositionKey(row.member)}:{})});};
@@ -403,7 +403,7 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   }
   for(const issue of r.issues||[]){const fs=issue.floor?[r.floors[issue.floor-1]]:r.floors.filter(f=>!issue.type||f.type===issue.type);for(const f of fs.filter(Boolean)){const row=out.rows.find(v=>v.floor===f.n&&[v.id,v.member.id].includes(issue.id));add(row||{floor:f.n,framing:f.type,id:issue.id||'模型',kind:'MODEL'},'MODEL',[issue.msg],'模型');}}
   if(recommendSB){const advice=yield* SBAdvice220.analyze(p,r,out.rows,runSteps,beamRC216);for(const item of items)if(item.kind==='SB'&&item.checks205?.b.status==='NOT OK'){item.sbAdvice220=advice.members[item.floor+'|'+item.token];item.sbFraming220=advice.framings[item.framing];}const tb=yield* TBAdvice221.analyze(p,r,out.rows,runSteps,beamRC216);for(const item of items)if(item.kind==='TB'&&item.checks205?.b.status==='NOT OK')item.tbAdvice221=tb[item.floor+'|'+item.token];}
-  return {items:items.sort((a,b)=>a.floor-b.floor||a.id.localeCompare(b.id)),total:out.rows.filter(r=>r.checked).length};
+  return {items:items.sort((a,b)=>a.floor-b.floor||a.id.localeCompare(b.id)),total:out.rows.filter(r=>r.checked).length,...(retainOutput226?{output226:{...out,rows:out.rows.map(row=>({...row,checked:p.explorer?.selected?.[row.floor+'|'+row.token]===true}))}}:{})};
  }
  function inspectSlab(p,r,f,t){if(!Number.isInteger(f)||f<1||f>p.total||!E.floorModel(r,f).slabs.some(s=>token('SLAB',s)===t))throw Error('板块已变化，请重新选择');const preview=E.clone(p);init(preview).selected={[f+'|'+t]:true};return run(preview,r,'B',false,f).rows.find(row=>row.floor===f&&row.kind==='SLAB'&&row.token===t);}
  return {auditChecks205,slabTransfer177,slabReaction177,fullSpanSlabLoads179,columnLoadPoint,slabStrips118,slabFace,slabWinner,audit,auditSteps,slabCalculation,beamSpan,beamSpanLoads,slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};

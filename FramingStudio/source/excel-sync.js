@@ -1,5 +1,5 @@
 window.ExcelSync=(()=>{
- let busy=false,progress='',records=[],issues=[],lastSnapshot='',runSection=null,runSections=[],pendingSections=new Set(),finishes={},preparedSnapshot='',sizingChanges=[];
+ let busy=false,progress='',records=[],issues=[],lastSnapshot='',runSection=null,runSections=[],pendingSections=new Set(),finishes={},sizingChanges=[];
  const reports={A:{snapshot:null,issues:[],message:'',records:[]},B:{snapshot:null,issues:[],message:'',records:[]}};
  const current=()=>JSON.stringify(window.ExcelProject().project),available=()=>!!window.chrome?.webview?.postMessage;
  // Report versions ignore the transient Member Check selection and the other report's selection.
@@ -22,7 +22,7 @@ window.ExcelSync=(()=>{
   return {jobs,issues:problems};
  }
 
- async function start(kind,section=null,filter=null){if(busy)return;if(kind==='Report'||kind==='RC'){busy=true;progress='检查梁深及自动加宽…';refresh();try{if(preparedSnapshot!==current()){const sized=await BeamSizing83.apply(StudioHost);sizingChanges=sized.changes||[];preparedSnapshot=current();if(sizingChanges.length){const summary=new Map();for(const v of sizingChanges){const key=v.framing+' / '+v.id,old=summary.get(key);summary.set(key,{from:old?.from??v.from,to:v.to});}StudioHost.toast('自动加宽：'+[...summary].map(([key,v])=>key+' '+v.from+' → '+v.to+' mm').join('；')+'。相关旧抄需重新生成。');}}else sizingChanges=[];}catch(e){progress=e.message;StudioHost.toast(e.message);busy=false;refresh();return;}busy=false;}const snapshot=current();lastSnapshot=snapshot;issues=[];records=[];runSection=kind==='Report'?section:null;runSections=kind==='Report'?(section==='AB'?['A','B']:[section]):[];pendingSections=new Set(runSections);finishes={};
+ async function start(kind,section=null,filter=null){if(busy)return;sizingChanges=[];const snapshot=current();lastSnapshot=snapshot;issues=[];records=[];runSection=kind==='Report'?section:null;runSections=kind==='Report'?(section==='AB'?['A','B']:[section]):[];pendingSections=new Set(runSections);finishes={};
   if(!available()){progress='请在桌面 App 中生成；此浏览器预览不能启动 Microsoft Excel。';for(const sec of runSections)reports[sec]={snapshot:reportSnapshot(sec,JSON.parse(snapshot)),issues:[],message:progress};pendingSections.clear();refresh();return;}
   busy=true;for(const sec of runSections){reports[sec]={snapshot:reportSnapshot(sec,JSON.parse(snapshot)),issues:[],message:'正在生成原 Excel 抄…',generatedAt:null,records:[]};WorkspacePages.clearPDF(sec);}progress='正在整理当前输入…';refresh();try{
    const p=JSON.parse(snapshot),jobs=[];

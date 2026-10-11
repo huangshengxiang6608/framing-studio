@@ -103,6 +103,7 @@ const Engine=(()=>{
   let end=0;const heights={};
   for(const g of p.groups){g.fire241??=2;if(![1,2,4].includes(g.fire241))fail('樓層 FRR 須為 1、2 或 4 小時');if(!keys.includes(g.type))fail('分组的 Framing 类型不存在');const e=g.end==='顶层'?p.total:g.end;num(e,1,500,'结束层须为整数或“顶层”');if(!Number.isInteger(e)||(end<p.total&&e<=end))fail('结束层须递增');end=Math.max(end,e);num(g.h,.1,30,'层高须为 0.1–30 m');const effectiveSH=structuralHeight(g);num(effectiveSH,1,10000,'Structural Height 须为 1–10000 mm');num(g.min,0,500,'最小柱距须为 0–500 m');if(p.types[g.type].beamDepth!=null)num(p.types[g.type].beamDepth,1,10000,'Framing SB 深度須為 1–10000 mm');}
   if(end<p.total)fail('楼层分组未覆盖到顶层');
+  if(!p.sbDefault243){if(p.defaults?.sb===250)p.defaults.sb=300;for(const t of Object.values(p.types))if(t.sbWidth===250)t.sbWidth=300;p.sbDefault243=true;}
   for(const k of ['cb','cd','gap','mb','sb','tb','tbd','slab','wall'])num(p.defaults?.[k],k==='gap'?100:1,20000,'默认尺寸无效：'+k);
   if(!['自动','X','Y'].includes(p.defaults.direction))fail('次梁方向无效');
   const point=(a,key)=>{if(!a||typeof a!=='object')fail('端点缺失');const v=resolve(p,a,key);v.forEach(n=>num(n,-5000,10000,'轴线引用或坐标无效'));};
@@ -160,7 +161,7 @@ const Engine=(()=>{
  }
  function dimensionIssues241(p,result){
   for(const f of result.floors){const m=floorModel(result,f.n);
-   for(const b of m.beams){const fire=beamFire241(p,f.n,b.kind),min=fire===4?280:200;if(b.b*1000<min-1e-6)result.issues.push({type:f.type,floor:f.n,id:b.id,msg:'FRR '+fire+' h：梁闊 '+Math.round(b.b*1000)+' mm 小於 Fire Code Table E6 最低 '+min+' mm'});}
+   for(const b of m.beams){const fire=beamFire241(p,f.n,b.kind),min=fire===4?280:200;if(b.b*1000<min-1e-6)result.issues.push({type:f.type,floor:f.n,id:b.id,fireWidthFailure243:true,msg:'FRR '+fire+' h：梁闊 '+Math.round(b.b*1000)+' mm 小於 Fire Code Table E6 最低 '+min+' mm'});}
    for(const s of m.slabs)if(s.thickness<200)result.issues.push({type:f.type,floor:f.n,id:s.id,msg:'樓板厚度 '+s.thickness+' mm 小於項目下限 200 mm'});
   }
  }

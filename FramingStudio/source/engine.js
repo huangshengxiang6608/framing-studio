@@ -101,7 +101,7 @@ const Engine=(()=>{
   const keys=Object.keys(p.types||{});if(!keys.length||keys.length>30||keys.some(k=>!/^F[0-9A-Za-z_-]{1,20}$/.test(k)))fail('类型名称须以 F 开头，最多 30 种');
   if(!Array.isArray(p.groups)||!p.groups.length||p.groups.length>100)fail('须填写楼层分组');
   let end=0;const heights={};
-  for(const g of p.groups){if(g.fire241!=null&&![1,2,4].includes(g.fire241))fail('樓層 FRR 須為 1、2 或 4 小時');if(!keys.includes(g.type))fail('分组的 Framing 类型不存在');const e=g.end==='顶层'?p.total:g.end;num(e,1,500,'结束层须为整数或“顶层”');if(!Number.isInteger(e)||(end<p.total&&e<=end))fail('结束层须递增');end=Math.max(end,e);num(g.h,.1,30,'层高须为 0.1–30 m');const effectiveSH=structuralHeight(g);num(effectiveSH,1,10000,'Structural Height 须为 1–10000 mm');num(g.min,0,500,'最小柱距须为 0–500 m');if(p.types[g.type].beamDepth!=null)num(p.types[g.type].beamDepth,1,10000,'Framing SB 深度須為 1–10000 mm');}
+  for(const g of p.groups){g.fire241??=2;if(![1,2,4].includes(g.fire241))fail('樓層 FRR 須為 1、2 或 4 小時');if(!keys.includes(g.type))fail('分组的 Framing 类型不存在');const e=g.end==='顶层'?p.total:g.end;num(e,1,500,'结束层须为整数或“顶层”');if(!Number.isInteger(e)||(end<p.total&&e<=end))fail('结束层须递增');end=Math.max(end,e);num(g.h,.1,30,'层高须为 0.1–30 m');const effectiveSH=structuralHeight(g);num(effectiveSH,1,10000,'Structural Height 须为 1–10000 mm');num(g.min,0,500,'最小柱距须为 0–500 m');if(p.types[g.type].beamDepth!=null)num(p.types[g.type].beamDepth,1,10000,'Framing SB 深度須為 1–10000 mm');}
   if(end<p.total)fail('楼层分组未覆盖到顶层');
   for(const k of ['cb','cd','gap','mb','sb','tb','tbd','slab','wall'])num(p.defaults?.[k],k==='gap'?100:1,20000,'默认尺寸无效：'+k);
   if(!['自动','X','Y'].includes(p.defaults.direction))fail('次梁方向无效');
@@ -130,10 +130,10 @@ const Engine=(()=>{
   if(typeof LocalHeights96!=="undefined")LocalHeights96.validate(p);
   return p;
  }
- // Fire Safety Code 2011 (2024), Table E6. Existing projects inherit material FRR.
+ // Fire Safety Code 2011 (2024), Table E6. Missing floor FRR defaults to 2 hours.
  function beamFire241(p,n,kind='MB'){
-  let from=1,group;for(const g of p.groups){const end=g.end==='顶层'?p.total:g.end;if(n>=from&&n<=end){group=g;break;}from=end+1;}const cfg=p.explorer?.settings||{};
-  return group?.fire241??(kind==='TB'?cfg.tbFire:cfg.fire)??2;
+  let from=1,group;for(const g of p.groups){const end=g.end==='顶层'?p.total:g.end;if(n>=from&&n<=end){group=g;break;}from=end+1;}
+  return group?.fire241??2;
  }
  function beamMinimum241(p,key,kind='MB'){
   const fs=floors(p).filter(f=>f.type===key),fire=Math.max(...(fs.length?fs.map(f=>beamFire241(p,f.n,kind)):[beamFire241(p,null,kind)]));
@@ -164,7 +164,7 @@ const Engine=(()=>{
    for(const s of m.slabs)if(s.thickness<200)result.issues.push({type:f.type,floor:f.n,id:s.id,msg:'樓板厚度 '+s.thickness+' mm 小於項目下限 200 mm'});
   }
  }
- function floors(p){let from=1,a=[];for(const g of p.groups){const to=Math.min(g.end==='顶层'?p.total:g.end,p.total);for(let n=from;n<=to;n++)a.push({n,name:FloorLevels.name(p,n),basement:FloorLevels.isBasement(FloorLevels.name(p,n)),h:g.h,type:g.type,sh:structuralHeight(g),headroom:g.headroom,em:g.em,min:g.min,fire241:g.fire241});from=to+1;}return a;}
+ function floors(p){let from=1,a=[];for(const g of p.groups){const to=Math.min(g.end==='顶层'?p.total:g.end,p.total);for(let n=from;n<=to;n++)a.push({n,name:FloorLevels.name(p,n),basement:FloorLevels.isBasement(FloorLevels.name(p,n)),h:g.h,type:g.type,sh:structuralHeight(g),headroom:g.headroom,em:g.em,min:g.min,fire241:g.fire241??2});from=to+1;}return a;}
  function tiles(p,t){const xs=axes(p,'x',t),ys=axes(p,'y',t),out=[];for(let i=0;i<xs.length-1;i++)for(let j=0;j<ys.length-1;j++){const k=i+','+j;out.push({i,j,k,x0:xs[i].v,x1:xs[i+1].v,y0:ys[j].v,y1:ys[j+1].v,state:!t.building[k]?0:t.opening[k]?2:1});}return out;}
  const inside=(ts,x,y,building=false)=>ts.some(t=>(t.state===1||(building&&t.state===2))&&x>t.x0&&x<t.x1&&y>t.y0&&y<t.y1);
  function rectAllowed(ts,x,y,w,d,building=false){let area=0;for(const t of ts)if(t.state===1||(building&&t.state===2))area+=Math.max(0,Math.min(x+w/2,t.x1)-Math.max(x-w/2,t.x0))*Math.max(0,Math.min(y+d/2,t.y1)-Math.max(y-d/2,t.y0));return area>=w*d-1e-7;}

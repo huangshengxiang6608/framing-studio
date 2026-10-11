@@ -24,7 +24,7 @@ c.run(`(()=>{
  assert.throws(()=>BeamLayout116.setThickness(p,key,[{slab:s,value:199}]),/200/);assert.equal(JSON.stringify(p.types.F1.slabSizes),oldSizes);
  const thickness=attempt(q=>BeamLayout116.setThickness(q,key,[{slab:s,value:200}]));assert(thickness.q);
  const legacy=Engine.clone(p);delete legacy.groups[0].fire241;delete legacy.groups[1].fire241;
- assert.equal(Engine.beamFire241(legacy,1,'MB'),2);assert.equal(Engine.beamFire241(legacy,1,'TB'),4);
+ assert.equal(Engine.beamFire241(legacy,1,'MB'),2);assert.equal(Engine.beamFire241(legacy,1,'TB'),2);legacy.groups[0].fire241=null;Engine.validate(legacy);assert.equal(legacy.groups[0].fire241,2);assert.equal(legacy.groups[1].fire241,2);assert.equal(JSON.parse(JSON.stringify(legacy)).groups[0].fire241,2);
  for(const fire of [1,2,4]){legacy.groups.forEach(g=>g.fire241=fire);const min=fire===4?280:200;assert.throws(()=>Engine.assertBeamWidth241(legacy,key,'MB',min-1));Engine.assertBeamWidth241(legacy,key,'MB',min);}
  const saved=JSON.parse(JSON.stringify(p));assert.equal(Engine.beamFire241(saved,2,'TB'),4);Engine.validate(saved);
  // FRR-only changes keep geometry, recalculate cover and report undersized legacy members.
@@ -41,6 +41,6 @@ c.run(`(()=>{
  return true;
 })()`,fixture.p);
 const app=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
-assert(app.includes("['沿用共同設定',1,2,4],'group',i,'fire241'"));
+assert(app.includes("select(g.fire241??2,[1,2,4],'group',i,'fire241')"));assert(!app.includes('沿用共同設定'));assert(app.includes("groupDraft.push({...last,start:null,end:'顶层',fire241:2})"));
 assert(app.includes('Engine.validateDimensionChanges241(p,old,next,result)'));
-console.log('PASS floor FRR inheritance/override, shared Framing max, width boundaries, rejected edit rollback, slab 200 boundary, reload, legacy diagnostics, Loading cover and insufficient-width rejection');
+console.log('PASS floor FRR default 2/explicit override, shared Framing max, width boundaries, rejected edit rollback, slab 200 boundary, reload, legacy diagnostics, Loading cover and insufficient-width rejection');

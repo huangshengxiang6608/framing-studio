@@ -1,0 +1,36 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{context}=require('../../verification/integration143.cjs');
+const c=context(path.resolve(__dirname,'../..'));c.ctx.assert=assert;c.run(fs.readFileSync(path.join(__dirname,'loading115-browser.js'),'utf8'));
+const measurements=[];for(const mode of ['depth','both']){c.ctx.batchMode245=mode;const measured=c.run(`(()=>{
+ function make(){const p=Engine.clone(loading115Tests().projects.slab),t=p.types.F1;p.axes.x[1].gap=166;p.axes.y[1].gap=8;for(const c of t.columns){if(c.x===6)c.x=166;if(c.y===4)c.y=8;}p.total=4;p.groups=[{...p.groups[0],end:'顶层',fire241:4,sh:900}];delete p.groups[0].headroom;delete p.groups[0].em;t.beams=[];t.suppressed=[];delete t.autoBeamSnapshot;t.autoBeams101=true;t.beamDepth=650;t.beamLayout116={main:true,secondary:true,mainDirection:'XY',secondaryDirection:'Y',gap:2000,scope:'all'};Engine.validate(p);return p;}
+ const base=make(),r=Engine.generate(base),m=Engine.floorModel(r,1),chosen=m.beams.filter(b=>b.kind==='SB');assert.equal(chosen.length,82);
+ const edits=chosen.map(beam=>({beam,size:{kind:'SB',b:batchMode245==='depth'?beam.b*1000:350,d:700}})),token=Loading.token('SB',chosen[0]);
+ base.explorer.members['1|'+token]={extraDead:7};base.explorer.reportA['1|'+token]=true;base.explorer.reportB['1|'+token]=true;
+ const old=Engine.clone(base),fast=Engine.clone(base),t0=performance.now();
+ Engine.freezeAutoBeams(old,'F1',m);
+ for(const {beam,size}of edits){const live=Engine.floorModel(Engine.generate(old),1).beams.find(b=>Engine.sig(b.rawA,b.rawZ)===Engine.sig(beam.rawA,beam.rawZ));Engine.editSize(old,'F1',{id:live.id,kind:live.kind,f:1},{...size,depthOverride184:true,preserveDepth184:false});}
+ const oldResult=Engine.generate(old),oldMs=performance.now()-t0,t1=performance.now();
+ assert(Engine.editBeamSizes245(fast,'F1',m,edits));const next=Engine.generate(fast);Engine.validateDimensionChanges241(fast,base,next,r);const fastMs=performance.now()-t1;
+ const projection=result=>result.floors.map(f=>{const m=Engine.floorModel(result,f.n);return {beams:m.beams.map(b=>({id:b.id,kind:b.kind,b:b.b,d:b.d,a:b.a,z:b.z,rawA:b.rawA,rawZ:b.rawZ,depth:b.depthOverride184,widthMode:b.widthMode,token:Loading.token(b.kind,b)})),slabs:m.slabs,columns:m.columns};});
+ assert.equal(JSON.stringify(projection(next)),JSON.stringify(projection(oldResult)),'batch and sequential geometry must match across shared floors');
+ assert.equal(JSON.stringify(fast.explorer),JSON.stringify(base.explorer),'loads, report A/B selections unchanged');
+ const reopened=Engine.generate(JSON.parse(JSON.stringify(fast)));assert.equal(JSON.stringify(projection(reopened)),JSON.stringify(projection(next)));
+ assert.equal(Engine.floorModel(next,1).beams.filter(b=>b.kind==='SB').length,82);
+ assert(Engine.floorModel(next,1).beams.filter(b=>b.kind==='SB').every(b=>b.b===(batchMode245==='depth'?chosen[0].b:.35)&&b.d===.7));
+ const invalid=Engine.clone(base),snapshot=JSON.stringify(invalid);assert.throws(()=>Engine.editBeamSizes245(invalid,'F1',m,[edits[0],{beam:chosen[1],size:{kind:'SB',b:250}}]),/280/);assert.equal(JSON.stringify(invalid),snapshot,'preflight must reject the whole batch before writing');
+ for(const change of [{...edits[0],size:{kind:'SB',b:350,d:null}},{...edits[0],size:{kind:'SB',b:null}},{beam:{...chosen[0],splitSecondaryParent200:'parent'},size:edits[0].size},{beam:chosen[0],size:{kind:'MB',b:350}}]){
+  const q=Engine.clone(base),before=JSON.stringify(q);assert.equal(Engine.editBeamSizes245(q,'F1',m,[change]),false);assert.equal(JSON.stringify(q),before,'unsupported edits retain the original path');
+ }
+
+ // Invalid depths reject the entire batch before any member or snapshot is written.
+ for(const d of [0,-1,NaN,Infinity,20001,901]){const q=Engine.clone(base),before=JSON.stringify(q);assert.throws(()=>Engine.editBeamSizes245(q,'F1',m,[edits[0],{beam:chosen[1],size:{kind:'SB',b:350,d}}]));assert.equal(JSON.stringify(q),before);}
+ const limited=Engine.clone(base);limited.groups=[{...limited.groups[0],end:2},{...limited.groups[0],end:'顶层',sh:675}];
+ const beforeLimit=JSON.stringify(limited);assert.throws(()=>Engine.editBeamSizes245(limited,'F1',m,[edits[0]]),/675/);assert.equal(JSON.stringify(limited),beforeLimit,'all shared floors checked');
+ // Explicit manual depths are editable and survive serialization.
+
+ const manual=Engine.clone(base);manual.types.F1.autoBeams101=false;manual.types.F1.beamLayout116.main=false;manual.types.F1.beamLayout116.secondary=false;
+ manual.types.F1.beams=[{id:'S1',kind:'SB',a:{x:2,y:0},z:{x:2,y:8},b:300,d:700,on:true,widthMode:'manual'}];
+ const mm=Engine.floorModel(Engine.generate(manual),1),mb=mm.beams.find(b=>b.id==='S1');assert(mb);assert(Engine.editBeamSizes245(manual,'F1',mm,[{beam:mb,size:{kind:'SB',b:350,d:750}}]));assert.equal(manual.types.F1.beams[0].d,750);assert.equal(manual.types.F1.beams[0].depthOverride184,750);
+ return {mode:batchMode245,beams:chosen.length,floors:base.total,sequentialMs:oldMs,batchMs:fastMs,speedup:oldMs/fastMs};
+})()`);
+measurements.push(measured);console.log('PASS '+mode+': batch/sequential geometry, slabs, shared floors, load/report selections, reload, depth/FRR preflight and fallback',JSON.stringify(measured));}
+console.log(JSON.stringify(measurements));

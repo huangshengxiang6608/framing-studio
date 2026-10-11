@@ -757,13 +757,24 @@ const Engine=(()=>{
   const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);
  }
  const slabSignature=s=>s.rects.map(r=>[r.x0,r.x1,r.y0,r.y1].map(v=>v.toFixed(6)).join(',')).sort().join('|');
- // Width-only SB edits share one stable topology. Other edits keep sequential resolution.
+ // Ordinary SB dimensions share one topology snapshot; complex edits retain sequential resolution.
  function editBeamWidths244(p,key,m,edits){
-  if(!edits.length||!edits.every(({beam,size})=>beam.kind==='SB'&&size.kind==='SB'&&size.b!==null&&!Object.hasOwn(size,'d')&&!beam.splitMainParent&&!beam.splitSecondaryParent200&&!beam.autoCantilever173&&!beam.autoTransfer))return false;
-  const members=new Map(m.beams.map(b=>[b.kind+'|'+sig(b.rawA,b.rawZ),b])),targets=edits.map(({beam,size})=>({beam:members.get(beam.kind+'|'+sig(beam.rawA,beam.rawZ)),size}));
-  for(const {beam,size}of targets){if(!beam)throw Error('梁已不存在，請重新選取');if(!Number.isFinite(size.b)||size.b>20000)throw Error('梁闊須為有效數字且不超過 20000 mm');assertBeamWidth241(p,key,'SB',size.b);}
+  return edits.every(({size})=>!Object.hasOwn(size,'d'))&&editBeamSizes245(p,key,m,edits);
+ }
+ function editBeamSizes245(p,key,m,edits){
+  if(!edits.length||!edits.every(({beam,size})=>beam.kind==='SB'&&size.kind==='SB'&&size.b!==null&&(!Object.hasOwn(size,'d')||size.d!==null)&&!beam.splitMainParent&&!beam.splitSecondaryParent200&&!beam.autoCantilever173&&!beam.autoTransfer))return false;
+  const members=new Map(m.beams.map(b=>[b.kind+'|'+sig(b.rawA,b.rawZ),b])),targets=edits.map(({beam,size})=>({beam:members.get(beam.kind+'|'+sig(beam.rawA,beam.rawZ)),size})),shared=floors(p).filter(f=>f.type===key);
+  // Validate every requested dimension before writing any member or freezing automatic beams.
+  for(const {beam,size}of targets){
+   if(!beam)throw Error('梁已不存在，請重新選取');
+   if(!Number.isFinite(size.b)||size.b<1||size.b>20000)throw Error('梁闊須為 1–20000 mm');assertBeamWidth241(p,key,'SB',size.b);
+   if(Object.hasOwn(size,'d')){
+    if(!Number.isFinite(size.d)||size.d<1||size.d>20000)throw Error('梁深須為 1–20000 mm');
+    for(const f of shared){const limit=LocalHeights96.beamAllowance(p,f.n,beam);if(size.d>limit+1e-6)throw Error(beam.id+' 梁深 '+size.d+' mm 超過 '+FloorLevels.name(p,f.n)+' Structural Zone 上限 '+limit+' mm；未套用');}
+   }
+  }
   freezeAutoBeams(p,key,m);
-  for(const {beam,size}of targets)editSize(p,key,{id:beam.id,kind:beam.kind},{...size,d:null,preserveDepth184:true},{model:m});
+  for(const {beam,size}of targets)editSize(p,key,{id:beam.id,kind:beam.kind},{...size,d:size.d??null,depthOverride184:Object.hasOwn(size,'d'),preserveDepth184:!Object.hasOwn(size,'d')},{model:m});
   return true;
  }
  function editSize(p,key,hit,size,batch244=null){
@@ -826,6 +837,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
+ return {editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

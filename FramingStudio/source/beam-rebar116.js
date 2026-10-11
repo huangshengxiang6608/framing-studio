@@ -44,7 +44,7 @@ const BeamRebar116=(()=>{
  }
  function metrics238(row,info={}){
   const values=row?.result?.values||{},inputs=row?.result?.inputs||{},context=['FRR','cover'];
-  const items=[['G29','Effective depth · d',values.G29,'mm','受壓邊至受拉鋼筋重心'],['FRR','FRR · 耐火時間',info.fire,'h',info.tb?'TB 獨立設定':'普通梁／CB 共用設定'],['cover','實際 cover',inputs.G16,'mm',typeof inputs.G16==='number'?(info.manualCover?'手動指定':'按 FRR 採用'):'更新 Check 後顯示實際採用值'],['K30','RC 彎矩係數 · K',values.K30,'','K = M / (b d² fcu)'],['K51','梁剪應力 · v',values.K51,'N/mm²','v = V / (b d)']];
+  const items=[['G29','Effective depth · d',values.G29,'mm','受壓邊至受拉鋼筋重心'],['FRR','FRR · 耐火時間',info.fire,'h',info.floorFire?'樓層 FRR 設定':info.tb?'TB 獨立設定':'普通梁／CB 共用設定'],['cover','實際 cover',inputs.G16,'mm',typeof inputs.G16==='number'?(info.manualCover?'手動指定':'按 FRR 採用'):'更新 Check 後顯示實際採用值'],['K30','RC 彎矩係數 · K',values.K30,'','K = M / (b d² fcu)'],['K51','梁剪應力 · v',values.K51,'N/mm²','v = V / (b d)']];
   return items.map(([cell,label,value,unit,description])=>{
    const valid=typeof value==='number'&&Number.isFinite(value),display=cell==='FRR'?value:BeamLoads.display208(value);
    return '<div><dt>'+label+'</dt><dd '+(context.includes(cell)?'data-rc-context240':'data-rc-metric238')+'="'+cell+'">'+(valid?esc(display)+(unit?' '+unit:''):'待計算')+'</dd><small>'+description+'</small></div>';
@@ -115,7 +115,7 @@ const BeamRebar116=(()=>{
    const badge=card.querySelector('.rebar-rc227');badge.textContent=status.text;badge.dataset.tone=status.tone;
    card.querySelector('.rebar-reasons227').textContent=status.reasons.join('；');
    const cfg240=Loading.settings(h.p),tb240=beam.kind==='TB',input240=Loading.input(h.p,h.floor,token);
-   card.querySelector('.rebar-metrics238').innerHTML=metrics238(live,{fire:tb240?cfg240.tbFire:cfg240.fire,tb:tb240,manualCover:input240.cover!=null});
+   card.querySelector('.rebar-metrics238').innerHTML=metrics238(live,{fire:Engine.beamFire241(h.p,h.floor,beam.kind),floorFire:Engine.floors(h.p).find(f=>f.n===h.floor)?.fire241!=null,tb:tb240,manualCover:input240.cover!=null});
    const linkText=prefix=>awaitAuto?'待自動選筋':$('ex-'+prefix+'-legs').value+' 肢 T'+$('ex-'+prefix+'-dia').value+' @ '+$('ex-'+prefix+'-space').value+' mm';
    card.querySelector('.rebar-section227').innerHTML=diagram227(awaitAuto?[]:counts(upper),awaitAuto?[]:counts(lower),beam.b,beam.d,{upperPart:upper,lowerPart:lower,upperDias:dias(upper),lowerDias:dias(lower),options:Object.fromEntries(['top','bottom','shear','torsion'].map(part=>[part,[...$('ex-'+(part==='shear'?'link':part==='torsion'?'tor':part)+'-dia').options].map(o=>Number(o.value))])),measures,upperRole:cb?'受拉':'受壓',lowerRole:cb?'受壓':'受拉',pending:awaitAuto,editable:true,drafts:drafts234,errors:errors234,shear:linkText('link'),torsion:linkText('tor'),shearFields:{legs:$('ex-link-legs').value,dia:$('ex-link-dia').value,space:$('ex-link-space').value},torsionFields:{legs:$('ex-tor-legs').value,dia:$('ex-tor-dia').value,space:$('ex-tor-space').value}});
    card.querySelector('[data-rebar-upper]').textContent='上筋 · '+(awaitAuto?'待自動選筋':countText(upper));

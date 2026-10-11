@@ -490,8 +490,28 @@ const Engine=(()=>{
   }
   splitSecondarySpans200(p,key,beams,[...walls,...supported],issue);
   const edges=[...walls,...supported],currentBays171=beamBays171(bayEdges171(edges,columns),ts,key),savedSB171=(t.autoBeamSnapshot?.secondary||[]).filter(b=>b.kind==='SB'),oldBays171=savedSB171.some(b=>!b.bay171)?beamBays171(edges,ts,key):[],changedBays171=new Set();
+  // Missing legacy bay tags can be recovered only when the entire saved SB layout
+  // exactly matches the current bay's independent spacing and support boundaries.
+  // Explicit historical tags and layouts that no longer fit retain the change guard.
+  const recoveredBays246=new Map();
+  for(const bay of currentBays171){
+   const [a,b,c,d]=bay,rule=secondaryAreaRule(t,bay);if(rule?.error||layout?.scope==='selected'&&!rule)continue;
+   const direction=rule?.direction??layout?.secondaryDirection??df.direction,gap=rule?.gap??layout?.gap??df.gap,h=direction==='自动'?b-a<=d-c:direction==='X',n=Math.ceil((h?d-c:b-a)/(gap/1000));
+   if(!Number.isFinite(n)||n<2||n>500)continue;
+   const inside=savedSB171.filter(s=>beamBay171(s,[bay]));if(inside.length!==n-1)continue;
+   if(inside.some(s=>s.bay171&&bayKey171(s.bay171)!==bayKey171(bay)))continue;
+   const positions=new Set();let fits=true;
+   for(const s of inside){
+    const axis=h?0:1,cross=1-axis,lo=h?a:c,hi=h?b:d,start=h?c:a,end=h?d:b;
+    if(!near(s.rawA[cross],s.rawZ[cross])||!near(Math.min(s.rawA[axis],s.rawZ[axis]),lo)||!near(Math.max(s.rawA[axis],s.rawZ[axis]),hi)){fits=false;break;}
+    const index=Math.round((s.rawA[cross]-start)*n/(end-start));
+    if(index<1||index>=n||positions.has(index)||!near(s.rawA[cross],start+(end-start)*index/n)){fits=false;break;}positions.add(index);
+   }
+   if(fits)for(const s of inside)if(!s.bay171)recoveredBays246.set(s,bay);
+  }
+  for(const s of savedSB171){const bay=recoveredBays246.get(s);if(!bay)continue;const live=beams.find(b=>b.source==='auto'&&b.kind==='SB'&&b.id===s.id&&sig(b.rawA,b.rawZ)===sig(s.rawA,s.rawZ));if(live)live.bay171=clone(bay);}
   // Repair only bays whose primary boundaries changed, retaining other saved spacing.
-  for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=b.bay171||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
+  for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=b.bay171||recoveredBays246.get(b)||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
    const customized=affected.some(b=>{const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null;return token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length)||t.beamWidths83?.[sig(b.rawA,b.rawZ)]!=null||t.beamDepths201?.[sig(b.rawA,b.rawZ)]!=null||b.depthOverride184!=null;});
    if(customized){issue('SB','主梁 bay 已改變，但原次梁有構件輸入；請核對後重新布置該 bay');continue;}changedBays171.add(key171);
   }
@@ -793,9 +813,11 @@ const Engine=(()=>{
   if(row.positionMode175==='fixed'){row.fixedA175=clone(b.a);row.fixedZ175=clone(b.z);}else{delete row.fixedA175;delete row.fixedZ175;}
   if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;if(nextKind==='CB'&&(b.kind!=='CB'||b.autoCantilever173))row.extendToBoundary173=true;row.widthMode=size.preserveWidth199?(b.widthMode??(b.source==='auto'?(b.kind==='SB'?'default':['MB','CB'].includes(b.kind)?'column':'manual'):'manual')):size.b===null?(["MB","CB"].includes(nextKind)?"column":"default"):"manual";row.kind=nextKind;row.b=size.b??(nextKind==='SB'?secondaryWidth(p,key):p.defaults[nextKind==='TB'?'tb':'mb']);if(size.depthOverride184){if(size.d===null)delete row.depthOverride184;else row.depthOverride184=size.d;}row.d??=null;if(requestedKind!==b.kind&&!size.depthOverride184){delete row.depthOverride184;row.d=null;}else if(!size.preserveDepth184)row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;if(autoEdit201){
    const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ),snap=t.autoBeamSnapshot;
+   const preservedBay246=snap.secondary?.find(v=>v.id===b.id&&sig(v.rawA,v.rawZ)===signature)?.bay171;
    for(const group of ['main','secondary','primary'])snap[group]=(snap[group]||[]).filter(v=>!(v.id===b.id&&sig(v.rawA,v.rawZ)===signature));
    const saved={id:row.id,kind:row.kind,rawA:clone(original.rawA),rawZ:clone(original.rawZ),a:clone(original.a),z:clone(original.z),b:row.b/1000,d:row.d==null?b.d:row.d/1000};
    for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','fixedEnd101','secondaryCantilever101','extendToBoundary173'])if(row[k]!==undefined)saved[k]=clone(row[k]);
+   if(row.kind==='SB'&&preservedBay246)saved.bay171=clone(preservedBay246);
    if(!size.depthOverride184&&!size.preserveDepth184&&row.kind==='SB'&&size.d!=null)saved.depthOverride184=size.d;
    if(b.autoCantilever173&&row.kind==='MB')delete saved.fixedEnd101;
    if(t.beamWidths83)delete t.beamWidths83[signature];if(saved.widthMode==='manual')(t.beamWidths83??={})[signature]=row.b;

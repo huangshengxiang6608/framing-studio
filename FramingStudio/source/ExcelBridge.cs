@@ -360,21 +360,30 @@ static class ExcelBridge {
   var breaks=new List<int>();foreach(dynamic br in sheet.HPageBreaks)if(Convert.ToInt32(br.Type)==-4135)breaks.Add(Convert.ToInt32(br.Location.Row));
   bool first=section=="A"?!job.ContainsKey("reportNumber")||Convert.ToBoolean(Obj(job["reportNumber"])["first"]):!job.ContainsKey("reportNumberB")||Convert.ToBoolean(Obj(job["reportNumberB"])["first"]);
   string oldHeader=Convert.ToString(sheet.PageSetup.CenterHeader);string[] footers80=Footers80(sheet);
+  // Finish the same member labels before formatting. Each PDF prints only its
+  // own row block; the complete copy's cells and drawings need formatting once,
+  // not once per member. No calculations or native copy generation are skipped.
+  for(int i=0;i<starts.Count;i++){
+   int begin=starts[i].Item1,end=i+1<starts.Count?starts[i+1].Item1-1:last;var m=starts[i].Item2;
+   double serial=m.ContainsKey("reportOrdinal")?Convert.ToDouble(m["reportOrdinal"]):i+1;
+   string t=Convert.ToString(labels82[begin,1]);var oldNumber=System.Text.RegularExpressions.Regex.Match(t,@"^B\.(\d+) ");t=System.Text.RegularExpressions.Regex.Replace(t,@"^(?:A\.[\d.]+ |B\.\d+ |\d+\) )","");
+   string prefix=section=="A"?"A."+(job.ContainsKey("reportNumber")?Obj(job["reportNumber"])["chapter"]:3)+".2."+serial:"B."+(serial+3);
+   sheet.Cells[begin,1].Value2=prefix+" "+t;
+   if(section=="B"&&oldNumber.Success)for(int rr=begin+1;rr<=end;rr++){string sub=Convert.ToString(labels82[rr,1]);if(sub!=null&&sub.StartsWith("B."+oldNumber.Groups[1].Value+"."))sheet.Cells[rr,1].Value2=prefix+sub.Substring(2+oldNumber.Groups[1].Value.Length);}
+  }
+  Stage79("整理原抄共用格式");Palette84(sheet);
   try{SetFooters80(sheet,new[]{"","",""});
    if(starts.Count>0&&first){int end=starts[0].Item1-1;
     if(section=="A")for(int r=end;r>=1;r--)if((Convert.ToString(labels82[r,1])??"").Contains("RC Member Checks")){end=r-1;break;}
     if(Convert.ToString(sheet.PageSetup.CenterHeader)!="Section "+section)sheet.PageSetup.CenterHeader="Section "+section;sheet.PageSetup.PrintArea="$A$1:$H$"+end;
-    string intro="Section-"+section+"-Intro.pdf";ExportCopy(sheet,dir,intro);files.Add(new{file=intro,reportOrder=0});
+    string intro="Section-"+section+"-Intro.pdf";ExportCopy(sheet,dir,intro,true);files.Add(new{file=intro,reportOrder=0});
    }
    for(int i=0;i<starts.Count;i++){
     int begin=starts[i].Item1,end=i+1<starts.Count?starts[i+1].Item1-1:last;var m=starts[i].Item2;string kind=Convert.ToString(m["kind"]);
     var ranks=new Dictionary<string,int>{{"SLAB",1},{"CS",1},{"SB",2},{"MB",3},{"CB",3},{"TB",4},{"COL",5}};int rank=ranks[kind];double serial=m.ContainsKey("reportOrdinal")?Convert.ToDouble(m["reportOrdinal"]):i+1;
-    string t=Convert.ToString(labels82[begin,1]);var oldNumber=System.Text.RegularExpressions.Regex.Match(t,@"^B\.(\d+) ");t=System.Text.RegularExpressions.Regex.Replace(t,@"^(?:A\.[\d.]+ |B\.\d+ |\d+\) )","");
-    string prefix=section=="A"?"A."+(job.ContainsKey("reportNumber")?Obj(job["reportNumber"])["chapter"]:3)+".2."+serial:"B."+(serial+3);
-    sheet.Cells[begin,1].Value2=prefix+" "+t;string header80=section=="A"?"Scheme 1 - RC":"Section B";if(Convert.ToString(sheet.PageSetup.CenterHeader)!=header80)sheet.PageSetup.CenterHeader=header80;
-    if(section=="B"&&oldNumber.Success)for(int rr=begin+1;rr<=end;rr++){string sub=Convert.ToString(labels82[rr,1]);if(sub!=null&&sub.StartsWith("B."+oldNumber.Groups[1].Value+"."))sheet.Cells[rr,1].Value2=prefix+sub.Substring(2+oldNumber.Groups[1].Value.Length);}
+    string header80=section=="A"?"Scheme 1 - RC":"Section B";if(Convert.ToString(sheet.PageSetup.CenterHeader)!=header80)sheet.PageSetup.CenterHeader=header80;
     sheet.ResetAllPageBreaks();sheet.PageSetup.PrintArea="$A$"+begin+":$H$"+end;
-    string file="Section-"+section+"-RC-"+i+".pdf";ExportCopy(sheet,dir,file);files.Add(new{file=file,reportOrder=(section=="A"?11:1)+rank+serial/10000});
+    string file="Section-"+section+"-RC-"+i+".pdf";ExportCopy(sheet,dir,file,true);files.Add(new{file=file,reportOrder=(section=="A"?11:1)+rank+serial/10000});
    }
   }finally{SetFooters80(sheet,footers80);sheet.PageSetup.PrintArea=area;if(Convert.ToString(sheet.PageSetup.CenterHeader)!=oldHeader)sheet.PageSetup.CenterHeader=oldHeader;sheet.ResetAllPageBreaks();foreach(int row in breaks)sheet.HPageBreaks.Add(sheet.Cells[row,1]);}
  }
@@ -490,9 +499,9 @@ static class ExcelBridge {
  // is disabled. Change them directly, only when needed; RC exports share one scope.
  static string[] Footers80(dynamic sheet){return new string[]{Convert.ToString(sheet.PageSetup.LeftFooter),Convert.ToString(sheet.PageSetup.CenterFooter),Convert.ToString(sheet.PageSetup.RightFooter)};}
  static void SetFooters80(dynamic sheet,string[] values){dynamic setup=sheet.PageSetup;if(Convert.ToString(setup.LeftFooter)!=values[0])setup.LeftFooter=values[0];if(Convert.ToString(setup.CenterFooter)!=values[1])setup.CenterFooter=values[1];if(Convert.ToString(setup.RightFooter)!=values[2])setup.RightFooter=values[2];}
- static object ExportCopy(dynamic sheet,string directory,string file) {
+ static object ExportCopy(dynamic sheet,string directory,string file,bool palettePrepared253=false) {
   if(ActiveJob75!=null)ReportHeader75(sheet,ActiveJob75);
-  Palette84(sheet);
+  if(!palettePrepared253)Palette84(sheet);
   Stage79("导出 PDF："+file);if(Math.Abs(Convert.ToDouble(sheet.PageSetup.HeaderMargin)-9)>.01)sheet.PageSetup.HeaderMargin=9;
   string path=Path.Combine(directory,file);bool paperMap75=Convert.ToBoolean(sheet.Application.MapPaperSize);string[] footers=Footers80(sheet);
   try{sheet.Application.MapPaperSize=false;SetFooters80(sheet,new[]{"","",""});sheet.ExportAsFixedFormat(0,path,0,true,false,Type.Missing,Type.Missing,false);}

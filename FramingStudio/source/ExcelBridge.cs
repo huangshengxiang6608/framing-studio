@@ -107,6 +107,91 @@ static class ExcelBridge {
  static object Run(dynamic x,dynamic b,string macro){Stage79(macro.StartsWith("Generate")?"生成原 Excel 抄":"计算与核对："+macro);return x.Run("'"+b.Name+"'!"+macro);}
  static void Set(dynamic sheet,string cell,object v){try{dynamic c=sheet.Range[cell];if(v==null)c.MergeArea.ClearContents();else if(v is string)c.Value2="'"+(string)v;else c.Value2=v;}catch(Exception e){throw new Exception(Convert.ToString(sheet.Name)+"!"+cell+": "+e.Message);}}
  static Dictionary<string,object> ActiveJob75;
+ // Adopt the App's checked reinforcement through native editable input cells.
+ // Formula cells are never replaced: their recalculated values must agree.
+ static HashSet<string> Adopted254=new HashSet<string>();
+ static string MemberKey254(Dictionary<string,object> m){return Convert.ToString(m["kind"])+"|"+Convert.ToString(m["id"]);}
+ static string[] CalculationSheets254={"_Input Engine","Section B Slab Check","Section B Main Beam Design","Section B Secondary Beam Design","_MB Analysis","_SB Analysis","_SB Helpers","Section B Transfer Beam Check","_TB Analysis","Section B Cantilever Beam Check","_CB Analysis","_CB Helpers","Section B Cantilever Slab Check","_CS Analysis"};
+ static void InputOnly254(dynamic sheet,string address,object value){
+  if(Convert.ToBoolean(sheet.Range[address].HasFormula))return;
+  if(value is string&&Convert.ToString(value).StartsWith("="))throw new Exception("App 输入不能包含公式："+address);
+  Set(sheet,address,value);
+ }
+ static void SelectAdopted254(dynamic x,dynamic b,Dictionary<string,object> member,bool seed){
+  string kind=Convert.ToString(member["kind"]),id=Convert.ToString(member["id"]);int row=Convert.ToInt32(member["row"]);
+  dynamic engine=b.Worksheets["_Input Engine"];
+  if(kind=="MB"||kind=="SB"){
+   InputOnly254(engine,kind=="MB"?"F3":"I3",id);x.CalculateFull();
+   x.Run("'"+b.Name+"'!"+kind+"LoadAuto81",row-(kind=="MB"?68:43));
+  }else if(kind=="SLAB"){
+   InputOnly254(engine,"C3",id);
+   if(!seed){string[] a={"F35","H35","C9","C57","D57"};for(int i=0;i<5;i++)InputOnly254(b.Worksheets["Section B Slab Check"],a[i],Val(engine.Cells[row-23,39+i]));}
+  }
+  else if(kind=="CB"){
+   x.Run("'"+b.Name+"'!CBSelect99",row);x.Run("'"+b.Name+"'!CBLoadAuto81",row-118);
+  }else if(kind=="CS")x.Run("'"+b.Name+"'!LoadCS101",row-118);
+  else if(kind=="TB"){
+   dynamic sheet=b.Worksheets["Section B Transfer Beam Check"];
+   InputOnly254(sheet,"L9",row);
+   if(seed){InputOnly254(sheet,"T13",row);InputOnly254(sheet,"T37",row);}else Run(x,b,"UpdateTransfer79");
+  }
+  x.CalculateFull();
+ }
+ static void AdoptInputs254(dynamic x,dynamic b,Dictionary<string,object> member,bool store){
+  var data=Obj(member["adopt254"]);string kind=Convert.ToString(member["kind"]),sheetName=Convert.ToString(data["sheet"]);int row=Convert.ToInt32(member["row"]);
+  var names=new Dictionary<string,string>{{"MB","Section B Main Beam Design"},{"SB","Section B Secondary Beam Design"},{"TB","Section B Transfer Beam Check"},{"CB","Section B Cantilever Beam Check"},{"SLAB","Section B Slab Check"},{"CS","Section B Cantilever Slab Check"}};
+  if(!names.ContainsKey(kind)||names[kind]!=sheetName)throw new Exception("App 配筋工作表不符");
+  var inputs=Obj(data["inputs"]);var steel=Obj(data["steel"]);var expected=Obj(data["expected"]);
+  bool slab=kind=="SLAB"||kind=="CS";
+  string[] required=slab?new[]{"C2","C4","C5","C6","C7","C9","F35","H35","C57","D57"}:new[]{"G12","G14","G15","G16","G17","G23","G24","C40","D40","C44","D44","G58","H58","E76","G76","H76"};
+  string[] results=slab?new[]{"F34","I35","I46"}:new[]{"G29","K36","K38","K58","N40","N44","N59","N77","N87"};
+  var steelCells=slab?new List<string>{"F35","H35","C57","D57"}:new List<string>{"E58","G58","H58","E76","G76","H76"};
+  if(!slab)foreach(int r in Enumerable.Range(40,8).Concat(Enumerable.Range(110,8)))foreach(string col in new[]{"C","D"})steelCells.Add(col+r);
+  if(required.Any(a=>!inputs.ContainsKey(a))||results.Any(a=>!expected.ContainsKey(a))||steelCells.Any(a=>!steel.ContainsKey(a)))throw new Exception("App 配筋或公式结果未完整，不能直接生成抄");
+  bool validRow=kind=="MB"?row>=74&&row<=93:kind=="SB"?row>=49&&row<=68:kind=="TB"?row>=6&&row<=25:kind=="SLAB"?row>=34&&row<=43:row>=124&&row<=143;
+  if(!validRow)throw new Exception("App 构件输入行不符");
+  SelectAdopted254(x,b,member,store);dynamic sheet=b.Worksheets[sheetName];
+  if(store){
+  foreach(var cell in inputs)if(SteelInput(kind,cell.Key)||new[]{"G13","T8","T9","T10","T11"}.Contains(cell.Key))InputOnly254(sheet,cell.Key,cell.Value);
+  foreach(var cell in steel){if(!SteelInput(kind,cell.Key))throw new Exception("非 App 配筋输入："+cell.Key);InputOnly254(sheet,cell.Key,cell.Value);}
+  if(kind=="MB"||kind=="SB"||kind=="CB"||kind=="TB"){
+   InputOnly254(sheet,"T16","Manual");
+   string[] shown={"BU44","BU45","CB44","CB45"},source={"T8","T9","T10","T11"};
+   for(int i=0;i<4;i++)if(inputs.ContainsKey(source[i]))InputOnly254(sheet,shown[i],inputs[source[i]]);
+  }
+  }
+  x.CalculateFull();
+  if(store){
+   if(kind=="MB"||kind=="SB")x.Run("'"+b.Name+"'!"+kind+"SaveAuto81",row-(kind=="MB"?68:43));
+   else if(kind=="TB")x.Run("'"+b.Name+"'!TBStorePending79",true);
+   else if(kind=="CB"){
+    InputOnly254(b.Worksheets["_CB Analysis"],"A"+(row-118),member["id"]);x.Run("'"+b.Name+"'!CBSaveAuto81",row-118);
+   }else{
+    if(kind=="CS")InputOnly254(b.Worksheets["_CS Analysis"],"A"+(row-118),member["id"]);
+    x.Run("'"+b.Name+"'!"+(kind=="SLAB"?"SectionBChanged78":"CSChanged101"),sheet,sheet.Range["F35,H35,C9,C57,D57"]);
+    if(kind=="SLAB")x.Run("'"+b.Name+"'!PersistManualSteel78");
+   }
+  }
+  int before=differences.Count;
+  Compare(Convert.ToString(member["id"])+" · adopted inputs",b,new Dictionary<string,object>{{sheetName,inputs}});
+  Compare(Convert.ToString(member["id"])+" · adopted steel",b,new Dictionary<string,object>{{sheetName,steel}});
+  Compare(Convert.ToString(member["id"])+" · original formulas",b,new Dictionary<string,object>{{sheetName,data["expected"]}});
+  if(differences.Count!=before)throw new Exception("App 配筋与原 Excel 公式不一致；没有重新选筋或覆盖公式，请查看差异。");
+ }
+ static void AdoptAll254(dynamic x,dynamic b,Dictionary<string,object> job){
+  var members=Arr(job["members"]).Select(Obj).Where(m=>m.ContainsKey("adopt254")&&m["adopt254"]!=null).ToList();if(members.Count==0)return;
+  Stage79("带入 App 已计算配筋，保留原 Excel 公式");
+  var enabled=new Dictionary<string,bool>();int mode=Convert.ToInt32(x.Calculation);
+  try{
+   x.Calculation=-4135;foreach(string name in CalculationSheets254){dynamic sheet=b.Worksheets[name];enabled[name]=Convert.ToBoolean(sheet.EnableCalculation);sheet.EnableCalculation=true;}
+   foreach(var member in members){AdoptInputs254(x,b,member,true);Adopted254.Add(MemberKey254(member));}
+  }finally{foreach(var pair in enabled)b.Worksheets[pair.Key].EnableCalculation=pair.Value;x.Calculation=mode;}
+ }
+ static void VerifyAdopted254(dynamic x,dynamic b,Dictionary<string,object> member){
+  var enabled=new Dictionary<string,bool>();int mode=Convert.ToInt32(x.Calculation);
+  try{x.Calculation=-4135;foreach(string name in CalculationSheets254){dynamic sheet=b.Worksheets[name];enabled[name]=Convert.ToBoolean(sheet.EnableCalculation);sheet.EnableCalculation=true;}AdoptInputs254(x,b,member,false);}
+  finally{foreach(var pair in enabled)b.Worksheets[pair.Key].EnableCalculation=pair.Value;x.Calculation=mode;}
+ }
  static List<object> differences=new List<object>();static int compared;
  static void Compare(string scope,dynamic b,Dictionary<string,object> expected){foreach(var s in expected){
  var cells=Obj(s.Value);if(cells.Count==0)continue;int rows=2,cols=1;var positions=new Dictionary<string,int[]>();
@@ -260,11 +345,12 @@ static class ExcelBridge {
     // The original update macro explicitly calculates its dependent ranges and
     // finishes with CalculateFull. Avoid recalculating on each intermediate write.
     x.Run("'"+b.Name+"'!InputChanged99",input,input.Range["C3,F3,C4,F4,C5,F5,"+reset]);
-    }finally{x.Calculation=inputCalculation80;}HoldFixedLoads252(b,job);Run(x,b,"Check99");
+    }finally{x.Calculation=inputCalculation80;}HoldFixedLoads252(b,job);AdoptAll254(x,b,job);Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("原 Excel Check 未完成："+Convert.ToString(Val(engine.Range["AS3"])));
     CompareFullLoads(b,job);
     foreach(var item in Arr(job["members"])){
      var member=Obj(item);string mk=Convert.ToString(member["kind"]),id=Convert.ToString(member["id"]),sheet=Convert.ToString(member["sheet"]);
+     if(Adopted254.Contains(MemberKey254(member))){VerifyAdopted254(x,b,member);if(!(member.ContainsKey("sectionA")&&Convert.ToBoolean(member["sectionA"])))continue;}
      if(member.ContainsKey("sectionA")&&Convert.ToBoolean(member["sectionA"])){
       Compare(id+" · Section A",b,new Dictionary<string,object>{{sheet,member["expected"]}});
       if(mk=="TB"){Set(b.Worksheets["Section B Transfer Beam Check"],"L9",member["row"]);Run(x,b,"UpdateTransfer79");Compare(id+" · transfer actions",b,new Dictionary<string,object>{{"Section B Transfer Beam Check",member["actions"]}});}continue;

@@ -18,8 +18,12 @@ with zipfile.ZipFile(io.BytesIO(old)) as a,zipfile.ZipFile(io.BytesIO(new)) as b
  before='Set ws = ThisWorkbook.Worksheets("Section A 抄")';after='Set ws = ThisWorkbook.Worksheets("Section A " & ChrW(&H6284))'
  for name,source in projects[0].items():
   if source==projects[1][name]:continue
-  assert source.count(before)==1 and projects[1][name]==source.replace(before,after);changed+=1
- assert changed==1
+  if name=='VBA/SteelPolicy84':
+   expected=source.replace('s.cells(f, 7).Value2 = d','s.cells(f, 7).Value2 = d: Application.CalculateFull').replace('s.cells(f, 8).Value2 = sp: Application.CalculateFull','s.cells(f, 8).Value2 = sp: s.Range("K" & f).Calculate: s.Range(out).Calculate')
+   assert expected!=source and projects[1][name]==expected
+  else: assert source.count(before)==1 and projects[1][name]==source.replace(before,after)
+  changed+=1
+ assert changed==2
  config=json.loads((app/'Excel/templates.json').read_text(encoding='utf8'))
  assert config['RC']['sha256']==hashlib.sha256(new).hexdigest()
- print(f'PASS {len(a.namelist())-1} unchanged OOXML parts; {len(projects[0])} VBA modules, exactly one Unicode-safe worksheet reference change; manifest hash matches')
+ print(f'PASS {len(a.namelist())-1} unchanged OOXML parts; {len(projects[0])} VBA modules, Unicode-safe worksheet reference plus exactly two link recalculation changes; manifest hash matches')

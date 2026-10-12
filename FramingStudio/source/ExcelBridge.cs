@@ -13,6 +13,30 @@ static class ExcelBridge {
  static JavaScriptSerializer J=new JavaScriptSerializer { MaxJsonLength=52428800, RecursionLimit=200 };
  static Dictionary<string,object> Obj(object o){return (Dictionary<string,object>)o;}
  static IEnumerable<object> Arr(object o){return ((IEnumerable)o).Cast<object>();}
+
+ // FullAction73 depends on fixed source IDs/spans and the submitted load table,
+ // not on trial reinforcement. Keep its formulas intact, suspend only this
+ // worksheet during native design, then recalculate and verify every held cell.
+ static object HeldLoadSheet252, HeldLoadValues252;
+ static void HoldFixedLoads252(dynamic book,Dictionary<string,object> job){
+  if(!job.ContainsKey("fullLoads"))return;int count=Arr(job["fullLoads"]).Count();if(count==0)return;
+  dynamic sheet=book.Worksheets["RC Load Results"];
+  if(!Convert.ToBoolean(sheet.EnableCalculation))return;
+  book.Application.CalculateFull();
+  object[,] values=(object[,])sheet.Range["A5:J"+(4+count)].Value2;
+  for(int r=1;r<=count;r++)if(Convert.ToString(values[r,10])!="OK")return;
+  HeldLoadValues252=values;HeldLoadSheet252=sheet;sheet.EnableCalculation=false;
+  Stage79("固定荷载已计算，开始原 Excel 配筋核对");
+ }
+ static void RestoreFixedLoads252(){
+  if(HeldLoadSheet252==null)return;dynamic sheet=HeldLoadSheet252;
+  sheet.EnableCalculation=true;HeldLoadSheet252=null;sheet.Application.CalculateFull();
+  var expected=(object[,])HeldLoadValues252;
+  var actual=(object[,])sheet.Range["A5:J"+(4+expected.GetLength(0))].Value2;
+  for(int r=1;r<=expected.GetLength(0);r++)for(int c=1;c<=10;c++)
+   if(!Same(expected[r,c],actual[r,c]))throw new Exception("生成期间荷载或跨度发生变化，结果未通过复核：RC Load Results!"+((char)('A'+c-1))+(r+4));
+  HeldLoadValues252=null;Stage79("固定荷载完整重算复核通过");
+ }
  static string RunDirectory79,CacheDirectory79,CacheVersion79;
  static readonly System.Diagnostics.Stopwatch Timer79=System.Diagnostics.Stopwatch.StartNew();
  static void Stage79(string message){if(RunDirectory79==null)return;try{Write(Path.Combine(RunDirectory79,"progress.json"),new {message=message,seconds=Timer79.Elapsed.TotalSeconds});File.AppendAllText(Path.Combine(RunDirectory79,"timing.jsonl"),J.Serialize(new {message=message,seconds=Timer79.Elapsed.TotalSeconds})+"\n");}catch{}}
@@ -236,7 +260,7 @@ static class ExcelBridge {
     // The original update macro explicitly calculates its dependent ranges and
     // finishes with CalculateFull. Avoid recalculating on each intermediate write.
     x.Run("'"+b.Name+"'!InputChanged99",input,input.Range["C3,F3,C4,F4,C5,F5,"+reset]);
-    }finally{x.Calculation=inputCalculation80;}Run(x,b,"Check99");
+    }finally{x.Calculation=inputCalculation80;}HoldFixedLoads252(b,job);Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("原 Excel Check 未完成："+Convert.ToString(Val(engine.Range["AS3"])));
     CompareFullLoads(b,job);
     foreach(var item in Arr(job["members"])){
@@ -279,10 +303,10 @@ static class ExcelBridge {
     // the native check once at export time, so opening need not regenerate it.
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("导出前 RC Check 未完成");
-    x.EnableEvents=false;b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    RestoreFixedLoads252();x.EnableEvents=false;b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
    Stage79("保存已核对结果");CommitPageCaches82(copy);StoreJob79(job,dir);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;GC.Collect();return 0;
-  }catch(Exception e){File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if(b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}
+  }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if(b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}
   finally{if(b!=null)try{b.Close(false);}catch{}if(x!=null)try{x.Quit();}catch{}}
  }
   static double D(Dictionary<string,object> a,string k,double fallback=0){return a.ContainsKey(k)&&a[k]!=null?Convert.ToDouble(a[k]):fallback;}

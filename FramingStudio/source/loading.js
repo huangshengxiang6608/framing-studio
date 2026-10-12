@@ -413,7 +413,14 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
    if(['MB','SB','TB','CB'].includes(row.kind)){if(!zones.has(row.floor))zones.set(row.floor,LocalHeights96.zones(q,row.floor));const box=slabGeometry.box(E.rect(row.member)),hits=zones.get(row.floor).filter(z=>LocalHeights96.overlap(z.rect,box)>1e-7),limit=hits.length?Math.min(...hits.map(z=>z.sh??0)):r.floors[row.floor-1].sh,depth=row.member.d*1000;if(Number.isFinite(limit)&&depth>limit+tol)add(row,'HEIGHT',[`梁深 ${depth.toFixed(0)} mm 超过本构件所在区域结构高度 ${limit.toFixed(0)} mm`],'结构高度');}
   }
   for(const issue of r.issues||[]){if(issue.fireWidthFailure243&&items.some(i=>i.floor===issue.floor&&i.id===issue.id&&i.fireWidth243?.pass===false))continue;const fs=issue.floor?[r.floors[issue.floor-1]]:r.floors.filter(f=>!issue.type||f.type===issue.type);for(const f of fs.filter(Boolean)){const row=out.rows.find(v=>v.floor===f.n&&[v.id,v.member.id].includes(issue.id));add(row||{floor:f.n,framing:f.type,id:issue.id||'模型',kind:'MODEL'},'MODEL',[issue.msg],'模型');}}
-  if(recommendSB){const check230=(project,row)=>BeamAdvice230.check(project,row,beamSummary||BeamLoadUI.summary211),needs230=row=>check230(p,row).status==='NOT OK';
+  if(recommendSB){
+   // A solved row is immutable during this recommendation search. Scope reuse to
+   // both the exact project and row objects; each candidate solve gets new rows.
+   const checksByProject=new WeakMap(),check230=(project,row)=>{
+    let checks=checksByProject.get(project);if(!checks){checks=new WeakMap();checksByProject.set(project,checks);}
+    if(!checks.has(row))checks.set(row,BeamAdvice230.check(project,row,beamSummary||BeamLoadUI.summary211));
+    return checks.get(row);
+   },needs230=row=>check230(p,row).status==='NOT OK';
    const advice=yield* SBAdvice220.analyze(p,r,out.rows,solve228,check230),tb=yield* TBAdvice221.analyze(p,r,out.rows,solve228,check230);
    for(const item of items){const row=out.rows.find(row=>row.floor===item.floor&&row.token===item.token);if(!item.checks205||!row||!needs230(row))continue;if(item.kind==='SB'){item.sbAdvice220=advice.members[item.floor+'|'+item.token];item.sbFraming220=advice.framings[item.framing];}else if(item.kind==='TB')item.tbAdvice221=tb[item.floor+'|'+item.token];}
   }

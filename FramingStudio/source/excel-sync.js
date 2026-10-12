@@ -1,10 +1,32 @@
+// Available only on the local preview server; native desktop messaging stays unchanged.
+window.LocalExcel251=(()=>{
+ let token='',ready=false,active=false;const workbooks=new Map();
+ async function request(url,options={}){const response=await fetch(url,{...options,headers:{'X-Framing-Key':token,...options.headers}});if(!response.ok){let message;try{message=(await response.json()).error}catch{}throw Error(message||'本機報表連線失敗（'+response.status+'）');}return response;}
+ async function send(message){
+  if(message.kind==='excel-open'){
+   try{const job=workbooks.get(message.id+'|'+message.file);if(!job)throw Error('找不到本次 Excel 檔案');const response=await request('/api/excel/workbook/'+job+'/'+encodeURIComponent(message.id)+'/'+encodeURIComponent(message.file)),url=URL.createObjectURL(await response.blob()),a=document.createElement('a');a.href=url;a.download=message.file;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}catch(error){window.StudioHost?.toast?.(error.message);}return;
+  }
+  if(message.kind!=='excel-run'||active)return;
+  active=true;
+  try{
+   const response=await request('/api/excel/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(message)}),job=(await response.json()).id;let cursor=0;
+   while(true){const value=await (await request('/api/excel/events/'+job+'/'+cursor)).json();cursor=value.cursor;
+    if(value.event){const record=value.event.record;if(record?.runId&&record.workbook)workbooks.set(record.runId+'|'+record.workbook,job);await ExcelSync.receive(value.event);if(value.event.done)break;}else await new Promise(resolve=>setTimeout(resolve,400));
+   }
+  }catch(error){await ExcelSync.receive({done:true,error:error.message,progress:'生成未完成：'+error.message});}
+  finally{active=false;}
+ }
+ async function probe(){if(typeof location==='undefined'||!['127.0.0.1','localhost'].includes(location.hostname)||typeof fetch!=='function')return;try{const r=await fetch('/api/excel/capabilities');if(!r.ok)return;const v=await r.json();ready=v.available===true;token=ready?v.token:'';WorkspacePages.refresh();}catch{ready=false;}}
+ setTimeout(probe,0);
+ return {available:()=>ready,send,probe};
+})();
 window.ExcelSync=(()=>{
  let busy=false,progress='',records=[],issues=[],lastSnapshot='',runSection=null,runSections=[],pendingSections=new Set(),finishes={},sizingChanges=[];
  const reports={A:{snapshot:null,issues:[],message:'',records:[]},B:{snapshot:null,issues:[],message:'',records:[]}};
- const current=()=>JSON.stringify(window.ExcelProject().project),available=()=>!!window.chrome?.webview?.postMessage;
+ const current=()=>JSON.stringify(window.ExcelProject().project),available=()=>!!window.chrome?.webview?.postMessage||window.LocalExcel251?.available()===true;
  // Report versions ignore the transient Member Check selection and the other report's selection.
  const reportSnapshot=(section,p=window.ExcelProject().project)=>{const v=Engine.clone(p);if(v.explorer){delete v.explorer.selected;delete v.explorer[section==='A'?'reportB':'reportA'];if(section==='B')delete v.explorer.reportANotes;}for(const t of v.transferTrusses||[])delete t[section==='A'?'reportB':'reportA'];return JSON.stringify(v);};
- const send=o=>window.chrome.webview.postMessage(o),refresh=()=>WorkspacePages.refresh();
+ const send=o=>window.chrome?.webview?.postMessage?window.chrome.webview.postMessage(o):LocalExcel251.send(o),refresh=()=>WorkspacePages.refresh();
  async function fingerprint(text){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');}
  function overallJob(p){const faces={},states={};for(const face of ['B','D']){const input=OverallGeometry.input(p,face),state=OverallGeometry.calculate(input,face);if(state.state!=='CALCULATED')throw Error(face+' 面：'+state.state);states[face]=state;const m=Overall.machine(input,face),expected={};for(const role of [1,2,3,4]){const sheet=Overall.roles[role];expected[sheet]={};for(const [cell,def] of Object.entries(Overall.source.sheets[sheet].cells)){if(!def.formula)continue;const value=m.safe(sheet,cell);if(typeof value==='string'&&(/^(#|Unsupported|Circular)/.test(value)))continue;expected[sheet][cell]=value;}}faces[face]={input:Overall.normalize(input,face),expected};}const comparison={};for(const [row,value] of Object.entries(Overall.compareFaces(states.B,states.D)))comparison['G'+row]=value;for(const face of ['B','D'])for(const [row,value] of Object.entries(states[face].results))comparison[(face==='B'?'C':'E')+row]=value;return {type:'Overall',faces,comparison,label:'Overall · B / D'};}
  function plan(p,kind,section,filter){const jobs=[],problems=[];
@@ -51,5 +73,5 @@ window.ExcelSync=(()=>{
  function open(type='Overall',section,filter){window.StudioHost?.navigate(section==='B'?'reportB':'reportA');if(filter?.member)start(type,section||'Check',[filter.member]);}
  function openWorkbook(id,file){if(available())send({kind:'excel-open',id,file});}
  document.addEventListener('click',e=>{const b=e.target.closest('[data-excel-open],[data-ex]');if(!b)return;if(b.dataset.excelOpen){e.preventDefault();e.stopImmediatePropagation();open(b.dataset.excelOpen);}else if(['preview-report','excel-row'].includes(b.dataset.ex)){e.preventDefault();e.stopImmediatePropagation();open('RC',b.dataset.section||'Check',b.dataset.ex==='excel-row'?{member:b.dataset.floor+'|'+b.dataset.token}:null);}},true);
- return {open,receive,overallJob,plan,state,reportState,ensureReport,generateReport:section=>start('Report',section),generate:type=>start(type),openWorkbook};
+ return {available,open,receive,overallJob,plan,state,reportState,ensureReport,generateReport:section=>start('Report',section),generate:type=>start(type),openWorkbook};
 })();

@@ -14,8 +14,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8",FrameworkDisplayName=".NET Framework 4.8")]
 
 [assembly: System.Reflection.AssemblyTitle("Framing Studio")]
-[assembly: System.Reflection.AssemblyVersion("2.250.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.250.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.251.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.251.0.0")]
 
 static class Program {
     [STAThread] static int Main(string[] args) {
@@ -46,6 +46,9 @@ sealed class Studio : Form {
     readonly List<string> Passed = new List<string>();
     readonly ToolStripStatusLabel Status = new ToolStripStatusLabel("正在启动…");
     readonly string TestDir, Profile, Data;
+    readonly string BrowserRequest251;
+    bool BrowserStarted251;
+    int BrowserEvent251;
     bool Ready, ClosingConfirmed, ClosingReview203;
     // Set by each autosave (project edit); cleared only after a confirmed .framing.json save.
     bool Unsaved;
@@ -55,10 +58,12 @@ sealed class Studio : Form {
         SuspendLayout();
         AutoScaleDimensions=new SizeF(96f,96f); AutoScaleMode=AutoScaleMode.Dpi;
         TestDir = args.Length == 2 && args[0] == "--self-test" ? Path.GetFullPath(args[1]) : null;
-        Data = TestDir == null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FramingStudio") : Path.Combine(TestDir, "isolated-user-data");
+        BrowserRequest251 = args.Length == 2 && args[0] == "--local-report251" ? Path.GetFullPath(args[1]) : null;
+        Data = BrowserRequest251 != null ? Path.Combine(Path.GetDirectoryName(BrowserRequest251), "worker-data") : TestDir == null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FramingStudio") : Path.Combine(TestDir, "isolated-user-data");
         Profile = Path.Combine(Data, "WebView2"); Directory.CreateDirectory(Data);
         if (TestDir != null) { Directory.CreateDirectory(TestDir); Opacity = .01; ShowInTaskbar = false; }
-        Text = "Framing Studio · E2.250 Desktop"; Width = 1500; Height = 950;
+        if (BrowserRequest251 != null) { Opacity = 0; ShowInTaskbar = false; }
+        Text = "Framing Studio · E2.251 Desktop"; Width = 1500; Height = 950;
         MinimumSize = new Size(900, 650); StartPosition = FormStartPosition.CenterScreen;
         if (File.Exists(Path.Combine(Root,"FramingStudio.ico"))) Icon = new Icon(Path.Combine(Root,"FramingStudio.ico"));
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("项目");
@@ -86,7 +91,7 @@ sealed class Studio : Form {
             await Start();
         };
         FormClosing += async delegate(object s, FormClosingEventArgs e) {
-            if (TestDir != null || ClosingConfirmed || !Ready) return;
+            if (TestDir != null || BrowserRequest251 != null || ClosingConfirmed || !Ready) return;
             e.Cancel = true;
             if (ClosingReview203) return;
             ClosingReview203 = true;
@@ -131,21 +136,39 @@ sealed class Studio : Form {
             await web.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(Path.Combine(Root,"desktop-bridge.js")));
             web.NavigationCompleted += async delegate(object s, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { Log("Navigation: " + e.WebErrorStatus); Status.Text = "页面加载失败：" + e.WebErrorStatus; return; }
-                Ready = true; Status.Text = "离线模式 · E2.250 · 项目请保存为 .framing.json";
+                Ready = true; Status.Text = "离线模式 · E2.251 · 项目请保存为 .framing.json";
                 if (TestDir != null && TestNavigation++ == 0) await SelfTest();
+                if (BrowserRequest251 != null && !BrowserStarted251) {
+                    BrowserStarted251=true;
+                    try { var request=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(BrowserRequest251));
+                        if(Convert.ToString(request["kind"])!="excel-run")throw new Exception("Invalid local report request");
+                        request["openWhenReady"]=false;ExcelMessage(request);
+                    } catch(Exception error) { ExcelNotify(new {done=true,error=error.Message}).GetAwaiter().GetResult(); }
+                }
             };
             if (TestDir != null) web.ScriptDialogOpening += delegate(object s, CoreWebView2ScriptDialogOpeningEventArgs e) { e.Accept(); };
             web.Navigate(Origin + "/index.html");
             Log("Started WebView2 " + env.BrowserVersionString);
         } catch (Exception ex) {
             Log(ex.ToString()); ExitCode = 1;
-            if (TestDir != null) { File.WriteAllText(Path.Combine(TestDir,"failure.txt"), ex.ToString()); Close(); }
+            if (BrowserRequest251 != null) { ExcelNotify(new {done=true,error=ex.Message}).GetAwaiter().GetResult(); }
+            else if (TestDir != null) { File.WriteAllText(Path.Combine(TestDir,"failure.txt"), ex.ToString()); Close(); }
             else MessageBox.Show(this,"无法启动：" + ex.Message + "\n\n本程序需要 Microsoft Edge WebView2 Runtime。若未安装，请运行包内 Install_WebView2.exe，再打开应用。", "Framing Studio", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
     bool ExcelBusy;
     readonly Dictionary<string,string> ExcelRuns = new Dictionary<string,string>();
-    async Task ExcelNotify(object message) { await JS("window.ExcelSync&&ExcelSync.receive("+Json.Serialize(message)+")"); }
+    async Task ExcelNotify(object message) {
+        if(BrowserRequest251 != null){
+            string folder=Path.Combine(Path.GetDirectoryName(BrowserRequest251),"events");Directory.CreateDirectory(folder);
+            string value=Json.Serialize(message),path=Path.Combine(folder,(++BrowserEvent251).ToString("D6")+".json");
+            File.WriteAllText(path+".tmp",value,new UTF8Encoding(false));File.Move(path+".tmp",path);
+            var fields=Json.Deserialize<Dictionary<string,object>>(value);
+            if(fields.ContainsKey("done")&&Convert.ToBoolean(fields["done"]))BeginInvoke(new Action(()=>{ClosingConfirmed=true;Close();}));
+            return;
+        }
+        await JS("window.ExcelSync&&ExcelSync.receive("+Json.Serialize(message)+")");
+    }
     async void ExcelMessage(Dictionary<string,object> message) {
         string excelError=null;
         try {

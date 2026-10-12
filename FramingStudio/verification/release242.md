@@ -1,0 +1,5 @@
+# E2.242 — Floor FRR defaults to 2 hours
+
+The floor FRR selector now contains only 1, 2 and 4 hours. Removed the inherit-common-settings option. Newly added groups explicitly start at 2 hours even when the preceding group uses 1 or 4. Missing/null FRR in existing projects normalizes to 2 hours; explicit selections remain unchanged. Beam width limits, calculation cover and Member Check read this same floor value for all beam types, including TB.
+
+Validation: updated fire241 regression verifies missing/null normalization, serialization, explicit 1/4 preservation, shared floor limits, width/slab rejection and actual Loading cover propagation. Member Check offline DOM regression, JavaScript syntax, whitespace check and Windows compilation passed. Package verification preserves unrelated tracked files, Section A/B report renderers, Excel/VBA and workbook templates. Preview verified by HTTP version and byte comparison without reloading the user's page or changing browser storage. No live browser QA claimed.

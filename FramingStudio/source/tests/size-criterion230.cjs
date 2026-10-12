@@ -1,0 +1,20 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{context}=require('../../verification/integration143.cjs');
+const c=context(path.resolve(__dirname,'../..'));c.run(fs.readFileSync(path.join(__dirname,'loading115-browser.js'),'utf8'));
+for(const rc of [true,false])for(const span of [true,false])for(const def of [true,false]){
+ const status=c.run(`BeamAdvice230.result({a:{status:argument.span?'OK':'NOT OK'},b:{status:argument.rc?'OK':'NOT OK',reasons:[]}}, {state:'available',L:6,max:argument.def?23.999:24}).status`,{rc,span,def});
+ assert.equal(status,rc&&(span||def)?'OK':'NOT OK');
+}
+for(const [a,b,d,expected] of [['OK','OK',null,'OK'],['NOT OK','OK',null,'INPUT REQUIRED'],['NOT OK','INPUT REQUIRED',{state:'available',L:6,max:0},'INPUT REQUIRED'],['INPUT REQUIRED','OK',{state:'available',L:6,max:0},'INPUT REQUIRED'],['CALC. REQUIRED','OK',{state:'available',L:6,max:0},'OK']])assert.equal(c.run('BeamAdvice230.result({a:{status:argument.a},b:{status:argument.b}},argument.d).status',{a,b,d}),expected);
+console.log('PASS RC AND (Section A OR strict L/250): eight combinations, equality and missing-input guards');
+const fixture=c.run(`(()=>{const p=Engine.clone(loading115Tests().projects.slab),t=p.types.F1;p.groups[0].sh=500;t.beamDepth=250;Object.assign(t.beams[0],{kind:'SB',b:250,d:250,depthOverride184:250,widthMode:'manual'});const r=Engine.generate(p),b=Engine.floorModel(r,1).beams.find(b=>b.id==='B1'),token=Loading.token('SB',b);p.explorer.members['1|'+token]={mode:'manual',beamSelfWeight:true,beamLoads:[{type:'line',a:0,b:6,dl:2,ll:1}]};return p;})()`);
+const run=(p,summary)=>c.run(`(()=>{const p=argument,r=Engine.generate(p),before=JSON.stringify(p),summary=${summary},it=Loading.auditSteps(p,r,summary,true,true);let step;do{step=it.next();}while(!step.done);return {unchanged:before===JSON.stringify(p),item:step.value.items.find(i=>(i.id==='B1'||i.kind==='TB')&&i.checks205)};})()`,p);
+const spanOnly=run(fixture,"(p,row)=>({state:'available',L:row.loading.L,max:100000})");
+assert(spanOnly.unchanged);assert.equal(spanOnly.item.checks205.b.status,'OK');assert.equal(spanOnly.item.checks205.a.status,'NOT OK');assert.equal(spanOnly.item.sbFraming220.b,250);assert.equal(spanOnly.item.sbFraming220.d,300);
+const actual=run(fixture,'BeamLoadUI.summary211');assert.equal(actual.item.checks205.a.status,'NOT OK');assert.equal(actual.item.checks205.b.status,'OK');assert(actual.item.deflection211.max<24);assert(!actual.item.sbAdvice220,'Deflection success must avoid resizing just for span/depth');
+const applied=c.run(`(()=>{const p=Engine.clone(argument.p),r=Engine.generate(p);SBAdvice220.apply(p,r,'F1',argument.advice);Loading.init(p).selected={};const m=Loading.members(p,Engine.generate(p),1).find(m=>m.id==='B1');p.explorer.selected['1|'+m.token]=true;const row=Loading.run(p,Engine.generate(p),'B').rows.find(r=>r.id==='B1');return {checks:Loading.auditChecks205(p,row),status:BeamAdvice230.check(p,row,()=>({state:'available',L:6,max:100000})).status};})()`,{p:fixture,advice:spanOnly.item.sbFraming220});
+assert.equal(applied.checks.a.status,'OK');assert.equal(applied.status,'OK');
+console.log('PASS real SB RC-only failure eligibility, depth-first Section A route despite failed deflection, and deflection route despite failed Section A; trial immutability');
+const tb=c.run(`(()=>{const p=Engine.clone(argument);p.groups[0].h=3.25;Object.assign(p.types.F1.beams[0],{kind:'TB'});const r=Engine.generate(p),b=Engine.floorModel(r,1).beams.find(b=>b.id==='B1');p.explorer.members['1|'+Loading.token('TB',b)]=Object.values(p.explorer.members)[0];return p;})()`,fixture);
+const width=run(tb,"(p,row)=>({state:'available',L:row.loading.L,max:30*.25/row.member.b})");
+assert.equal(width.item.checks205.b.status,'OK');assert.equal(width.item.tbAdvice221.d,250);assert.equal(width.item.tbAdvice221.b,350);assert(width.item.tbAdvice221.depthFull);
+console.log('PASS TB previously RC-pass now gets advice when both serviceability paths fail; width only after full zone, strict L/250 sizing');

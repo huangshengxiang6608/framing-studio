@@ -1,0 +1,9 @@
+# E2.227 verification — 2026-10-11
+
+Baseline E2.226 00f90c9ea4ed2f5906923fde364e1adc76fe5be1. Official main 5d18359d7110709b14fcecf431e23b88509791f6, release v2.203, PR #8 checked before editing; no remote-only changes.
+
+E2.227 replaces the click-to-expand beam reinforcement sketch in Member Check with an RC result card and always-visible reinforcement editors. The card shows RC pass/fail and reasons using the same criterion as Summary Check, excluding the independent Excel L/d check. A cross-section schematic shows upper/lower reinforcement layers, with actual counts in text. Compression/tension inputs retain their existing cell mapping; CB places the tension face at the top.
+
+The original input controls and Save/check/restore-auto actions are moved into the card rather than duplicated. Draft edits switch to MANUAL and show pending recheck; stale/missing results cannot show a current pass. Responsive styles stack the controls in narrow sidebars. No sizing, RC formulas, loading calculations, native Excel/VBA or Section A/B report rendering changes.
+
+Validation: rebar227.cjs runs the actual Member Check renderer, DOM events, save handler and calculation flow using linkedom (DOM-only; no browser). Checks visible editors, unique IDs, AUTO/manual transitions, upper/lower mapping including CB, eight-layer steel cell mapping, invalid count rejection, shear spacing, restore AUTO, stale/dirty result guards and unchanged report selections. check-sync226 regression passes. The schematic is rendered offline for inspection. Bundle/package guards preserve unrelated tracked app files and both report paths byte-for-byte. Windows desktop compiled successfully. Live browser visual inspection remains unavailable due to URL policy; native Excel was not rerun because its files/calculations are unchanged.

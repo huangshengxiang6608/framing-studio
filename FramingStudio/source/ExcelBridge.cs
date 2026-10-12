@@ -13,6 +13,30 @@ static class ExcelBridge {
  static JavaScriptSerializer J=new JavaScriptSerializer { MaxJsonLength=52428800, RecursionLimit=200 };
  static Dictionary<string,object> Obj(object o){return (Dictionary<string,object>)o;}
  static IEnumerable<object> Arr(object o){return ((IEnumerable)o).Cast<object>();}
+
+ // FullAction73 depends on fixed source IDs/spans and the submitted load table,
+ // not on trial reinforcement. Keep its formulas intact, suspend only this
+ // worksheet during native design, then recalculate and verify every held cell.
+ static object HeldLoadSheet252, HeldLoadValues252;
+ static void HoldFixedLoads252(dynamic book,Dictionary<string,object> job){
+  if(!job.ContainsKey("fullLoads"))return;int count=Arr(job["fullLoads"]).Count();if(count==0)return;
+  dynamic sheet=book.Worksheets["RC Load Results"];
+  if(!Convert.ToBoolean(sheet.EnableCalculation))return;
+  book.Application.CalculateFull();
+  object[,] values=(object[,])sheet.Range["A5:J"+(4+count)].Value2;
+  for(int r=1;r<=count;r++)if(Convert.ToString(values[r,10])!="OK")return;
+  HeldLoadValues252=values;HeldLoadSheet252=sheet;sheet.EnableCalculation=false;
+  Stage79("固定荷载已计算，开始原 Excel 配筋核对");
+ }
+ static void RestoreFixedLoads252(){
+  if(HeldLoadSheet252==null)return;dynamic sheet=HeldLoadSheet252;
+  sheet.EnableCalculation=true;HeldLoadSheet252=null;sheet.Application.CalculateFull();
+  var expected=(object[,])HeldLoadValues252;
+  var actual=(object[,])sheet.Range["A5:J"+(4+expected.GetLength(0))].Value2;
+  for(int r=1;r<=expected.GetLength(0);r++)for(int c=1;c<=10;c++)
+   if(!Same(expected[r,c],actual[r,c]))throw new Exception("生成期间荷载或跨度发生变化，结果未通过复核：RC Load Results!"+((char)('A'+c-1))+(r+4));
+  HeldLoadValues252=null;Stage79("固定荷载完整重算复核通过");
+ }
  static string RunDirectory79,CacheDirectory79,CacheVersion79;
  static readonly System.Diagnostics.Stopwatch Timer79=System.Diagnostics.Stopwatch.StartNew();
  static void Stage79(string message){if(RunDirectory79==null)return;try{Write(Path.Combine(RunDirectory79,"progress.json"),new {message=message,seconds=Timer79.Elapsed.TotalSeconds});File.AppendAllText(Path.Combine(RunDirectory79,"timing.jsonl"),J.Serialize(new {message=message,seconds=Timer79.Elapsed.TotalSeconds})+"\n");}catch{}}
@@ -83,6 +107,91 @@ static class ExcelBridge {
  static object Run(dynamic x,dynamic b,string macro){Stage79(macro.StartsWith("Generate")?"生成原 Excel 抄":"计算与核对："+macro);return x.Run("'"+b.Name+"'!"+macro);}
  static void Set(dynamic sheet,string cell,object v){try{dynamic c=sheet.Range[cell];if(v==null)c.MergeArea.ClearContents();else if(v is string)c.Value2="'"+(string)v;else c.Value2=v;}catch(Exception e){throw new Exception(Convert.ToString(sheet.Name)+"!"+cell+": "+e.Message);}}
  static Dictionary<string,object> ActiveJob75;
+ // Adopt the App's checked reinforcement through native editable input cells.
+ // Formula cells are never replaced: their recalculated values must agree.
+ static HashSet<string> Adopted254=new HashSet<string>();
+ static string MemberKey254(Dictionary<string,object> m){return Convert.ToString(m["kind"])+"|"+Convert.ToString(m["id"]);}
+ static string[] CalculationSheets254={"_Input Engine","Section B Slab Check","Section B Main Beam Design","Section B Secondary Beam Design","_MB Analysis","_SB Analysis","_SB Helpers","Section B Transfer Beam Check","_TB Analysis","Section B Cantilever Beam Check","_CB Analysis","_CB Helpers","Section B Cantilever Slab Check","_CS Analysis"};
+ static void InputOnly254(dynamic sheet,string address,object value){
+  if(Convert.ToBoolean(sheet.Range[address].HasFormula))return;
+  if(value is string&&Convert.ToString(value).StartsWith("="))throw new Exception("App 输入不能包含公式："+address);
+  Set(sheet,address,value);
+ }
+ static void SelectAdopted254(dynamic x,dynamic b,Dictionary<string,object> member,bool seed){
+  string kind=Convert.ToString(member["kind"]),id=Convert.ToString(member["id"]);int row=Convert.ToInt32(member["row"]);
+  dynamic engine=b.Worksheets["_Input Engine"];
+  if(kind=="MB"||kind=="SB"){
+   InputOnly254(engine,kind=="MB"?"F3":"I3",id);x.CalculateFull();
+   x.Run("'"+b.Name+"'!"+kind+"LoadAuto81",row-(kind=="MB"?68:43));
+  }else if(kind=="SLAB"){
+   InputOnly254(engine,"C3",id);
+   if(!seed){string[] a={"F35","H35","C9","C57","D57"};for(int i=0;i<5;i++)InputOnly254(b.Worksheets["Section B Slab Check"],a[i],Val(engine.Cells[row-23,39+i]));}
+  }
+  else if(kind=="CB"){
+   x.Run("'"+b.Name+"'!CBSelect99",row);x.Run("'"+b.Name+"'!CBLoadAuto81",row-118);
+  }else if(kind=="CS")x.Run("'"+b.Name+"'!LoadCS101",row-118);
+  else if(kind=="TB"){
+   dynamic sheet=b.Worksheets["Section B Transfer Beam Check"];
+   InputOnly254(sheet,"L9",row);
+   if(seed){InputOnly254(sheet,"T13",row);InputOnly254(sheet,"T37",row);}else Run(x,b,"UpdateTransfer79");
+  }
+  x.CalculateFull();
+ }
+ static void AdoptInputs254(dynamic x,dynamic b,Dictionary<string,object> member,bool store){
+  var data=Obj(member["adopt254"]);string kind=Convert.ToString(member["kind"]),sheetName=Convert.ToString(data["sheet"]);int row=Convert.ToInt32(member["row"]);
+  var names=new Dictionary<string,string>{{"MB","Section B Main Beam Design"},{"SB","Section B Secondary Beam Design"},{"TB","Section B Transfer Beam Check"},{"CB","Section B Cantilever Beam Check"},{"SLAB","Section B Slab Check"},{"CS","Section B Cantilever Slab Check"}};
+  if(!names.ContainsKey(kind)||names[kind]!=sheetName)throw new Exception("App 配筋工作表不符");
+  var inputs=Obj(data["inputs"]);var steel=Obj(data["steel"]);var expected=Obj(data["expected"]);
+  bool slab=kind=="SLAB"||kind=="CS";
+  string[] required=slab?new[]{"C2","C4","C5","C6","C7","C9","F35","H35","C57","D57"}:new[]{"G12","G14","G15","G16","G17","G23","G24","C40","D40","C44","D44","G58","H58","E76","G76","H76"};
+  string[] results=slab?new[]{"F34","I35","I46"}:new[]{"G29","K36","K38","K58","N40","N44","N59","N77","N87"};
+  var steelCells=slab?new List<string>{"F35","H35","C57","D57"}:new List<string>{"E58","G58","H58","E76","G76","H76"};
+  if(!slab)foreach(int r in Enumerable.Range(40,8).Concat(Enumerable.Range(110,8)))foreach(string col in new[]{"C","D"})steelCells.Add(col+r);
+  if(required.Any(a=>!inputs.ContainsKey(a))||results.Any(a=>!expected.ContainsKey(a))||steelCells.Any(a=>!steel.ContainsKey(a)))throw new Exception("App 配筋或公式结果未完整，不能直接生成抄");
+  bool validRow=kind=="MB"?row>=74&&row<=93:kind=="SB"?row>=49&&row<=68:kind=="TB"?row>=6&&row<=25:kind=="SLAB"?row>=34&&row<=43:row>=124&&row<=143;
+  if(!validRow)throw new Exception("App 构件输入行不符");
+  SelectAdopted254(x,b,member,store);dynamic sheet=b.Worksheets[sheetName];
+  if(store){
+  foreach(var cell in inputs)if(SteelInput(kind,cell.Key)||new[]{"G13","T8","T9","T10","T11"}.Contains(cell.Key))InputOnly254(sheet,cell.Key,cell.Value);
+  foreach(var cell in steel){if(!SteelInput(kind,cell.Key))throw new Exception("非 App 配筋输入："+cell.Key);InputOnly254(sheet,cell.Key,cell.Value);}
+  if(kind=="MB"||kind=="SB"||kind=="CB"||kind=="TB"){
+   InputOnly254(sheet,"T16","Manual");
+   string[] shown={"BU44","BU45","CB44","CB45"},source={"T8","T9","T10","T11"};
+   for(int i=0;i<4;i++)if(inputs.ContainsKey(source[i]))InputOnly254(sheet,shown[i],inputs[source[i]]);
+  }
+  }
+  x.CalculateFull();
+  if(store){
+   if(kind=="MB"||kind=="SB")x.Run("'"+b.Name+"'!"+kind+"SaveAuto81",row-(kind=="MB"?68:43));
+   else if(kind=="TB")x.Run("'"+b.Name+"'!TBStorePending79",true);
+   else if(kind=="CB"){
+    InputOnly254(b.Worksheets["_CB Analysis"],"A"+(row-118),member["id"]);x.Run("'"+b.Name+"'!CBSaveAuto81",row-118);
+   }else{
+    if(kind=="CS")InputOnly254(b.Worksheets["_CS Analysis"],"A"+(row-118),member["id"]);
+    x.Run("'"+b.Name+"'!"+(kind=="SLAB"?"SectionBChanged78":"CSChanged101"),sheet,sheet.Range["F35,H35,C9,C57,D57"]);
+    if(kind=="SLAB")x.Run("'"+b.Name+"'!PersistManualSteel78");
+   }
+  }
+  int before=differences.Count;
+  Compare(Convert.ToString(member["id"])+" · adopted inputs",b,new Dictionary<string,object>{{sheetName,inputs}});
+  Compare(Convert.ToString(member["id"])+" · adopted steel",b,new Dictionary<string,object>{{sheetName,steel}});
+  Compare(Convert.ToString(member["id"])+" · original formulas",b,new Dictionary<string,object>{{sheetName,data["expected"]}});
+  if(differences.Count!=before)throw new Exception("App 配筋与原 Excel 公式不一致；没有重新选筋或覆盖公式，请查看差异。");
+ }
+ static void AdoptAll254(dynamic x,dynamic b,Dictionary<string,object> job){
+  var members=Arr(job["members"]).Select(Obj).Where(m=>m.ContainsKey("adopt254")&&m["adopt254"]!=null).ToList();if(members.Count==0)return;
+  Stage79("带入 App 已计算配筋，保留原 Excel 公式");
+  var enabled=new Dictionary<string,bool>();int mode=Convert.ToInt32(x.Calculation);
+  try{
+   x.Calculation=-4135;foreach(string name in CalculationSheets254){dynamic sheet=b.Worksheets[name];enabled[name]=Convert.ToBoolean(sheet.EnableCalculation);sheet.EnableCalculation=true;}
+   foreach(var member in members){AdoptInputs254(x,b,member,true);Adopted254.Add(MemberKey254(member));}
+  }finally{foreach(var pair in enabled)b.Worksheets[pair.Key].EnableCalculation=pair.Value;x.Calculation=mode;}
+ }
+ static void VerifyAdopted254(dynamic x,dynamic b,Dictionary<string,object> member){
+  var enabled=new Dictionary<string,bool>();int mode=Convert.ToInt32(x.Calculation);
+  try{x.Calculation=-4135;foreach(string name in CalculationSheets254){dynamic sheet=b.Worksheets[name];enabled[name]=Convert.ToBoolean(sheet.EnableCalculation);sheet.EnableCalculation=true;}AdoptInputs254(x,b,member,false);}
+  finally{foreach(var pair in enabled)b.Worksheets[pair.Key].EnableCalculation=pair.Value;x.Calculation=mode;}
+ }
  static List<object> differences=new List<object>();static int compared;
  static void Compare(string scope,dynamic b,Dictionary<string,object> expected){foreach(var s in expected){
  var cells=Obj(s.Value);if(cells.Count==0)continue;int rows=2,cols=1;var positions=new Dictionary<string,int[]>();
@@ -236,11 +345,12 @@ static class ExcelBridge {
     // The original update macro explicitly calculates its dependent ranges and
     // finishes with CalculateFull. Avoid recalculating on each intermediate write.
     x.Run("'"+b.Name+"'!InputChanged99",input,input.Range["C3,F3,C4,F4,C5,F5,"+reset]);
-    }finally{x.Calculation=inputCalculation80;}Run(x,b,"Check99");
+    }finally{x.Calculation=inputCalculation80;}HoldFixedLoads252(b,job);AdoptAll254(x,b,job);Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("原 Excel Check 未完成："+Convert.ToString(Val(engine.Range["AS3"])));
     CompareFullLoads(b,job);
     foreach(var item in Arr(job["members"])){
      var member=Obj(item);string mk=Convert.ToString(member["kind"]),id=Convert.ToString(member["id"]),sheet=Convert.ToString(member["sheet"]);
+     if(Adopted254.Contains(MemberKey254(member))){VerifyAdopted254(x,b,member);if(!(member.ContainsKey("sectionA")&&Convert.ToBoolean(member["sectionA"])))continue;}
      if(member.ContainsKey("sectionA")&&Convert.ToBoolean(member["sectionA"])){
       Compare(id+" · Section A",b,new Dictionary<string,object>{{sheet,member["expected"]}});
       if(mk=="TB"){Set(b.Worksheets["Section B Transfer Beam Check"],"L9",member["row"]);Run(x,b,"UpdateTransfer79");Compare(id+" · transfer actions",b,new Dictionary<string,object>{{"Section B Transfer Beam Check",member["actions"]}});}continue;
@@ -279,10 +389,10 @@ static class ExcelBridge {
     // the native check once at export time, so opening need not regenerate it.
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("导出前 RC Check 未完成");
-    x.EnableEvents=false;b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    RestoreFixedLoads252();x.EnableEvents=false;b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
    Stage79("保存已核对结果");CommitPageCaches82(copy);StoreJob79(job,dir);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;GC.Collect();return 0;
-  }catch(Exception e){File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if(b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}
+  }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if(b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}
   finally{if(b!=null)try{b.Close(false);}catch{}if(x!=null)try{x.Quit();}catch{}}
  }
   static double D(Dictionary<string,object> a,string k,double fallback=0){return a.ContainsKey(k)&&a[k]!=null?Convert.ToDouble(a[k]):fallback;}
@@ -336,21 +446,30 @@ static class ExcelBridge {
   var breaks=new List<int>();foreach(dynamic br in sheet.HPageBreaks)if(Convert.ToInt32(br.Type)==-4135)breaks.Add(Convert.ToInt32(br.Location.Row));
   bool first=section=="A"?!job.ContainsKey("reportNumber")||Convert.ToBoolean(Obj(job["reportNumber"])["first"]):!job.ContainsKey("reportNumberB")||Convert.ToBoolean(Obj(job["reportNumberB"])["first"]);
   string oldHeader=Convert.ToString(sheet.PageSetup.CenterHeader);string[] footers80=Footers80(sheet);
+  // Finish the same member labels before formatting. Each PDF prints only its
+  // own row block; the complete copy's cells and drawings need formatting once,
+  // not once per member. No calculations or native copy generation are skipped.
+  for(int i=0;i<starts.Count;i++){
+   int begin=starts[i].Item1,end=i+1<starts.Count?starts[i+1].Item1-1:last;var m=starts[i].Item2;
+   double serial=m.ContainsKey("reportOrdinal")?Convert.ToDouble(m["reportOrdinal"]):i+1;
+   string t=Convert.ToString(labels82[begin,1]);var oldNumber=System.Text.RegularExpressions.Regex.Match(t,@"^B\.(\d+) ");t=System.Text.RegularExpressions.Regex.Replace(t,@"^(?:A\.[\d.]+ |B\.\d+ |\d+\) )","");
+   string prefix=section=="A"?"A."+(job.ContainsKey("reportNumber")?Obj(job["reportNumber"])["chapter"]:3)+".2."+serial:"B."+(serial+3);
+   sheet.Cells[begin,1].Value2=prefix+" "+t;
+   if(section=="B"&&oldNumber.Success)for(int rr=begin+1;rr<=end;rr++){string sub=Convert.ToString(labels82[rr,1]);if(sub!=null&&sub.StartsWith("B."+oldNumber.Groups[1].Value+"."))sheet.Cells[rr,1].Value2=prefix+sub.Substring(2+oldNumber.Groups[1].Value.Length);}
+  }
+  Stage79("整理原抄共用格式");Palette84(sheet);
   try{SetFooters80(sheet,new[]{"","",""});
    if(starts.Count>0&&first){int end=starts[0].Item1-1;
     if(section=="A")for(int r=end;r>=1;r--)if((Convert.ToString(labels82[r,1])??"").Contains("RC Member Checks")){end=r-1;break;}
     if(Convert.ToString(sheet.PageSetup.CenterHeader)!="Section "+section)sheet.PageSetup.CenterHeader="Section "+section;sheet.PageSetup.PrintArea="$A$1:$H$"+end;
-    string intro="Section-"+section+"-Intro.pdf";ExportCopy(sheet,dir,intro);files.Add(new{file=intro,reportOrder=0});
+    string intro="Section-"+section+"-Intro.pdf";ExportCopy(sheet,dir,intro,true);files.Add(new{file=intro,reportOrder=0});
    }
    for(int i=0;i<starts.Count;i++){
     int begin=starts[i].Item1,end=i+1<starts.Count?starts[i+1].Item1-1:last;var m=starts[i].Item2;string kind=Convert.ToString(m["kind"]);
     var ranks=new Dictionary<string,int>{{"SLAB",1},{"CS",1},{"SB",2},{"MB",3},{"CB",3},{"TB",4},{"COL",5}};int rank=ranks[kind];double serial=m.ContainsKey("reportOrdinal")?Convert.ToDouble(m["reportOrdinal"]):i+1;
-    string t=Convert.ToString(labels82[begin,1]);var oldNumber=System.Text.RegularExpressions.Regex.Match(t,@"^B\.(\d+) ");t=System.Text.RegularExpressions.Regex.Replace(t,@"^(?:A\.[\d.]+ |B\.\d+ |\d+\) )","");
-    string prefix=section=="A"?"A."+(job.ContainsKey("reportNumber")?Obj(job["reportNumber"])["chapter"]:3)+".2."+serial:"B."+(serial+3);
-    sheet.Cells[begin,1].Value2=prefix+" "+t;string header80=section=="A"?"Scheme 1 - RC":"Section B";if(Convert.ToString(sheet.PageSetup.CenterHeader)!=header80)sheet.PageSetup.CenterHeader=header80;
-    if(section=="B"&&oldNumber.Success)for(int rr=begin+1;rr<=end;rr++){string sub=Convert.ToString(labels82[rr,1]);if(sub!=null&&sub.StartsWith("B."+oldNumber.Groups[1].Value+"."))sheet.Cells[rr,1].Value2=prefix+sub.Substring(2+oldNumber.Groups[1].Value.Length);}
+    string header80=section=="A"?"Scheme 1 - RC":"Section B";if(Convert.ToString(sheet.PageSetup.CenterHeader)!=header80)sheet.PageSetup.CenterHeader=header80;
     sheet.ResetAllPageBreaks();sheet.PageSetup.PrintArea="$A$"+begin+":$H$"+end;
-    string file="Section-"+section+"-RC-"+i+".pdf";ExportCopy(sheet,dir,file);files.Add(new{file=file,reportOrder=(section=="A"?11:1)+rank+serial/10000});
+    string file="Section-"+section+"-RC-"+i+".pdf";ExportCopy(sheet,dir,file,true);files.Add(new{file=file,reportOrder=(section=="A"?11:1)+rank+serial/10000});
    }
   }finally{SetFooters80(sheet,footers80);sheet.PageSetup.PrintArea=area;if(Convert.ToString(sheet.PageSetup.CenterHeader)!=oldHeader)sheet.PageSetup.CenterHeader=oldHeader;sheet.ResetAllPageBreaks();foreach(int row in breaks)sheet.HPageBreaks.Add(sheet.Cells[row,1]);}
  }
@@ -466,9 +585,9 @@ static class ExcelBridge {
  // is disabled. Change them directly, only when needed; RC exports share one scope.
  static string[] Footers80(dynamic sheet){return new string[]{Convert.ToString(sheet.PageSetup.LeftFooter),Convert.ToString(sheet.PageSetup.CenterFooter),Convert.ToString(sheet.PageSetup.RightFooter)};}
  static void SetFooters80(dynamic sheet,string[] values){dynamic setup=sheet.PageSetup;if(Convert.ToString(setup.LeftFooter)!=values[0])setup.LeftFooter=values[0];if(Convert.ToString(setup.CenterFooter)!=values[1])setup.CenterFooter=values[1];if(Convert.ToString(setup.RightFooter)!=values[2])setup.RightFooter=values[2];}
- static object ExportCopy(dynamic sheet,string directory,string file) {
+ static object ExportCopy(dynamic sheet,string directory,string file,bool palettePrepared253=false) {
   if(ActiveJob75!=null)ReportHeader75(sheet,ActiveJob75);
-  Palette84(sheet);
+  if(!palettePrepared253)Palette84(sheet);
   Stage79("导出 PDF："+file);if(Math.Abs(Convert.ToDouble(sheet.PageSetup.HeaderMargin)-9)>.01)sheet.PageSetup.HeaderMargin=9;
   string path=Path.Combine(directory,file);bool paperMap75=Convert.ToBoolean(sheet.Application.MapPaperSize);string[] footers=Footers80(sheet);
   try{sheet.Application.MapPaperSize=false;SetFooters80(sheet,new[]{"","",""});sheet.ExportAsFixedFormat(0,path,0,true,false,Type.Missing,Type.Missing,false);}

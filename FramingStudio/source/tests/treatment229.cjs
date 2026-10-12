@@ -1,0 +1,31 @@
+// Exercise real mixed SB/TB recommendations through the Summary DOM.
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{parseHTML}=require('linkedom'),{context}=require('../../verification/integration143.cjs');
+const c=context(path.resolve(__dirname,'../..')),{document,window}=parseHTML('<html><body><aside id="side"></aside></body></html>'),pending=[];
+c.ctx.document=document;c.ctx.setTimeout=setTimeout;c.ctx.clearTimeout=clearTimeout;
+const listen=document.addEventListener.bind(document);document.addEventListener=(type,fn,...rest)=>listen(type,e=>{const result=fn(e);if(result?.then)pending.push(result);},...rest);
+c.run(fs.readFileSync(path.join(__dirname,'loading115-browser.js'),'utf8'));
+const $=s=>document.querySelector(s),click=async el=>{el.dispatchEvent(new window.Event('click',{bubbles:true}));await Promise.all(pending.splice(0));},rows=()=>[...document.querySelectorAll('tr[data-audit-applied229]')];
+(async()=>{
+ c.run(`globalThis.t229={p:Engine.clone(loading115Tests().projects.slab),floor:1,key:'F1',undo:[],runs:0};const t=t229;t.p.groups[0].sh=900;t.p.types.F1.beamDepth=250;
+ for(const [index,kind] of ['SB','TB'].entries())Object.assign(t.p.types.F1.beams[index],{kind,b:250,d:250,depthOverride184:250,widthMode:'manual'});
+ t.result=Engine.generate(t.p);for(const b of Engine.floorModel(t.result,1).beams.filter(b=>['SB','TB'].includes(b.kind)))t.p.explorer.members['1|'+Loading.token(b.kind,b)]={mode:'manual',beamSelfWeight:true,beamLoads:[{type:'line',a:0,b:Loading.beamSpan(b).value,dl:b.kind==='SB'?25:130,ll:15}]};
+ const original=AuditRunner132.run;AuditRunner132.run=(...args)=>{t.runs++;return original(...args);};t.render=()=>{document.getElementById('side').innerHTML=t.ui.beamInputs(null);};t.host={get:()=>t,refresh:()=>t.render(),toast:()=>{},transact(fn){t.undo.push(Engine.clone(t.p));fn();t.result=Engine.generate(t.p);t.render();return true;}};t.ui=ExplorerUI(t.host);t.render();`);
+ await c.run('t229.ui.calculate()');assert($('[data-ex=audit-sb-apply220]'));assert($('[data-ex=audit-tb-apply222]'));
+ assert(rows().every(row=>row.dataset.auditApplied229==='false'));
+ assert($('[data-sb-advice220]').textContent.includes('建議須 RC 通過'));
+ await click($('[data-ex=audit-sb-apply220]'));assert.equal(c.run('t229.runs'),1);
+ const sb=$('[data-ex=audit-sb-apply220]').closest('tr'),tb=$('[data-ex=audit-tb-apply222]').closest('tr');
+ assert.equal(sb.dataset.auditApplied229,'true');assert.equal(tb.dataset.auditApplied229,'false');assert(rows().indexOf(tb)<rows().indexOf(sb));
+ assert(sb.textContent.includes('已套用建議 · 待複查'));assert(tb.textContent.includes('未套用建議'));assert(tb.textContent.includes('可能受其他修改影響'));
+ const rc=tb.querySelector('[data-audit-section205=B]>span');assert.equal(rc.textContent,'上次：未通過');assert(rc.getAttribute('style').includes('#e60000'));
+ assert(tb.querySelector('[data-audit-deflection212]'),'Previous deflection remains visible');assert(!tb.querySelector('[data-ex=audit-tb-apply222]').hasAttribute('disabled'));
+ assert(sb.querySelector('[data-ex=audit-sb-apply220]').hasAttribute('disabled'));
+ const applied=c.run('JSON.stringify(t229.p)');c.run('t229.p.name="unrelated edit";t229.render();');assert(rows().every(row=>row.dataset.auditApplied229==='false'));assert(!document.querySelector('[data-audit-treatment229=applied]'));assert(!document.querySelector('[data-ex=audit-tb-apply222]'),'Unrecognized edits invalidate old advice');
+ c.run('t229.p=JSON.parse(argument);t229.result=Engine.generate(t229.p);t229.render();',applied);assert($('[data-ex=audit-sb-apply220]').hasAttribute('disabled'));
+ const choose=value=>{const filter=$('[data-audit-filter131=kind]');for(const option of filter.options)option.selected=option.value===value;filter.dispatchEvent(new window.Event('change',{bubbles:true}));};choose('TB');assert.equal(rows().length,1);assert(rows()[0].textContent.includes('未套用建議'));
+ choose('all');
+ await click($('[data-ex=audit-tb-apply222]'));assert.equal(c.run('t229.runs'),1);assert($('[data-ex=audit-tb-apply222]').closest('tr').textContent.includes('已套用建議 · 待複查'));assert(!$('[data-tb-advice221]').textContent.includes('尚未套用'));
+ c.run('t229.p=t229.undo.pop();t229.result=Engine.generate(t229.p);t229.render();');assert.equal(rows()[0].dataset.auditApplied229,'false');assert($('[data-ex=audit-tb-apply222]').closest('tr').textContent.includes('未套用建議'));
+ c.run('t229.p=t229.undo.pop();t229.result=Engine.generate(t229.p);t229.render();');assert(!document.querySelector('[data-audit-treatment229=applied]'));assert(!$('[data-ex=audit-sb-apply220]').hasAttribute('disabled'));
+ console.log('PASS mixed SB/TB: applied-last sorting, unapplied red previous RC, pending labels/numbers, manual-edit invalidation, filters, sequential apply and undo');
+})().catch(e=>{console.error(e);process.exitCode=1;});

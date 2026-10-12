@@ -4,13 +4,17 @@ const RCPlan=(()=>{
   const p=Engine.clone(project),e=Loading.init(p),settings=Loading.settings(p),map=section==='Check'?e.selected:e['report'+section]||{};
   const wanted=selection||Object.keys(map).filter(k=>map[k]);for(const k of wanted)e.selected[k]=true;
   const model=Engine.generate(p);for(let f=1;f<=p.total;f++)for(const m of Loading.members(p,model,f))e.selected[f+'|'+m.token]=m.kind!=='COL'||wanted.includes(f+'|'+m.token);
-  const out=Loading.run(p,model,section==='A'?'A':'B'),roots=out.rows.filter(r=>r.kind!=='TT'&&wanted.includes(r.floor+'|'+r.token)),issues=[],batches=[];
+  // A keeps its existing load convention. B may reuse the fresh shared check
+  // snapshot, but only when every requested member has completed design data.
+  const cached=section!=='A'&&typeof ExplorerUI!=='undefined'?ExplorerUI.getReportOutput254?.(project):null;
+  const reusable=cached&&wanted.every(key=>cached.rows.some(r=>r.floor+'|'+r.token===key&&r.result?.inputs));
+  const out=reusable?Engine.clone(cached):Loading.run(p,model,section==='A'?'A':'B'),roots=out.rows.filter(r=>r.kind!=='TT'&&wanted.includes(r.floor+'|'+r.token)),issues=[],batches=[];
   const lookup=(r,id)=>out.rows.find(x=>x.floor===r.floor&&x.id===id),kind=r=>r.result.kind||r.displayType||r.kind;
   function dependencies(r,seen=new Map()){
    if(r.result.widthViolation)throw Error(r.result.fail.join('；'));if(seen.has(r.token))return seen;const k=kind(r),l=r.loading||{};
+   if(r.result.autoFailed&&(section!=='A'||['SLAB','CS'].includes(k)))throw Error(r.id+' 自动选筋失败：'+r.result.fail.join('；')+'；请调整截面或配筋限制');
    if(section==='A'&&!['COL','SB','MB','TB'].includes(k)){if(!(l.L>0)||!['SLAB','CS','SB','MB','CB'].includes(k))throw Error('构件尺寸或支承资料未完整');seen.set(r.token,r);return seen;}
    if(k==='COL'){if(section==='A'&&r.truss109?.length)throw Error('原 Section A 面积表不支持桁架反力输入；请查看桁架独立计算及 Section B 柱验算');const a=r.columnA||Reports.columnA(p,r);if(a.errors.length)throw Error(a.errors.join('；'));if(section!=='A'&&!r.result.inputs)throw Error((r.result.fail||['柱验算输入未完整']).join('；'));r.columnA=a;seen.set(r.token,r);return seen;}
-   if(section!=='A'&&r.result.autoFailed)throw Error(r.id+' 自动选筋失败：'+r.result.fail.join('；')+'；请调整截面或配筋限制');
    if(!r.result.inputs)throw Error((r.result.fail||['输入未完整']).join('；'));
    if(!['SLAB','CS','SB','MB','CB','TB'].includes(k))throw Error('原表没有对应构件类型');
    if((r.input?.torsion||0)!==0)throw Error('手动扭矩不能对应原表的偏心传荷输入，未核对');
@@ -52,10 +56,11 @@ const RCPlan=(()=>{
      }continue;
     }
     const inputs={...r.result.inputs},expected={...r.result.values};if(['SLAB','CS'].includes(k)){inputs.C1=id(r);if(Object.hasOwn(expected,'C1'))expected.C1=id(r);}
+    const adopt254=(section!=='A'||['MB','SB','TB'].includes(k))&&(k!=='CS'||r.input?.steel)&&r.result.inputs&&r.result.steel?{sheet:r.result.source,inputs,expected,steel:{...r.result.steel}}:null;
     if(section==='A'){
      const sup=['CS','CB'].includes(k)?'Cantilever':support,h=['CS','SLAB'].includes(k)?c.thickness:c.d*1000,ratio=l.L*1000/h*(sup!=='Cantilever'&&l.L>10.001?l.L/10:1),limit={'Cantilever':7,'Simply-supported':20,'Continuous':26,'End span':23}[sup],status=sup==='Cantilever'&&l.L>10.001?'CALC. REQUIRED':ratio<=limit?'OK':'NOT OK',cols={SLAB:['J','K','L'],SB:['H','I','J'],MB:['F','G','H'],CB:['N','O','P'],CS:['N','O','P'],TB:['V','W','X']}[k],sheet=k==='TB'?'Section A Transfer Beam':'Input';
-     members.push({id:id(r),kind:k,row,sectionA:true,sheet,expected:Object.fromEntries(cols.map((c,i)=>[c+row,[ratio,limit,k==='TB'?status.replace('NOT OK','NOT OKAY').replace(/^OK$/,'OKAY'):status][i]])),inputs:{},actions:k==='TB'?{G23:r.actions.M,G24:r.actions.V}:null,selected:true});
-    }else members.push({id:id(r),kind:k,row,sheet:r.result.source,expected,inputs,steel:r.input?.steel?{...r.result.steel,...r.input.steel}:null,cover:k==='CB'?null:r.input?.cover??null,selected:b.roots.includes(r)});
+     members.push({id:id(r),kind:k,row,sectionA:true,sheet,expected:Object.fromEntries(cols.map((c,i)=>[c+row,[ratio,limit,k==='TB'?status.replace('NOT OK','NOT OKAY').replace(/^OK$/,'OKAY'):status][i]])),inputs:{},actions:k==='TB'?{G23:r.actions.M,G24:r.actions.V}:null,selected:true,adopt254});
+    }else members.push({id:id(r),kind:k,row,sheet:r.result.source,expected,inputs,steel:r.input?.steel?{...r.result.steel,...r.input.steel}:null,cover:k==='CB'?null:r.input?.cover??null,selected:b.roots.includes(r),adopt254});
    }
    const notes=p.explorer?.reportANotes||{},copyNotes={};for(const[k,a]of Object.entries({introduction:'A5',location:'A6',steelGrade:'A34',steelDL:'A36'}))if(Object.hasOwn(notes,k))copyNotes[a]=String(notes[k]);notes.constraints?.slice(0,8).forEach((r,i)=>{copyNotes['A'+(10+i)]=String(r[0]??'');copyNotes['E'+(10+i)]=String(r[1]??'')});
    return {type:'RC',section,fullLoads,projectFloors:floorSummary(p,model),label:'RC '+(section==='Check'?'Check':'Section '+section)+' · '+floors.map(floorName).join(', ')+' · 第 '+(i+1)+' 份',cells,sheetCells,members,copyNotes,dependencies:b.rows.filter(r=>!b.roots.includes(r)).map(id)};

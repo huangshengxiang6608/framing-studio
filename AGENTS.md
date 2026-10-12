@@ -33,6 +33,24 @@ After every completed update, create or update a pull request in the existing
 GitHub repository and describe the changes and validation results. Include the
 PR link in the delivery message. Honor any explicit user hold on EXE generation.
 
+## Preview continuity and remote updates
+
+User preference recorded 2026-10-09: after future verified updates, reuse the
+existing browser preview at http://127.0.0.1:8783/ instead of opening a new tab
+or assigning a new port for each version. Update the content served at that
+address so refreshing the existing tab loads the newly verified version.
+Preserve historical release folders and the user's project/browser storage;
+do not force a reload that could discard pending input. Verify the served
+version and avoid stale-cache responses before announcing availability.
+
+Before starting a software change and again before publishing, check official
+GitHub main, releases and relevant PR heads against the local baseline and
+known local commits. If remote changes are not present locally, tell the user
+which PR/commits changed and summarize their scope before integrating them.
+Do not overwrite those changes. Git metadata alone may not identify the
+physical computer; state uncertainty instead of claiming a machine origin.
+This is a check during active work, not a request for a recurring monitor.
+
 ## Primary bays and secondary beams
 
 MB, CB and TB are primary beams for bay boundaries. SB is a separate secondary

@@ -1,0 +1,10 @@
+# E2.245 — Batch SB depth and combined dimension performance
+
+Ordinary SB edits now share one model snapshot for D-only and B+D changes as well as width-only edits. The table invokes editBeamSizes245; the previous width helper remains a compatible wrapper. All numeric widths and depths are validated before the helper writes any beam. Depth checks cover every shared Framing floor through the existing local Structural Zone allowance. The original final model regeneration, geometry/missing-member checks, FRR checks, transaction rollback, selection remapping and undo remain in place. Reset/type changes and derived split, transfer or cantilever members keep the sequential path.
+
+Validation:
+- beam-batch245.cjs compares the old sequential path against the batch path for 82 automatic SBs on four shared floors, separately for D and B+D. Beam geometry, IDs, dimensions, tokens, slabs and columns match exactly. Load inputs and both report selections are preserved; save/reopen has identical geometry. Manual SB depth changes work. Invalid numeric depths, excessive depth on another shared floor and insufficient FRR width reject the entire batch before helper mutation; complex edits retain fallback.
+- Synthetic core timings: D-only 31,244.8 ms sequential / 164.5 ms batch; B+D 30,585.3 ms / 147.0 ms. This is a synthetic model benchmark, not the user's browser click-to-paint time.
+- fire241, sb-width218 and offline rebar227 DOM regressions pass, alongside JS syntax and whitespace checks. Windows desktop compiled using PowerShell 7; legacy Windows PowerShell could not decode the existing UTF-8 version script.
+- Package verification checks exact bundled source and byte-preservation of unrelated tracked files, including Section A/B report renderers, workbook templates and Excel/VBA routines. No report presentation changes.
+- Deployment reuses http://127.0.0.1:8783/ and verifies version, exact served bytes and no-store cache headers. No forced browser reload or storage modification; no live browser QA claimed.

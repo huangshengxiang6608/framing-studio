@@ -1,0 +1,9 @@
+# E2.226 verification — 2026-10-11
+
+Baseline E2.225 038a9df68abea8ef8a41ec498e6700c41bd7e23f; official main 5d18359d7110709b14fcecf431e23b88509791f6, release v2.203 and PR #8 checked before editing; no remote-only changes.
+
+E2.226 makes a full-building Check publish Summary and Member Check/report data together. The audit retains its detailed Section B result rather than discarding it; saved Check selections are restored on those rows, and Section A/B report selection maps remain unchanged. The duplicate Member Check update button is removed. Existing save/update and report freshness paths use the shared calculation flow.
+
+Check and native Excel RC/report preflights no longer invoke automatic beam widening. Explicit SB/TB/column recommendation application and manual dimension editing remain available. The Excel/VBA renderer and calculation formulas are unchanged. Native Excel still performs its required own workbook calculation when producing a report.
+
+Validation: check-sync226 verifies audit/detail parity and selected-row results, report scopes, no dimension mutations, one concurrent job, atomic publication, stale-input rejection, failure handling, cancellation/restart races and no resizing on the native export preflight. Existing beam-filters214 and tb-apply222 regressions pass, including A/B/deflection, transfer, sizing advice and explicit undoable application. A full audit of the user-supplied project verifies unchanged saved inputs/dimensions and shared selected results. Package verification preserves original numeric loading code, report generation functions, native Excel/VBA and report templates; Windows app and source are included. Live browser inspection is blocked by URL policy; no workaround or forced reload used. Native Excel execution was not rerun.

@@ -1,0 +1,11 @@
+# E2.219 verification — 2026-10-10
+
+Baseline E2.218: 3d4489fb61eff8c481b2bb394dba886383c54a4a. Official main 5d18359d7110709b14fcecf431e23b88509791f6, latest official release v2.203 and PR #8 were checked before editing; no remote-only updates were found.
+
+Summary now presents recognized beam-width sizing caps as an independent orange dimension advisory, outside Section B RC pass/fail. Existing complete reinforcement, shear and torsion results establish RC status; real failures, unknown errors and incomplete input guards remain. Original complete Member Check/Excel results, report copies and the automatic +50 mm widening loop/stop rules remain unchanged. Existing combination filters consume the independent RC result, so otherwise passing beams can be hidden by the current default selection; advisories remain available through all-beam selection.
+
+Validation:
+- `width-advisory219.cjs` creates a real 1500 mm wide MB against 1000 mm column caps, runs Loading/Section B, verifies the original NOT OK result is preserved, Summary RC is OK with a separate numerical advisory, and the auto-sizing loop still stops without widening. Each of the seven structural check failures still fails RC alongside the advisory. Unknown errors, incomplete inputs, warning-only audit collection, filters and rendered HTML are covered.
+- `summary-rc216.cjs` passes the L/d-only case, structural/input guards, independent deflection and new width advisory expectations. `beam-filters214.cjs` and its existing A/B, slab/support/transfer, deflection closed forms and threshold regressions pass. The original fixture comparison now excludes the intentionally separated width-stop advisory from RC reasons.
+- All 36 marked bundle modules match source; only loading.js Summary classification/audit and explorer-ui.js presentation change. Numerical loading code before the Summary adapter, automatic sizing code, RC formulas, engine, native Excel/VBA/ExcelBridge and both Section A/B report renderers/templates are byte-identical to E2.218.
+- Windows host rebuilt as 2.219.0.0; every package entry verified against current files. Existing 8783 preview is updated with no-store caching without forcing a reload. Native Excel recalculation/printing and browser-driven testing were not performed for this classification-only change.

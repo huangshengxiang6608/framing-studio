@@ -101,12 +101,13 @@ const Engine=(()=>{
   const keys=Object.keys(p.types||{});if(!keys.length||keys.length>30||keys.some(k=>!/^F[0-9A-Za-z_-]{1,20}$/.test(k)))fail('类型名称须以 F 开头，最多 30 种');
   if(!Array.isArray(p.groups)||!p.groups.length||p.groups.length>100)fail('须填写楼层分组');
   let end=0;const heights={};
-  for(const g of p.groups){if(!keys.includes(g.type))fail('分组的 Framing 类型不存在');const e=g.end==='顶层'?p.total:g.end;num(e,1,500,'结束层须为整数或“顶层”');if(!Number.isInteger(e)||(end<p.total&&e<=end))fail('结束层须递增');end=Math.max(end,e);num(g.h,.1,30,'层高须为 0.1–30 m');const effectiveSH=structuralHeight(g);num(effectiveSH,1,10000,'Structural Height 须为 1–10000 mm');num(g.min,0,500,'最小柱距须为 0–500 m');if(p.types[g.type].beamDepth!=null)num(p.types[g.type].beamDepth,1,10000,'Framing SB 深度須為 1–10000 mm');}
+  for(const g of p.groups){g.fire241??=2;if(![1,2,4].includes(g.fire241))fail('樓層 FRR 須為 1、2 或 4 小時');if(!keys.includes(g.type))fail('分组的 Framing 类型不存在');const e=g.end==='顶层'?p.total:g.end;num(e,1,500,'结束层须为整数或“顶层”');if(!Number.isInteger(e)||(end<p.total&&e<=end))fail('结束层须递增');end=Math.max(end,e);num(g.h,.1,30,'层高须为 0.1–30 m');const effectiveSH=structuralHeight(g);num(effectiveSH,1,10000,'Structural Height 须为 1–10000 mm');num(g.min,0,500,'最小柱距须为 0–500 m');if(p.types[g.type].beamDepth!=null)num(p.types[g.type].beamDepth,1,10000,'Framing SB 深度須為 1–10000 mm');}
   if(end<p.total)fail('楼层分组未覆盖到顶层');
+  if(!p.sbDefault243){if(p.defaults?.sb===250)p.defaults.sb=300;for(const t of Object.values(p.types))if(t.sbWidth===250)t.sbWidth=300;p.sbDefault243=true;}
   for(const k of ['cb','cd','gap','mb','sb','tb','tbd','slab','wall'])num(p.defaults?.[k],k==='gap'?100:1,20000,'默认尺寸无效：'+k);
   if(!['自动','X','Y'].includes(p.defaults.direction))fail('次梁方向无效');
   const point=(a,key)=>{if(!a||typeof a!=='object')fail('端点缺失');const v=resolve(p,a,key);v.forEach(n=>num(n,-5000,10000,'轴线引用或坐标无效'));};
-  for(const [key,t] of Object.entries(p.types)){for(const row of [...t.beams||[],...t.autoBeamSnapshot?.main||[],...t.autoBeamSnapshot?.secondary||[],...t.autoBeamSnapshot?.primary||[]])delete row.typeMode175;if(t.cbColumnWidth171!==true&&Array.isArray(t.beams)){for(const b of [...t.beams,...t.autoBeamSnapshot?.secondary||[],...t.autoBeamSnapshot?.primary||[]])if(b.kind==='CB'){b.widthMode='column';if(t.beamWidths83){const a=Array.isArray(b.rawA)?b.rawA:resolve(p,b.a,key),z=Array.isArray(b.rawZ)?b.rawZ:resolve(p,b.z,key);delete t.beamWidths83[sig(a,z)];}}t.cbColumnWidth171=true;}if(t.columnDefaults101)for(const k of ['cb','cd'])num(t.columnDefaults101[k],1,20000,'Framing 默认柱尺寸无效：'+k);if(t.autoBeams101!==undefined&&typeof t.autoBeams101!=='boolean')fail('自动排梁设置无效');
+  for(const [key,t] of Object.entries(p.types)){for(const row of [...t.beams||[],...t.autoBeamSnapshot?.main||[],...t.autoBeamSnapshot?.secondary||[],...t.autoBeamSnapshot?.primary||[]])delete row.typeMode175;if(t.cbColumnWidth171!==true&&Array.isArray(t.beams)){for(const b of [...t.beams,...t.autoBeamSnapshot?.secondary||[],...t.autoBeamSnapshot?.primary||[]])if(b.kind==='CB'){b.widthMode='column';if(t.beamWidths83){const a=Array.isArray(b.rawA)?b.rawA:resolve(p,b.a,key),z=Array.isArray(b.rawZ)?b.rawZ:resolve(p,b.z,key);delete t.beamWidths83[sig(a,z)];}}t.cbColumnWidth171=true;}if(t.sbWidth!=null)num(t.sbWidth,1,20000,'Framing SB 闊度須為 1–20000 mm');if(t.columnDefaults101)for(const k of ['cb','cd'])num(t.columnDefaults101[k],1,20000,'Framing 默认柱尺寸无效：'+k);if(t.autoBeams101!==undefined&&typeof t.autoBeams101!=='boolean')fail('自动排梁设置无效');
    if(t.autoBeamSnapshot!==undefined){const snap=t.autoBeamSnapshot;if(!snap||typeof snap!=='object'||Array.isArray(snap)||Object.keys(snap).some(k=>!['main','primary','secondary'].includes(k)))fail('已保存梁布置無效');const ids=new Set();for(const group of ['main','primary','secondary']){if(snap[group]===undefined)continue;if(!Array.isArray(snap[group])||snap[group].length>5000)fail('已保存梁布置過多');for(const b of snap[group]){if(!b||typeof b.id!=='string'||!b.id||ids.has(b.id)||!(group==='main'?['MB']:group==='primary'?['CB','TB']:['SB','CB']).includes(b.kind))fail('已保存梁資料無效');ids.add(b.id);for(const field of ['a','z','rawA','rawZ'])if(!Array.isArray(b[field])||b[field].length!==2||!b[field].every(Number.isFinite))fail('已保存梁座標無效');if(!near(b.a[0],b.z[0])&&!near(b.a[1],b.z[1])||Math.hypot(b.a[0]-b.z[0],b.a[1]-b.z[1])<eps)fail('已保存梁方向無效');if(b.bay171!==undefined&&(!Array.isArray(b.bay171)||b.bay171.length!==4||!b.bay171.every(Number.isFinite)||b.bay171[1]<=b.bay171[0]||b.bay171[3]<=b.bay171[2]))fail('已保存次梁 bay 無效');if(b.widthMode!==undefined&&!['column','default','manual'].includes(b.widthMode))fail('已保存梁寬模式無效');if(b.depthOverride184!=null)num(b.depthOverride184,1,20000,'指定梁深無效');num(b.b,.001,20,'已保存梁寬無效');num(b.d,.001,30,'已保存梁深無效');}}}
    if(t.autoBeamSnapshot?.secondary?.some(b=>b.kind==='CB')){const snap=t.autoBeamSnapshot;snap.primary=[...snap.primary||[],...snap.secondary.filter(b=>b.kind==='CB')];snap.secondary=snap.secondary.filter(b=>b.kind!=='CB');}
    if(t.beamLayout116!==undefined){const v=t.beamLayout116;if(!v||typeof v!=='object'||typeof v.main!=='boolean'||typeof v.secondary!=='boolean'||v.columnsOnly!==undefined&&typeof v.columnsOnly!=='boolean'||v.shortSpanMain!==undefined&&typeof v.shortSpanMain!=='boolean'||!['XY','X','Y'].includes(v.mainDirection)||!['自动','X','Y'].includes(v.secondaryDirection)||!['all','selected'].includes(v.scope))fail('梁布置设置无效');num(v.gap,100,20000,'次梁间距须为 100–20000 mm');}
@@ -130,7 +131,41 @@ const Engine=(()=>{
   if(typeof LocalHeights96!=="undefined")LocalHeights96.validate(p);
   return p;
  }
- function floors(p){let from=1,a=[];for(const g of p.groups){const to=Math.min(g.end==='顶层'?p.total:g.end,p.total);for(let n=from;n<=to;n++)a.push({n,name:FloorLevels.name(p,n),basement:FloorLevels.isBasement(FloorLevels.name(p,n)),h:g.h,type:g.type,sh:structuralHeight(g),headroom:g.headroom,em:g.em,min:g.min});from=to+1;}return a;}
+ // Fire Safety Code 2011 (2024), Table E6. Missing floor FRR defaults to 2 hours.
+ function beamFire241(p,n,kind='MB'){
+  let from=1,group;for(const g of p.groups){const end=g.end==='顶层'?p.total:g.end;if(n>=from&&n<=end){group=g;break;}from=end+1;}
+  return group?.fire241??2;
+ }
+ function beamMinimum241(p,key,kind='MB'){
+  const fs=floors(p).filter(f=>f.type===key),fire=Math.max(...(fs.length?fs.map(f=>beamFire241(p,f.n,kind)):[beamFire241(p,null,kind)]));
+  return {fire,width:fire===4?280:200};
+ }
+ function assertBeamWidth241(p,key,kind,width){
+  const q=beamMinimum241(p,key,kind);
+  if(!Number.isFinite(width)||width<q.width-1e-6)throw Error(key+' '+kind+' 梁闊 '+width+' mm 小於 FRR '+q.fire+' h 最低 '+q.width+' mm（Fire Code Table E6）；未套用');
+ }
+ function assertSlab241(value){if(!Number.isFinite(value)||value<200)throw Error('樓板厚度不可小於項目下限 200 mm；未套用');}
+ // Compare dimensions, so older undersized members remain loadable and can be repaired.
+ function validateDimensionChanges241(p,old,next,previous){
+  if(p.defaults.slab!==old.defaults.slab)assertSlab241(p.defaults.slab);
+  for(const key of Object.keys(p.types))for(const kind of ['MB','SB','TB']){
+   const field=kind.toLowerCase(),width=kind==='SB'?secondaryWidth(p,key):p.defaults[field],before=kind==='SB'?secondaryWidth(old,key):old.defaults[field];
+   if(width!==before)assertBeamWidth241(p,key,kind,width);
+  }
+  for(const f of next.floors){const m=floorModel(next,f.n),before=previous.floors.some(x=>x.n===f.n&&x.type===f.type)?floorModel(previous,f.n):null;
+   const beams=new Map((before?.beams||[]).map(b=>[b.kind+'|'+sig(b.rawA,b.rawZ),b]));
+   for(const b of m.beams){const prev=beams.get(b.kind+'|'+sig(b.rawA,b.rawZ));if(!prev||Math.abs(prev.b-b.b)>1e-9)assertBeamWidth241(p,f.type,b.kind,b.b*1000);}
+   const slabs=new Map((before?.slabs||[]).map(s=>[slabSignature(s),s]));
+   for(const s of m.slabs){const prev=slabs.get(slabSignature(s));if(!prev||s.thickness!==prev.thickness)assertSlab241(s.thickness);}
+  }
+ }
+ function dimensionIssues241(p,result){
+  for(const f of result.floors){const m=floorModel(result,f.n);
+   for(const b of m.beams){const fire=beamFire241(p,f.n,b.kind),min=fire===4?280:200;if(b.b*1000<min-1e-6)result.issues.push({type:f.type,floor:f.n,id:b.id,fireWidthFailure243:true,msg:'FRR '+fire+' h：梁闊 '+Math.round(b.b*1000)+' mm 小於 Fire Code Table E6 最低 '+min+' mm'});}
+   for(const s of m.slabs)if(s.thickness<200)result.issues.push({type:f.type,floor:f.n,id:s.id,msg:'樓板厚度 '+s.thickness+' mm 小於項目下限 200 mm'});
+  }
+ }
+ function floors(p){let from=1,a=[];for(const g of p.groups){const to=Math.min(g.end==='顶层'?p.total:g.end,p.total);for(let n=from;n<=to;n++)a.push({n,name:FloorLevels.name(p,n),basement:FloorLevels.isBasement(FloorLevels.name(p,n)),h:g.h,type:g.type,sh:structuralHeight(g),headroom:g.headroom,em:g.em,min:g.min,fire241:g.fire241??2});from=to+1;}return a;}
  function tiles(p,t){const xs=axes(p,'x',t),ys=axes(p,'y',t),out=[];for(let i=0;i<xs.length-1;i++)for(let j=0;j<ys.length-1;j++){const k=i+','+j;out.push({i,j,k,x0:xs[i].v,x1:xs[i+1].v,y0:ys[j].v,y1:ys[j+1].v,state:!t.building[k]?0:t.opening[k]?2:1});}return out;}
  const inside=(ts,x,y,building=false)=>ts.some(t=>(t.state===1||(building&&t.state===2))&&x>t.x0&&x<t.x1&&y>t.y0&&y<t.y1);
  function rectAllowed(ts,x,y,w,d,building=false){let area=0;for(const t of ts)if(t.state===1||(building&&t.state===2))area+=Math.max(0,Math.min(x+w/2,t.x1)-Math.max(x-w/2,t.x0))*Math.max(0,Math.min(y+d/2,t.y1)-Math.max(y-d/2,t.y0));return area>=w*d-1e-7;}
@@ -326,6 +361,7 @@ const Engine=(()=>{
   }
   const out=beams.flatMap(b=>replacements.get(b)||[b]);beams.splice(0,beams.length,...out);
  }
+ function secondaryWidth(p,key){return p.types[key]?.sbWidth??p.defaults.sb;}
  function secondaryDepth(span,height){return Math.min(Math.ceil(span*1000/15/50-1e-9)*50/1000,height);}
 
  // Walls use the input axis as their reference; their physical section can sit on either side.
@@ -388,7 +424,7 @@ const Engine=(()=>{
   return changed;
  }
  function baseModel(p,key,localRects=[],referenceModel=null){p=scoped(p,key);
-  const t=p.types[key],ts=tiles(p,t).map(tile=>tile.state!==0&&localRects.some(r=>LocalHeights96.overlap(tile,r)>1e-7)?{...tile,state:2}:tile),gs=p.groups.filter(g=>g.type===key),sh=(gs[0]?structuralHeight(gs[0]):600)/1000,sbDepth=(t.beamDepth??600)/1000,min=t.columnGrid?0:t.minColumnSpacing??Math.max(0,...gs.map(g=>g.min)),df={...p.defaults,...t.columnDefaults101},issues=[],walls=[],columns=[],beams=[],panels=[];
+  const t=p.types[key],ts=tiles(p,t).map(tile=>tile.state!==0&&localRects.some(r=>LocalHeights96.overlap(tile,r)>1e-7)?{...tile,state:2}:tile),gs=p.groups.filter(g=>g.type===key),sh=(gs[0]?structuralHeight(gs[0]):600)/1000,sbDepth=(t.beamDepth??600)/1000,min=t.columnGrid?0:t.minColumnSpacing??Math.max(0,...gs.map(g=>g.min)),df={...p.defaults,...t.columnDefaults101,sb:secondaryWidth(p,key)},issues=[],walls=[],columns=[],beams=[],panels=[];
   const issue=(id,msg)=>issues.push({type:key,id,msg});
   const layout=t.beamLayout116,autoMain=!t.autoBeamSnapshot?.main&&(layout?.main??(t.autoBeams101!==false)),autoSecondary=!t.autoBeamSnapshot?.secondary&&(layout?.secondary??(t.autoBeams101!==false)),mainDirection=layout?.mainDirection||'XY';
   if(referenceModel)walls.push(...clone(referenceModel.walls));
@@ -454,8 +490,28 @@ const Engine=(()=>{
   }
   splitSecondarySpans200(p,key,beams,[...walls,...supported],issue);
   const edges=[...walls,...supported],currentBays171=beamBays171(bayEdges171(edges,columns),ts,key),savedSB171=(t.autoBeamSnapshot?.secondary||[]).filter(b=>b.kind==='SB'),oldBays171=savedSB171.some(b=>!b.bay171)?beamBays171(edges,ts,key):[],changedBays171=new Set();
+  // Missing legacy bay tags can be recovered only when the entire saved SB layout
+  // exactly matches the current bay's independent spacing and support boundaries.
+  // Explicit historical tags and layouts that no longer fit retain the change guard.
+  const recoveredBays246=new Map();
+  for(const bay of currentBays171){
+   const [a,b,c,d]=bay,rule=secondaryAreaRule(t,bay);if(rule?.error||layout?.scope==='selected'&&!rule)continue;
+   const direction=rule?.direction??layout?.secondaryDirection??df.direction,gap=rule?.gap??layout?.gap??df.gap,h=direction==='自动'?b-a<=d-c:direction==='X',n=Math.ceil((h?d-c:b-a)/(gap/1000));
+   if(!Number.isFinite(n)||n<2||n>500)continue;
+   const inside=savedSB171.filter(s=>beamBay171(s,[bay]));if(inside.length!==n-1)continue;
+   if(inside.some(s=>s.bay171&&bayKey171(s.bay171)!==bayKey171(bay)))continue;
+   const positions=new Set();let fits=true;
+   for(const s of inside){
+    const axis=h?0:1,cross=1-axis,lo=h?a:c,hi=h?b:d,start=h?c:a,end=h?d:b;
+    if(!near(s.rawA[cross],s.rawZ[cross])||!near(Math.min(s.rawA[axis],s.rawZ[axis]),lo)||!near(Math.max(s.rawA[axis],s.rawZ[axis]),hi)){fits=false;break;}
+    const index=Math.round((s.rawA[cross]-start)*n/(end-start));
+    if(index<1||index>=n||positions.has(index)||!near(s.rawA[cross],start+(end-start)*index/n)){fits=false;break;}positions.add(index);
+   }
+   if(fits)for(const s of inside)if(!s.bay171)recoveredBays246.set(s,bay);
+  }
+  for(const s of savedSB171){const bay=recoveredBays246.get(s);if(!bay)continue;const live=beams.find(b=>b.source==='auto'&&b.kind==='SB'&&b.id===s.id&&sig(b.rawA,b.rawZ)===sig(s.rawA,s.rawZ));if(live)live.bay171=clone(bay);}
   // Repair only bays whose primary boundaries changed, retaining other saved spacing.
-  for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=b.bay171||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
+  for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=b.bay171||recoveredBays246.get(b)||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
    const customized=affected.some(b=>{const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null;return token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length)||t.beamWidths83?.[sig(b.rawA,b.rawZ)]!=null||t.beamDepths201?.[sig(b.rawA,b.rawZ)]!=null||b.depthOverride184!=null;});
    if(customized){issue('SB','主梁 bay 已改變，但原次梁有構件輸入；請核對後重新布置該 bay');continue;}changedBays171.add(key171);
   }
@@ -656,7 +712,7 @@ const Engine=(()=>{
    for(const c of up.columns.filter(c=>c.status!=='上层柱')){const matches=dn.columns.filter(d=>d.status!=='上层柱'&&overlap(columnRect(c),columnRect(d))),point=columnLoadPoint(c),beam=transferBeamAt(p,dn,fs[i-1].n,point);if(matches.length!==1&&(matches.length||!dn.walls.some(w=>on(point,w))&&beam?.kind!=='TB'))final.issues.push({type:up.key,floor:fs[i].n,id:c.id,msg:fs[i].n+'/F 上層柱與下層支承關係待確認；請核對柱、牆及 TB'});}
    for(const w of up.walls){const r=rect(w),horizontal=near(w.a[1],w.z[1]),eligible=supports.filter(s=>{const rr=rect(s);return horizontal?Math.abs(rr.y-r.y)+r.d/2<=rr.d/2+eps:Math.abs(rr.x-r.x)+r.w/2<=rr.w/2+eps;}).map(s=>({...s,rawA:s.a,rawZ:s.z}));if(!covered(eligible,w.a,w.z))final.issues.push({type:up.key,id:w.id,msg:fs[i].n+'/F 墙与下层墙／TB 不连续，请核对支承'});}
   }
-  applyFloorBeamDepths(p,final);for(const f of final.floors){const m=floorModel(final,f.n),local=typeof LocalHeights96!=='undefined'&&LocalHeights96.hasClearance(p,f.n),deep=m.beams.filter(b=>b.d*1000>(local?LocalHeights96.beamAllowance(p,f.n,b):f.sh)+1e-6);if(deep.length)final.issues.push({type:f.type,floor:f.n,id:deep.map(b=>b.displayId||b.id).join('、'),msg:FloorLevels.name(p,f.n)+'：'+deep.length+' 根梁深超过'+(local?'本层／局部结构预留高度':'本层结构预留高度 '+f.sh+' mm')+'；Framing 截面保持不变，请检查净高安排'});}if(reconcileResizedBeams163(p,final))return generate(p);slabGeometry.migrate(p,final);return final;}
+  applyFloorBeamDepths(p,final);for(const f of final.floors){const m=floorModel(final,f.n),local=typeof LocalHeights96!=='undefined'&&LocalHeights96.hasClearance(p,f.n),deep=m.beams.filter(b=>b.d*1000>(local?LocalHeights96.beamAllowance(p,f.n,b):f.sh)+1e-6);if(deep.length)final.issues.push({type:f.type,floor:f.n,id:deep.map(b=>b.displayId||b.id).join('、'),msg:FloorLevels.name(p,f.n)+'：'+deep.length+' 根梁深超过'+(local?'本层／局部结构预留高度':'本层结构预留高度 '+f.sh+' mm')+'；Framing 截面保持不变，请检查净高安排'});}if(reconcileResizedBeams163(p,final))return generate(p);slabGeometry.migrate(p,final);dimensionIssues241(p,final);return final;}
  function removeAxis(p,dim,index,key){if(!key||!p.types[key])throw Error('请选择要修改轴线的 Framing');const grid=ownAxes(p,key);return removeAxisLocal({...p,axes:grid,types:{[key]:p.types[key]}},dim,index);}
  function removeAxisLocal(p,dim,index){
   const arr=p.axes[dim],count=arr.length;
@@ -721,31 +777,54 @@ const Engine=(()=>{
   const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);
  }
  const slabSignature=s=>s.rects.map(r=>[r.x0,r.x1,r.y0,r.y1].map(v=>v.toFixed(6)).join(',')).sort().join('|');
- function editSize(p,key,hit,size){
-  const t=p.types[key],m=hit.f?floorModel(generate(p),hit.f,key):model(p,key),number=(v,name)=>{if(v!==null&&(!Number.isFinite(v)||v<1||v>20000))throw Error(name+' 须为 1–20000 mm，或留空恢复默认');};number(size.b,'B / 厚度');if(size.depthOverride184||!['MB','TB','CB'].includes(size.kind??hit.kind))number(size.d,'D');
-  if(hit.kind==='SLAB'){const s=m.slabs.find(s=>s.id===hit.slabId);if(!s)throw Error('板块已不存在');const signature=slabSignature(s);t.slabSizes=(t.slabSizes||[]).filter(s=>s.signature!==signature);if(size.b!==null)t.slabSizes.push({signature,value:size.b});return;}
+ // Ordinary SB dimensions share one topology snapshot; complex edits retain sequential resolution.
+ function editBeamWidths244(p,key,m,edits){
+  return edits.every(({size})=>!Object.hasOwn(size,'d'))&&editBeamSizes245(p,key,m,edits);
+ }
+ function editBeamSizes245(p,key,m,edits){
+  if(!edits.length||!edits.every(({beam,size})=>beam.kind==='SB'&&size.kind==='SB'&&size.b!==null&&(!Object.hasOwn(size,'d')||size.d!==null)&&!beam.splitMainParent&&!beam.splitSecondaryParent200&&!beam.autoCantilever173&&!beam.autoTransfer))return false;
+  const members=new Map(m.beams.map(b=>[b.kind+'|'+sig(b.rawA,b.rawZ),b])),targets=edits.map(({beam,size})=>({beam:members.get(beam.kind+'|'+sig(beam.rawA,beam.rawZ)),size})),shared=floors(p).filter(f=>f.type===key);
+  // Validate every requested dimension before writing any member or freezing automatic beams.
+  for(const {beam,size}of targets){
+   if(!beam)throw Error('梁已不存在，請重新選取');
+   if(!Number.isFinite(size.b)||size.b<1||size.b>20000)throw Error('梁闊須為 1–20000 mm');assertBeamWidth241(p,key,'SB',size.b);
+   if(Object.hasOwn(size,'d')){
+    if(!Number.isFinite(size.d)||size.d<1||size.d>20000)throw Error('梁深須為 1–20000 mm');
+    for(const f of shared){const limit=LocalHeights96.beamAllowance(p,f.n,beam);if(size.d>limit+1e-6)throw Error(beam.id+' 梁深 '+size.d+' mm 超過 '+FloorLevels.name(p,f.n)+' Structural Zone 上限 '+limit+' mm；未套用');}
+   }
+  }
+  freezeAutoBeams(p,key,m);
+  for(const {beam,size}of targets)editSize(p,key,{id:beam.id,kind:beam.kind},{...size,d:size.d??null,depthOverride184:Object.hasOwn(size,'d'),preserveDepth184:!Object.hasOwn(size,'d')},{model:m});
+  return true;
+ }
+ function editSize(p,key,hit,size,batch244=null){
+  const t=p.types[key],m=batch244?.model||(hit.f?floorModel(generate(p),hit.f,key):model(p,key)),number=(v,name)=>{if(v!==null&&(!Number.isFinite(v)||v<1||v>20000))throw Error(name+' 须为 1–20000 mm，或留空恢复默认');};number(size.b,'B / 厚度');if(size.depthOverride184||!['MB','TB','CB'].includes(size.kind??hit.kind))number(size.d,'D');
+  if(hit.kind==='SLAB'){assertSlab241(size.b??p.defaults.slab);const s=m.slabs.find(s=>s.id===hit.slabId);if(!s)throw Error('板块已不存在');const signature=slabSignature(s);t.slabSizes=(t.slabSizes||[]).filter(s=>s.signature!==signature);if(size.b!==null)t.slabSizes.push({signature,value:size.b});return;}
   if(hit.kind==='COL'){const c=m.columns.find(c=>c.id===hit.id);if(!c)throw Error('柱已不存在');if(t.mode==='auto'&&c.anchorX!==undefined){t.columnSizes=(t.columnSizes||[]).filter(o=>o.ax!==c.anchorX||o.ay!==c.anchorY);if(size.b!==null||size.d!==null)t.columnSizes.push({ax:c.anchorX,ay:c.anchorY,b:size.b??t.columnDefaults101?.cb??p.defaults.cb,d:size.d??t.columnDefaults101?.cd??p.defaults.cd,bMode201:size.b==null?'default':'manual',dMode201:size.d==null?'default':'manual'});}else{const row=t.columns.find(c=>c.id===hit.id);row.b=size.b??t.columnDefaults101?.cb??p.defaults.cb;row.d=size.d??t.columnDefaults101?.cd??p.defaults.cd;row.bMode201=size.b==null?'default':'manual';row.dMode201=size.d==null?'default':'manual';}return;}
   if(hit.kind==='WALL'){const row=t.walls.find(w=>w.id===hit.id);if(!row)throw Error('墙已不存在');row.b=size.b??p.defaults.wall;return;}
   const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)throw Error('梁已不存在');if(size.depthOverride184&&size.d!==null){for(const f of floors(p).filter(f=>f.type===key)){const limit=LocalHeights96.beamAllowance(p,f.n,b);if(size.d>limit+1e-6)throw Error(b.id+' 梁深 '+size.d+' mm 超過 '+FloorLevels.name(p,f.n)+' Structural Zone 上限 '+limit+' mm；未套用');}}const requestedKind=size.kind??b.kind,nextKind=(b.autoTransfer||b.autoCantilever173)&&requestedKind===b.kind?b.baseKind:requestedKind;if(!['MB','SB','TB','CB'].includes(nextKind))throw Error('梁类型须为 MB、SB、TB 或 CB');if(nextKind!==b.kind&&m.beams.some(other=>other!==b&&other.kind===nextKind&&sig(other.rawA,other.rawZ)===sig(b.rawA,b.rawZ)))throw Error('同位置已存在该类型的梁，请先检查重复构件');if(b.splitMainParent||b.splitSecondaryParent200){materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}let row=t.beams.find(c=>c.id===b.id&&c.kind===(b.baseKind||b.kind)&&b.source==='manual');
+  if(size.b!==null)assertBeamWidth241(p,key,requestedKind,size.b);
   const autoEdit201=b.source==='auto';
-  if(autoEdit201){freezeAutoBeams(p,key,m);const original=beamIdentity173(b);row={...clone(b),id:b.id,kind:nextKind,a:{x:original.rawA[0],y:original.rawA[1]},z:{x:original.rawZ[0],y:original.rawZ[1]},b:b.b*1000,d:null,on:true};}
+  if(autoEdit201){if(!batch244)freezeAutoBeams(p,key,m);const original=beamIdentity173(b);row={...clone(b),id:b.id,kind:nextKind,a:{x:original.rawA[0],y:original.rawA[1]},z:{x:original.rawZ[0],y:original.rawZ[1]},b:b.b*1000,d:null,on:true};}
   if(!row){let n=1;while(t.beams.some(b=>b.id==='EDIT_'+n))n++;const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);row={id:'EDIT_'+n,kind:nextKind,a:{x:original.rawA[0],y:original.rawA[1]},z:{x:original.rawZ[0],y:original.rawZ[1]},on:true,original:signature};t.beams.push(row);}
   if(b.loadKind194)row.loadKind194=b.loadKind194;
   row.columnSupports164=clone(b.columnSupports164||mainColumnSupports164(p,key,b,m.columns));
   row.positionMode175=size.positionMode175??b.positionMode175??'follow';delete row.typeMode175;
   if(row.positionMode175==='fixed'){row.fixedA175=clone(b.a);row.fixedZ175=clone(b.z);}else{delete row.fixedA175;delete row.fixedZ175;}
-  if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;if(nextKind==='CB'&&(b.kind!=='CB'||b.autoCantilever173))row.extendToBoundary173=true;row.widthMode=size.preserveWidth199?(b.widthMode??(b.source==='auto'?(b.kind==='SB'?'default':['MB','CB'].includes(b.kind)?'column':'manual'):'manual')):size.b===null?(["MB","CB"].includes(nextKind)?"column":"default"):"manual";row.kind=nextKind;row.b=size.b??p.defaults[nextKind==='SB'?'sb':nextKind==='TB'?'tb':'mb'];if(size.depthOverride184){if(size.d===null)delete row.depthOverride184;else row.depthOverride184=size.d;}row.d??=null;if(requestedKind!==b.kind&&!size.depthOverride184){delete row.depthOverride184;row.d=null;}else if(!size.preserveDepth184)row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;if(autoEdit201){
+  if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;if(nextKind==='CB'&&(b.kind!=='CB'||b.autoCantilever173))row.extendToBoundary173=true;row.widthMode=size.preserveWidth199?(b.widthMode??(b.source==='auto'?(b.kind==='SB'?'default':['MB','CB'].includes(b.kind)?'column':'manual'):'manual')):size.b===null?(["MB","CB"].includes(nextKind)?"column":"default"):"manual";row.kind=nextKind;row.b=size.b??(nextKind==='SB'?secondaryWidth(p,key):p.defaults[nextKind==='TB'?'tb':'mb']);if(size.depthOverride184){if(size.d===null)delete row.depthOverride184;else row.depthOverride184=size.d;}row.d??=null;if(requestedKind!==b.kind&&!size.depthOverride184){delete row.depthOverride184;row.d=null;}else if(!size.preserveDepth184)row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;if(autoEdit201){
    const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ),snap=t.autoBeamSnapshot;
+   const preservedBay246=snap.secondary?.find(v=>v.id===b.id&&sig(v.rawA,v.rawZ)===signature)?.bay171;
    for(const group of ['main','secondary','primary'])snap[group]=(snap[group]||[]).filter(v=>!(v.id===b.id&&sig(v.rawA,v.rawZ)===signature));
    const saved={id:row.id,kind:row.kind,rawA:clone(original.rawA),rawZ:clone(original.rawZ),a:clone(original.a),z:clone(original.z),b:row.b/1000,d:row.d==null?b.d:row.d/1000};
    for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','fixedEnd101','secondaryCantilever101','extendToBoundary173'])if(row[k]!==undefined)saved[k]=clone(row[k]);
+   if(row.kind==='SB'&&preservedBay246)saved.bay171=clone(preservedBay246);
    if(!size.depthOverride184&&!size.preserveDepth184&&row.kind==='SB'&&size.d!=null)saved.depthOverride184=size.d;
    if(b.autoCantilever173&&row.kind==='MB')delete saved.fixedEnd101;
    if(t.beamWidths83)delete t.beamWidths83[signature];if(saved.widthMode==='manual')(t.beamWidths83??={})[signature]=row.b;
    if(t.beamDepths201)delete t.beamDepths201[signature];if(saved.depthOverride184!=null)(t.beamDepths201??={})[signature]=saved.depthOverride184;
    snap[row.kind==='MB'?'main':row.kind==='SB'?'secondary':'primary'].push(saved);
   }
-  return model(p,key).beams.find(v=>v.id===row.id||v.splitSecondaryParent200===row.id)||{id:row.id,kind:row.kind,rawA:resolve(p,row.a,key),rawZ:resolve(p,row.z,key)};
+  return (!batch244&&model(p,key).beams.find(v=>v.id===row.id||v.splitSecondaryParent200===row.id))||{id:row.id,kind:row.kind,rawA:resolve(p,row.a,key),rawZ:resolve(p,row.z,key)};
  }
  // Resolve every target before mutation: generated member IDs may change after deletion.
  function removeMembers(p,key,hits,f){
@@ -780,6 +859,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
+ return {editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

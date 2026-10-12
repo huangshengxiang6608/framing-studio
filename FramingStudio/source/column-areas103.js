@@ -2,6 +2,15 @@
 const ColumnAreas103=(()=>{
  const eps=1e-7,R=LoadRegions83;
  let stamp='',cache=new Map();
+ // Loading runs use immutable project/model snapshots. Hash that pair once per
+ // scoped run; interactive calls outside the scope still detect in-place edits.
+ const snapshots228=new WeakMap();
+ function snapshot228(p,result){
+  let entries=snapshots228.get(p);if(!entries){entries=new Map();snapshots228.set(p,entries);}
+  let entry=entries.get(result);if(!entry){entry={key:JSON.stringify([p,result]),count:0,routes:new Map(),columnInputs:new Map()};entries.set(result,entry);}entry.count++;
+  let released=false;return ()=>{if(released)return;released=true;if(--entry.count===0)entries.delete(result);if(!entries.size)snapshots228.delete(p);};
+ }
+
  const area=R.area,copy=x=>JSON.parse(JSON.stringify(x)),a=b=>b.rawA||b.a,z=b=>b.rawZ||b.z;
  const active=m=>m.columns.filter(c=>c.status!=='上层柱');
  function point(p,m,c){
@@ -120,10 +129,14 @@ const ColumnAreas103=(()=>{
  function footprint(p,m,c){return partition(p,m).get(c)||{rects:[],polygons:[],b:null,d:null,box:null,area:0,errors:[],method:'geometric-half-bay'};}
 
  function calculate(p,result,f,target){
-  const key=JSON.stringify([p,result]);if(key!==stamp){stamp=key;cache=new Map();}const id=f+'|'+target;if(cache.has(id))return copy(cache.get(id));
+  const key=snapshots228.get(p)?.get(result)?.key??JSON.stringify([p,result]);if(key!==stamp){stamp=key;cache=new Map();}const id=f+'|'+target;if(cache.has(id))return copy(cache.get(id));
   const base=Engine.floorModel(result,f),selected=base&&active(base).find(c=>Loading.token('COL',c)===target);
   if(!selected)return {groups:[],errors:['当前楼层未找到所选下层柱'],method:'geometric-half-bay'};
-  const memo=new Map(),groups=[],errors=[],shapeCache=new WeakMap();
+  // Routes depend on the immutable snapshot and receiving floor, not on
+  // which receiving column is being totalled. Never reuse across snapshot scopes.
+  const scoped=snapshots228.get(p)?.get(result),memo=scoped?.routes.get(f)||new Map(),columnInputs=scoped?.columnInputs||new Map(),groups=[],errors=[],shapeCache=new WeakMap();
+  if(scoped)scoped.routes.set(f,memo);
+  const columnInput=(n,c)=>{const token=Loading.token('COL',c),key=n+'|'+token;if(!columnInputs.has(key))columnInputs.set(key,Loading.input(p,n,token));return columnInputs.get(key);};
   const geometry=(m,c)=>{let values=shapeCache.get(m);if(!values){values=new Map();shapeCache.set(m,values);}const key=Loading.token('COL',c);if(!values.has(key))values.set(key,footprint(p,m,c));return values.get(key);},baseShape=geometry(base,selected);
   const inside=(c,q)=>{const r=Engine.columnRect(c);return Math.abs(r.x-q[0])<=r.w/2+eps&&Math.abs(r.y-q[1])<=r.d/2+eps;};
   const on=(q,b)=>{const u=a(b),v=z(b),dx=v[0]-u[0],dy=v[1]-u[1],l2=dx*dx+dy*dy;if(l2<eps)return false;const t=((q[0]-u[0])*dx+(q[1]-u[1])*dy)/l2;return Math.abs((q[0]-u[0])*dy-(q[1]-u[1])*dx)<eps*Math.sqrt(l2)&&t>=-eps&&t<=1+eps;};
@@ -143,7 +156,7 @@ const ColumnAreas103=(()=>{
    }
    return {entries:merge(entries),errors:[...new Set(err)]};
   }
-  const overrides=(n,c,source)=>{const o=Loading.input(p,n,Loading.token('COL',c));return !!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto'||Object.hasOwn(o.sectionAAreaOverrides115||{},source));};
+  const overrides=(n,c,source)=>{const o=columnInput(n,c);return !!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto'||Object.hasOwn(o.sectionAAreaOverrides115||{},source));};
   function route(n,c,source=n,bypass=false){
    const k=n+'|'+Loading.token('COL',c)+'|'+source+'|'+bypass;if(n>f&&!bypass&&overrides(n,c,source))return {entries:[],errors:[]};if(memo.has(k))return memo.get(k);
    if(n===f){const answer={entries:[{column:c,weight:1}],errors:[]};memo.set(k,answer);return answer;}
@@ -167,7 +180,7 @@ const ColumnAreas103=(()=>{
   // A confirmed upper-column area replaces its geometric contribution exactly
   // once along the same column/TB route, including further transfers below it.
   for(let n=f+1;n<=p.total;n++)for(const c of active(Engine.floorModel(result,n))){
-   const o=Loading.input(p,n,Loading.token('COL',c));if(!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto')&&!Object.keys(o.sectionAAreaOverrides115||{}).length)continue;
+   const o=columnInput(n,c);if(!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto')&&!Object.keys(o.sectionAAreaOverrides115||{}).length)continue;
    const a=Reports.columnA(p,{floor:n,token:Loading.token('COL',c),id:c.id},result);
    for(let source=n;source<=p.total;source++){if(!overrides(n,c,source))continue;const routing=route(n,c,source,true),weight=routing.entries.filter(e=>Loading.token('COL',e.column)===target).reduce((v,e)=>v+e.weight,0);if(weight<eps)continue;errors.push(...routing.errors,...a.errors);
     for(const x of a.rows.filter(x=>x.lo<=source&&x.hi>=source)){const named=x.areaName&&x.areaName!=='整层默认',load=named?LoadData.areas(p,source).find(l=>l.name===x.areaName||l.id===x.areaName):null;groups.push({lo:source,hi:source,area:x.area*weight,b:null,d:null,areaId:load?.id??null,areaName:load?.name||'整层默认',automatic:true,manualArea:true,rects:[],polygons:[],sourceColumn:c.id,transferWeight:weight});}
@@ -181,5 +194,5 @@ const ColumnAreas103=(()=>{
   }
   const answer={groups:[...grouped.values()],errors:[...new Set(errors)],method:'geometric-half-bay'};cache.set(id,answer);return copy(answer);
  }
- return {calculate,footprint,wallShapes,wallSchedule,polygonArea,clipPolygon,subtractPolygon};
+ return {snapshot228,calculate,footprint,wallShapes,wallSchedule,polygonArea,clipPolygon,subtractPolygon};
 })();

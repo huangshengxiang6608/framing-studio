@@ -25,5 +25,3 @@ const settle=async()=>{while(pending.length)await Promise.all(pending.splice(0))
  assert(!c.run('ui247.messages').some(s=>s.includes('未完成')));
  console.log('PASS actual Summary Check DOM buttons: full run, B/D edit, incremental/full parity, cancel and restart; project unchanged by checks');
 })().catch(e=>{console.error(e);process.exitCode=1});
-
-

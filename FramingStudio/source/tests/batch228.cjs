@@ -20,4 +20,3 @@ const $=s=>document.querySelector(s),buttons=()=>[...document.querySelectorAll('
  await c.run('batch228.ui.calculate()');const sb=$('[data-ex=audit-sb-apply220]');assert(sb);const runs=c.run('batch228.runs');await click(sb);assert.equal(c.run('batch228.runs'),runs);assert($('[data-ex=audit-sb-apply220]').hasAttribute('disabled'));assert($('.summary-issues131').textContent.includes('以下為上次檢查結果'));
  console.log('PASS real Summary DOM: two sequential TB applications without checks, preserved list/filter/side scroll and unresolved-first order, duplicate guard, undo state and explicit incremental update');
 })().catch(e=>{console.error(e);process.exitCode=1;});
-

@@ -12,4 +12,3 @@ const $=s=>document.querySelector(s),click=async s=>{$(s).dispatchEvent(new wind
  c.ctx.fetch=async()=>({ok:false,status:503,json:async()=>({error:'Disconnected'})});await c.run("LocalExcel251.send({kind:'excel-run',jobs:[]})");assert(received.at(-1).done);assert.equal(received.at(-1).error,'Disconnected');
  console.log('PASS browser local-Excel capability, A/B/AB generation dispatch, authenticated job/event transport, record delivery and connection-error completion');
 })().catch(e=>{console.error(e);process.exitCode=1});
-

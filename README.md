@@ -44,7 +44,7 @@ E2.208 統一荷載精度：原始 DL／LL、自重、反力及中間傳荷均�
 
 新增 Legend 箭嘴，可收起／展開柱關係、構件顯示及標註選項，並記住本機狀態。保留 E2.205 的 Section A／B 分開檢查結果及手動梁深編輯。
 
-Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.228**，在 E2.204 可编辑梁深的基础上，Summary Check 分开显示 Section A Span/Depth 与 Section B RC Check 的通过状态，补回仅 A 未通过的构件。保留既有支承及 RC 验算规则、Section A／B 抄格式、Excel／VBA 模板，以及界面提示和保存保护。包含源码、重新编译的 Windows 程序及离线浏览器资源。
+Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.256**，在 E2.204 可编辑梁深的基础上，Summary Check 分开显示 Section A Span/Depth 与 Section B RC Check 的通过状态，补回仅 A 未通过的构件。保留既有支承及 RC 验算规则、Section A／B 抄格式、Excel／VBA 模板，以及界面提示和保存保护。包含源码、重新编译的 Windows 程序及离线浏览器资源。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 
@@ -144,7 +144,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File source/compile.ps1 -DesktopO
 
 该命令使用系统 .NET Framework C# 编译器及随附的 WebView2 库重建桌面程序。省略 `-DesktopOnly` 可同时重建 ExcelBridge.exe。
 
-`compile.ps1` 不负责网页资源打包。修改已标记的 23 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
+`compile.ps1` 不负责网页资源打包。修改已标记的 36 个模块后，在仓库根目录执行 `python FramingStudio/source/sync-web.py`；它只同步标记范围并保留其余网页字节。其他 JavaScript/CSS 模块仍须同步 `assets/index.html` 中对应内容；仅改 `source/` 不会自动改变运行界面。`source/build-floor-names.py` 是历史版本迁移脚本，不是当前版本的通用构建入口。
 
 ## 版本与依赖
 

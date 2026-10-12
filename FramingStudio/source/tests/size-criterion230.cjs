@@ -18,5 +18,3 @@ const tb=c.run(`(()=>{const p=Engine.clone(argument);p.groups[0].h=3.25;Object.a
 const width=run(tb,"(p,row)=>({state:'available',L:row.loading.L,max:30*.25/row.member.b})");
 assert.equal(width.item.checks205.b.status,'OK');assert.equal(width.item.tbAdvice221.d,250);assert.equal(width.item.tbAdvice221.b,350);assert(width.item.tbAdvice221.depthFull);
 console.log('PASS TB previously RC-pass now gets advice when both serviceability paths fail; width only after full zone, strict L/250 sizing');
-
-

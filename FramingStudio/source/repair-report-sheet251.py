@@ -34,7 +34,7 @@ import argparse
 parser=argparse.ArgumentParser(description='Repair the E2.250 RC template worksheet reference without saving sheets in Excel. Requires olefile and oletools.')
 parser.add_argument('template',type=Path);parser.add_argument('output',type=Path);args=parser.parse_args();src=args.template
 assert hashlib.sha256(src.read_bytes()).hexdigest()=='71c8e2e36e5b3510447aa1dfc29f0e44a2ca1504705cfb241a5c8294f1709988','Unexpected template baseline'
-assert src.resolve()!=args.output.resolve() and not args.output.exists(),'Use a new output file' 
+assert src.resolve()!=args.output.resolve() and not args.output.exists(),'Use a new output file'
 with zipfile.ZipFile(src) as z: original=z.read('xl/vbaProject.bin')
 bio=io.BytesIO(original);ole=olefile.OleFileIO(bio,write_mode=True)
 p=VBA_Project(ole,'','PROJECT','VBA/dir');p.parse_project_stream();list(p.parse_modules())

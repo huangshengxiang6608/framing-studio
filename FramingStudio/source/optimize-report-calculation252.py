@@ -34,7 +34,7 @@ import argparse
 parser=argparse.ArgumentParser(description='Optimize the E2.251 native link-spacing recalculation without saving sheets in Excel. Requires olefile and oletools.')
 parser.add_argument('template',type=Path);parser.add_argument('output',type=Path);args=parser.parse_args();src=args.template
 assert hashlib.sha256(src.read_bytes()).hexdigest()=='37d0bc87dc7bb06ecc7fb012f23c8b80f724db1254261db05e4987c9441c00ea','Unexpected template baseline'
-assert src.resolve()!=args.output.resolve() and not args.output.exists(),'Use a new output file' 
+assert src.resolve()!=args.output.resolve() and not args.output.exists(),'Use a new output file'
 with zipfile.ZipFile(src) as z: original=z.read('xl/vbaProject.bin')
 bio=io.BytesIO(original);ole=olefile.OleFileIO(bio,write_mode=True)
 p=VBA_Project(ole,'','PROJECT','VBA/dir');p.parse_project_stream();list(p.parse_modules())

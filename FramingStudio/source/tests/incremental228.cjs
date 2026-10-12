@@ -32,4 +32,3 @@ const root=path.resolve(__dirname,'../..'),c=context(root);c.ctx.setTimeout=setT
  console.log('PASS scoped immutable column-area hashing matches original path and releases on cancellation');
  console.log('PASS after TB application: loading, RC, deflection and size recommendations equal a full audit',JSON.stringify(advice));
 })().catch(e=>{console.error(e);process.exitCode=1;});
-

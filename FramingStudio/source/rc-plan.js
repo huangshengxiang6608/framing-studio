@@ -12,6 +12,7 @@ const RCPlan=(()=>{
   const lookup=(r,id)=>out.rows.find(x=>x.floor===r.floor&&x.id===id),kind=r=>r.result.kind||r.displayType||r.kind;
   function dependencies(r,seen=new Map()){
    if(r.result.widthViolation)throw Error(r.result.fail.join('；'));if(seen.has(r.token))return seen;const k=kind(r),l=r.loading||{};
+   if(['MB','SB','TB','CB'].includes(k)){const gate=Loading.beamAcceptance261(p,r);if(!gate.pass)throw Error(r.id+'：'+(!gate.rc?(r.result.fail||gate.checks.b.reasons).join('；'):'Span/Depth 與 Actual Deflection 均未通過或資料未完整')+'；生成抄須 RC 通過，且 Span/Depth 或 Actual Deflection 至少一項通過');}
    if(r.result.autoFailed&&(section!=='A'||['SLAB','CS'].includes(k)))throw Error(r.id+' 自动选筋失败：'+r.result.fail.join('；')+'；请调整截面或配筋限制');
    if(section==='A'&&!['COL','SB','MB','TB'].includes(k)){if(!(l.L>0)||!['SLAB','CS','SB','MB','CB'].includes(k))throw Error('构件尺寸或支承资料未完整');seen.set(r.token,r);return seen;}
    if(k==='COL'){if(section==='A'&&r.truss109?.length)throw Error('原 Section A 面积表不支持桁架反力输入；请查看桁架独立计算及 Section B 柱验算');const a=r.columnA||Reports.columnA(p,r);if(a.errors.length)throw Error(a.errors.join('；'));if(section!=='A'&&!r.result.inputs)throw Error((r.result.fail||['柱验算输入未完整']).join('；'));r.columnA=a;seen.set(r.token,r);return seen;}

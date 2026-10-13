@@ -7,7 +7,7 @@ const actual=c.run(`(()=>{
  return {rows,pendingFail,pending,nonbeam:BeamLoadUI.combinationKey214({kind:'COL'}),choices:BeamLoadUI.combinations214};
 })()`);
 assert.equal(new Set(actual.rows.map(r=>r.key)).size,8);assert.equal(actual.rows.filter(r=>r.default).length,5);
-for(const r of actual.rows){const failed=r.key[1]==='F'||r.key[2]==='F';assert.equal(r.failed,failed);assert.equal(r.default,failed&&r.key!=='PFP');assert.equal(r.status,failed?'NOT OK':r.key[0]==='F'?'OK (SHORT-TERM)':'OK');}
+for(const r of actual.rows){const failed=r.key[1]==='F'||r.key[2]==='F';assert.equal(r.failed,failed);assert.equal(r.default,failed&&r.key!=='PFP');assert.equal(r.status,r.key[2]==='F'||r.key[0]==='F'&&r.key[1]==='F'?'NOT OK':r.key[0]==='F'?'OK (SHORT-TERM)':'OK');}
 assert.equal(actual.pendingFail.key,'pending-fail');assert.equal(actual.pending.key,'pending');assert.equal(actual.nonbeam,'other');
 const fixtures=JSON.parse(fs.readFileSync(path.resolve(__dirname,'../../../tmp/release205/fixtures.json'),'utf8'));
 const all=c.run(`(()=>{const p=argument,r=Engine.generate(p),snapshot=JSON.stringify(p),legacy=Loading.audit(p,r,BeamLoadUI.summary211),full=Loading.audit(p,r,BeamLoadUI.summary211,true),expected=r.floors.reduce((n,f)=>n+Loading.members(p,r,f.n).filter(m=>['MB','SB','TB','CB'].includes(m.kind)).length,0);return {legacy,full,expected,unchanged:snapshot===JSON.stringify(p)};})()`,fixtures['OK / OK'].p);

@@ -33,7 +33,7 @@ const BeamRebar116=(()=>{
  }
  function preview237(row,steel){
   const v=row?.result?.inputs;if(!v)return null;
-  try{return {...row,result:SectionB.beam({kind:row.result.kind||row.kind,L:v.G12,b:v.G14,h:v.G15,cover:v.G16,fcu:v.G17,M:v.G23,V:v.G24,T:v.K25,steel})};}
+  try{return {...row,result:SectionB.beam({acceptance261:'rc',kind:row.result.kind||row.kind,L:v.G12,b:v.G14,h:v.G15,cover:v.G16,fcu:v.G17,M:v.G23,V:v.G24,T:v.K25,steel})};}
   catch(e){return {...row,result:{status:'INPUT REQUIRED',fail:[e.message]}};}
  }
  function measures237(row,steel){

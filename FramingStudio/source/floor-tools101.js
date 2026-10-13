@@ -137,6 +137,30 @@ const FloorColumns101=(()=>{
   }
   return plan.length?applySizePlan(p,result,plan):{columns:0,floors:0};
  }
+ // Apply all selected offsets together, so touching columns can move as one batch.
+ // Resolve identities before moving and retain the existing per-column position rules.
+ function positionMany257(p,result,key,f,changes){
+  const model=Engine.floorModel(result,f,key),seen=new Set(),plan=[];
+  const valid=['','center','up','down','left','right','up-left','up-right','down-left','down-right'];
+  for(const {hit,position} of changes){assertEditable(hit,f);if(hit.kind!=='COL'||!valid.includes(position))throw Error('請選擇有效的當層柱基準位置');
+   const c=model.columns.find(c=>c.id===hit.id&&c.status!=='上层柱');if(!c)throw Error('柱已不存在，請重新選取');const id=Engine.columnPositionKey(c);if(seen.has(id))throw Error('同一柱有重複修改');seen.add(id);plan.push({id,position,name:c.id});
+  }
+  if(!plan.length)return {columns:0};
+  const trial=Engine.clone(p),before=Engine.model(p,key).columns.map(Engine.columnPositionKey);
+  mutate(trial,key,f,q=>{const t=q.types[key];
+   for(const x of plan){t.columnAxisPositions=(t.columnAxisPositions||[]).filter(v=>v.key!==x.id);if(x.position){t.columnAxisPositions.push({key:x.id,position:x.position});t.columnPlacements=(t.columnPlacements||[]).filter(v=>v.key!==x.id);}}
+   const next=Engine.model(q,key),present=new Map(next.columns.map(c=>[Engine.columnPositionKey(c),c]));
+   for(const id of before)if(!present.has(id))throw Error((plan.find(x=>x.id===id)?.name||id)+'：基準位置與牆、柱或建築範圍衝突；整批未修改');
+   for(const x of plan){const c=present.get(x.id),r=Engine.columnRect(c);if(!Engine.rectAllowed(next.ts,r.x,r.y,r.w,r.d,true))throw Error(x.name+'：柱截面越出建築範圍；整批未修改');if(next.walls.some(w=>Engine.overlap(r,Engine.rect(w)))||next.columns.some(o=>Engine.columnPositionKey(o)!==x.id&&Engine.overlap(r,Engine.columnRect(o))))throw Error(x.name+'：柱截面與牆或其他柱重疊；整批未修改');}
+  });
+  // Generated columns may change coordinate tokens. Move their saved inputs and
+  // Check/A/B selection together, including every floor sharing this Framing.
+  if(trial.explorer){const next=Engine.generate(trial),moves=[];
+   for(const floor of result.floors.filter(v=>v.type===key)){const old=Engine.floorModel(result,floor.n,key),now=new Map(Engine.floorModel(next,floor.n,key).columns.map(c=>[Engine.columnPositionKey(c),c]));for(const c of old.columns){const to=now.get(Engine.columnPositionKey(c));if(!to)continue;const a=floor.n+'|'+Loading.token('COL',c),b=floor.n+'|'+Loading.token('COL',to);if(a!==b)moves.push([a,b]);}}
+   for(const name of ['members','selected','reportA','reportB']){const map=trial.explorer[name];if(!map)continue;const source=Engine.clone(map);for(const [a]of moves)delete map[a];for(const [a,b]of moves){if(!Object.hasOwn(source,a))continue;if(Object.hasOwn(map,b)&&JSON.stringify(map[b])!==JSON.stringify(source[a]))throw Error('柱位置對應已有獨立輸入；整批未修改，請檢查 Loading／Check');map[b]=source[a];}}
+  }
+  p.types[key]=trial.types[key];if(trial.explorer)p.explorer=trial.explorer;return {columns:plan.length};
+ }
  function snap(c){const r=Engine.columnRect(c);return [[r.x,r.y]];}
  function viewport(p){const xs=Object.keys(p.types).flatMap(k=>Engine.axes(p,'x',k).map(a=>a.v)),ys=Object.keys(p.types).flatMap(k=>Engine.axes(p,'y',k).map(a=>a.v));return {x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)};}
  document.addEventListener('change',e=>{const a=e.target,k=a.dataset.c101;if(!k)return;const box=a.closest('[data-column-floor]'),f=+box.dataset.columnFloor,id=box.dataset.columnId;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=box.dataset.columnFraming,c=Engine.floorModel(result,f,key).columns.find(c=>c.id===id);if(!c)throw Error('柱已不存在');const v=k==='position'?a.value:+a.value;if(k==='position')mutate(p,key,f,q=>Engine.setColumnPosition(q,key,Engine.columnPositionKey(c),v));else if(['b','d'].includes(k)){const reset=a.value.trim()==='',df={...p.defaults,...p.types[key].columnDefaults101},value=reset?df[k==='b'?'cb':'cd']:v;resizeMany(p,result,key,f,[{hit:{kind:'COL',id,f},b:k==='b'?value:c.b*1000,d:k==='d'?value:c.d*1000,bMode201:k==='b'?(reset?'default':'manual'):c.bMode201??'manual',dMode201:k==='d'?(reset?'default':'manual'):c.dMode201??'manual'}]);}else{if(a.value.trim()===''||!Number.isFinite(v))throw Error('請填寫有效的柱中心座標');mutate(p,key,f,q=>{const r=Engine.columnRect(c),t=q.types[key],pk=Engine.columnPositionKey(c);t.columnPlacements=(t.columnPlacements||[]).filter(x=>x.key!==pk);t.columnPlacements.push({key:pk,x:k==='x'?v:r.x,y:k==='y'?v:r.y,explicit174:true});});}});});
@@ -144,5 +168,5 @@ const FloorColumns101=(()=>{
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-copy]');if(!a||a.disabled)return;const box=a.closest('[data-column-floor]'),f=Number(box.dataset.columnFloor),step=Number(a.dataset.c101Copy),h=StudioHost.get();if(f!==h.floor||box.dataset.columnFraming!==h.key){h&&StudioHost.toast('請先選擇當層柱');return;}const hit={kind:'COL',id:box.dataset.columnId,f};let outcome;if(StudioHost.transact(()=>{const now=StudioHost.get();outcome=copyAdjacent(now.p,now.result,now.key,now.floor,hit,step);}))StudioHost.toast(outcome.message);});
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-delete]');if(!a)return;const b=a.closest('[data-column-floor]'),f=+b.dataset.columnFloor;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=b.dataset.columnFraming;mutate(p,key,f,q=>Engine.removeMember(q,key,{kind:'COL',id:b.dataset.columnId}));});});
  for(const name of ['editSize','removeMember','setTransferColumn']){const original=Engine[name];Engine[name]=function(p,key,hit,...args){if(name==='editSize'&&hit.kind==='COL'){const f=hit.f||Engine.floors(p).find(v=>v.type===key)?.n,k=key||Engine.floors(p)[f-1]?.type;if(!k||!f)throw Error('柱楼层不存在');const size=args[0],df={...p.defaults,...p.types[k].columnDefaults101},result=Engine.generate(p),c=Engine.floorModel(result,f,k).columns.find(c=>c.id===hit.id);return resizeMany(p,result,k,f,[{hit:{...hit,f},b:size.b??df.cb,d:size.d??df.cd,bMode201:size.preserveColumnB201?c?.bMode201??'manual':size.b==null?'default':'manual',dMode201:size.preserveColumnD201?c?.dMode201??'manual':size.d==null?'default':'manual'}]);}if(hit.kind==='COL'&&hit.f){const f=hit.f,k=key||Engine.floors(p)[f-1]?.type;if(!k)throw Error('柱楼层不存在');return mutate(p,k,f,q=>original(q,k,{...hit,f:undefined},...args));}return original(p,key,hit,...args);};}
- return {resizeMany,recommendationPlan,applyRecommendations,record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
+ return {positionMany257,resizeMany,recommendationPlan,applyRecommendations,record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
 })();

@@ -192,6 +192,61 @@ static class ExcelBridge {
   try{x.Calculation=-4135;foreach(string name in CalculationSheets254){dynamic sheet=b.Worksheets[name];enabled[name]=Convert.ToBoolean(sheet.EnableCalculation);sheet.EnableCalculation=true;}AdoptInputs254(x,b,member,false);}
   finally{foreach(var pair in enabled)b.Worksheets[pair.Key].EnableCalculation=pair.Value;x.Calculation=mode;}
  }
+ // Per-member, read-only calculation copies. Capture only after the original
+ // design has passed comparison. Cross-sheet inputs are private value captures;
+ // the design's equations remain formulas, including native reinforcement UDFs.
+ sealed class DesignCopy265 { public string Name,Source,Member,Address; public object[,] Values; }
+ static readonly List<DesignCopy265> DesignCopies265=new List<DesignCopy265>();
+ static readonly Dictionary<string,string> DesignTail265=new Dictionary<string,string>();
+ static readonly System.Text.RegularExpressions.Regex DesignRefs265=new System.Text.RegularExpressions.Regex("\"(?:[^\"]|\"\")*\"|(?<sheet>'(?:[^']|'')+'|[A-Za-z_][A-Za-z0-9_ ]*)!|(?<loads>\\bRCLoads73\\b(?:\\[#Data\\])?)");
+ static string UniqueDesignName265(dynamic b,string text){
+  text=System.Text.RegularExpressions.Regex.Replace(text,@"[\\/:?*\[\]]","").Trim().Trim('\'');if(text.Length==0)text="RC design";if(text.Length>31)text=text.Substring(0,31);
+  var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(dynamic s in b.Worksheets)names.Add(Convert.ToString(s.Name));string name=text;int i=2;
+  while(names.Contains(name)){string suffix=" ("+(i++)+")";name=text.Substring(0,Math.Min(text.Length,31-suffix.Length))+suffix;}return name;
+ }
+ static void CaptureDesign265(dynamic x,dynamic b,Dictionary<string,object> job,Dictionary<string,object> member){
+  if(Convert.ToString(job["section"])=="A"||(member.ContainsKey("selected")&&!Convert.ToBoolean(member["selected"])))return;
+  if(differences.Count>0)throw new Exception("构件核对未通过，不能生成独立计算页");
+  string source=Convert.ToString(member["sheet"]),id=Convert.ToString(member["id"]);if(!source.StartsWith("Section B "))throw new Exception("未知构件 design sheet："+source);
+  dynamic original=b.Worksheets[source];string address=Convert.ToString(original.UsedRange.Address);object[,] values=(object[,])original.Range[address].Value2;
+  string name=UniqueDesignName265(b,member.ContainsKey("designName265")?Convert.ToString(member["designName265"]):id),tail;int mode=Convert.ToInt32(x.Calculation);bool events=Convert.ToBoolean(x.EnableEvents);
+  try{
+   x.Calculation=-4135;x.EnableEvents=false;Stage79("保留构件计算页："+name);
+   original.Copy(Type.Missing,b.Worksheets[DesignTail265.TryGetValue(source,out tail)?tail:source]);dynamic copy=x.ActiveSheet;copy.Name=name;copy.Unprotect();copy.EnableCalculation=false;
+   copy.Names.Add("_RCDesign265","=TRUE",false);var captures=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);int serial=DesignCopies265.Count+1;
+   Func<string,string> capture=(string key)=>{
+    string existing;if(captures.TryGetValue(key,out existing))return existing;
+    dynamic from=b.Worksheets[key];dynamic hidden=b.Worksheets.Add(Type.Missing,b.Worksheets[b.Worksheets.Count]);string hiddenName=UniqueDesignName265(b,"_D"+serial.ToString("000")+"_"+(captures.Count+1));hidden.Name=hiddenName;
+    string area=Convert.ToString(from.UsedRange.Address);object[,] data=(object[,])from.Range[area].Value2;
+    for(int r=data.GetLowerBound(0);r<=data.GetUpperBound(0);r++)for(int c=data.GetLowerBound(1);c<=data.GetUpperBound(1);c++)if(data[r,c] is string)data[r,c]="'"+(string)data[r,c];
+    hidden.Range[area].Value2=data;hidden.Protect(Type.Missing,true,true,true);copy.Activate();hidden.Visible=0;captures.Add(key,hiddenName);return hiddenName;
+   };
+   string loadRange=null;
+   foreach(dynamic cell in copy.UsedRange.SpecialCells(-4123).Cells){
+    if(!Convert.ToBoolean(cell.HasFormula))continue;string formula=Convert.ToString(cell.Formula);
+    string changed=DesignRefs265.Replace(formula,match=>{
+     if(match.Groups["sheet"].Success){string key=match.Groups["sheet"].Value;if(key.StartsWith("'"))key=key.Substring(1,key.Length-2).Replace("''","'");if(key==name||key==source)return "'"+name.Replace("'","''")+"'!";return "'"+capture(key)+"'!";}
+     if(match.Groups["loads"].Success){if(loadRange==null)loadRange="'"+capture("RC Loads")+"'!"+Convert.ToString(b.Worksheets["RC Loads"].ListObjects["RCLoads73"].DataBodyRange.Address);return loadRange;}
+     return match.Value;
+    });
+    if(changed!=formula)try{cell.Formula=changed;}catch(Exception ex){throw new Exception("Independent design formula: "+name+"!"+Convert.ToString(cell.Address)+": "+ex.Message,ex);}
+   }
+   // HasFullLoads73's existing lookup must also remain private to this member.
+   if(Convert.ToString(member["kind"])=="CB"){
+    if(loadRange==null)loadRange="'"+capture("RC Loads")+"'!"+Convert.ToString(b.Worksheets["RC Loads"].ListObjects["RCLoads73"].DataBodyRange.Address);
+    copy.Names.Add("_RCLoads265","="+loadRange,false);
+   }
+   foreach(dynamic shape in copy.Shapes){try{if(!string.IsNullOrEmpty(Convert.ToString(shape.OnAction))){shape.OnAction="";try{shape.TextFrame2.TextRange.Text="Read-only design copy";}catch{}shape.AlternativeText="Read-only member calculation captured at generation. Update the model and regenerate to refresh.";}}catch{}}
+   copy.EnableCalculation=true;copy.Calculate();copy.UsedRange.Locked=true;copy.Protect(Type.Missing,true,true,true);
+   DesignCopies265.Add(new DesignCopy265{Name=name,Source=source,Member=id,Address=address,Values=values});DesignTail265[source]=name;
+   VerifyDesign265(b,DesignCopies265[DesignCopies265.Count-1]);original.Activate();
+  }finally{x.EnableEvents=events;x.Calculation=mode;}
+ }
+ static void VerifyDesign265(dynamic b,DesignCopy265 item){
+  dynamic sheet=b.Worksheets[item.Name];sheet.Calculate();object[,] values=(object[,])sheet.Range[item.Address].Value2;
+  for(int r=item.Values.GetLowerBound(0);r<=item.Values.GetUpperBound(0);r++)for(int c=item.Values.GetLowerBound(1);c<=item.Values.GetUpperBound(1);c++)if(!Same(item.Values[r,c],values[r,c]))throw new Exception("独立计算页数值改变："+item.Name+" · relative R"+r+"C"+c+" ("+Convert.ToString(item.Values[r,c])+" / "+Convert.ToString(values[r,c])+")");
+ }
+
  static List<object> differences=new List<object>();static int compared;
  static void Compare(string scope,dynamic b,Dictionary<string,object> expected){foreach(var s in expected){
  var cells=Obj(s.Value);if(cells.Count==0)continue;int rows=2,cols=1;var positions=new Dictionary<string,int[]>();
@@ -350,7 +405,7 @@ static class ExcelBridge {
     CompareFullLoads(b,job);
     foreach(var item in Arr(job["members"])){
      var member=Obj(item);string mk=Convert.ToString(member["kind"]),id=Convert.ToString(member["id"]),sheet=Convert.ToString(member["sheet"]);
-     if(Adopted254.Contains(MemberKey254(member))){VerifyAdopted254(x,b,member);if(!(member.ContainsKey("sectionA")&&Convert.ToBoolean(member["sectionA"])))continue;}
+     if(Adopted254.Contains(MemberKey254(member))){VerifyAdopted254(x,b,member);if(!(member.ContainsKey("sectionA")&&Convert.ToBoolean(member["sectionA"]))){CaptureDesign265(x,b,job,member);continue;}}
      if(member.ContainsKey("sectionA")&&Convert.ToBoolean(member["sectionA"])){
       Compare(id+" · Section A",b,new Dictionary<string,object>{{sheet,member["expected"]}});
       if(mk=="TB"){Set(b.Worksheets["Section B Transfer Beam Check"],"L9",member["row"]);Run(x,b,"UpdateTransfer79");Compare(id+" · transfer actions",b,new Dictionary<string,object>{{"Section B Transfer Beam Check",member["actions"]}});}continue;
@@ -368,6 +423,7 @@ static class ExcelBridge {
      // Same source inputs and same source result cells; no derived replacement formulas.
      Compare(id+" · input",b,new Dictionary<string,object>{{sheet,member["inputs"]}});
      Compare(id+" · check",b,new Dictionary<string,object>{{sheet,member["expected"]}});
+     CaptureDesign265(x,b,job,member);
     }
     string section=Convert.ToString(job["section"]);
     if(section=="A"||section=="Check"){Run(x,b,"GenerateCopy");}
@@ -389,7 +445,7 @@ static class ExcelBridge {
     // the native check once at export time, so opening need not regenerate it.
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("导出前 RC Check 未完成");
-    RestoreFixedLoads252();x.EnableEvents=false;b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);x.EnableEvents=false;b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
    Stage79("保存已核对结果");CommitPageCaches82(copy);StoreJob79(job,dir);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;GC.Collect();return 0;
   }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if(b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}

@@ -70,6 +70,7 @@ const RCPlan=(()=>{
      members.push({id:id(r),kind:k,row,sectionA:true,sheet,expected:Object.fromEntries(cols.map((c,i)=>[c+row,[ratio,limit,k==='TB'?status.replace('NOT OK','NOT OKAY').replace(/^OK$/,'OKAY'):status][i]])),inputs:{},actions:k==='TB'?{G23:r.actions.M,G24:r.actions.V}:null,selected:true,adopt254});
     }else members.push({id:id(r),kind:k,row,sheet:r.result.source,expected,inputs,steel:r.input?.steel?{...r.result.steel,...r.input.steel}:null,cover:k==='CB'?null:r.input?.cover??null,selected:b.roots.includes(r),adopt254});
    }
+   for(const member of members){const r=b.rows.find(r=>id(r)===member.id);member.designName265=floorName(r.floor)+' '+r.id;}
    const notes=p.explorer?.reportANotes||{},copyNotes={};for(const[k,a]of Object.entries({introduction:'A5',location:'A6',steelGrade:'A34',steelDL:'A36'}))if(Object.hasOwn(notes,k))copyNotes[a]=String(notes[k]);notes.constraints?.slice(0,8).forEach((r,i)=>{copyNotes['A'+(10+i)]=String(r[0]??'');copyNotes['E'+(10+i)]=String(r[1]??'')});
    return {type:'RC',section,fullLoads,projectFloors:floorSummary(p,model),label:'RC '+(section==='Check'?'Check':'Section '+section)+' · '+floors.map(floorName).join(', ')+' · 第 '+(i+1)+' 份',cells,sheetCells,members,copyNotes,dependencies:b.rows.filter(r=>!b.roots.includes(r)).map(id)};
   })};

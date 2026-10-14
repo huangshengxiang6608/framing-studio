@@ -81,3 +81,13 @@ for MB, SB, TB and CB; recalculate stale or absent Check data. This supersedes
 the historical separate Section A beam-load basis. Keep Section A slab and
 column schedules, all original A/B formulas, report layout and native rendering
 routines unchanged. Do not overwrite formula cells to force agreement.
+
+
+## Independent Section B member design sheets
+
+E2.265 user request: generated B/combined workbooks retain a read-only calculation
+sheet for each selected member, grouped after its original Section B design sheet.
+Preserve the original design layout and calculation equations; capture member
+inputs privately so later shared-sheet selection cannot overwrite them. Copied
+UPDATE/auto-design buttons must not operate the original design. Original A/B
+report-copy content and formatting remain unchanged.

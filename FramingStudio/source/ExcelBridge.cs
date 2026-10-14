@@ -37,18 +37,73 @@ static class ExcelBridge {
    if(!Same(expected[r,c],actual[r,c]))throw new Exception("生成期间荷载或跨度发生变化，结果未通过复核：RC Load Results!"+((char)('A'+c-1))+(r+4));
   HeldLoadValues252=null;Stage79("固定荷载完整重算复核通过");
  }
- static string RunDirectory79,CacheDirectory79,CacheVersion79;
+ static string RunDirectory79,CacheDirectory79,CacheVersion79,CacheSource277;
  static readonly System.Diagnostics.Stopwatch Timer79=System.Diagnostics.Stopwatch.StartNew();
  static void Stage79(string message){if(RunDirectory79==null)return;try{Write(Path.Combine(RunDirectory79,"progress.json"),new {message=message,seconds=Timer79.Elapsed.TotalSeconds});File.AppendAllText(Path.Combine(RunDirectory79,"timing.jsonl"),J.Serialize(new {message=message,seconds=Timer79.Elapsed.TotalSeconds})+"\n");}catch{}}
  static string TextHash79(string text){using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(Encoding.UTF8.GetBytes(text))).Replace("-","").ToLowerInvariant();}
  static string Canon79(object value){var map=value as Dictionary<string,object>;if(map!=null)return "{"+string.Join(",",map.OrderBy(v=>v.Key,StringComparer.Ordinal).Select(v=>J.Serialize(v.Key)+":"+Canon79(v.Value)))+"}";if(value is IEnumerable&&!(value is string))return "["+string.Join(",",((IEnumerable)value).Cast<object>().Select(Canon79))+"]";return J.Serialize(value);}
  static string CacheKey79(object value){return TextHash79(CacheVersion79+"|"+Canon79(value));}
- static void Start79(string dir,string source){RunDirectory79=dir;CacheDirectory79=Environment.GetEnvironmentVariable("FRAMING_CACHE_DIR");if(string.IsNullOrEmpty(CacheDirectory79))CacheDirectory79=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"FramingStudio","ReportCache79");CacheDirectory79=Path.GetFullPath(CacheDirectory79);Directory.CreateDirectory(CacheDirectory79);CacheVersion79=Hash(typeof(ExcelBridge).Assembly.Location)+"|"+Hash(source)+"|"+System.Globalization.CultureInfo.CurrentCulture.Name;string images=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ReportImages");if(Directory.Exists(images))foreach(string f in Directory.GetFiles(images,"*.png").OrderBy(v=>v))CacheVersion79+="|"+Hash(f);Stage79("准备生成");}
+ static void Start79(string dir,string source){RunDirectory79=dir;CacheDirectory79=Environment.GetEnvironmentVariable("FRAMING_CACHE_DIR");if(string.IsNullOrEmpty(CacheDirectory79))CacheDirectory79=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"FramingStudio","ReportCache79");CacheDirectory79=Path.GetFullPath(CacheDirectory79);Directory.CreateDirectory(CacheDirectory79);CacheSource277=Hash(source);CacheVersion79="completed277|"+Hash(typeof(ExcelBridge).Assembly.Location)+"|"+CacheSource277+"|"+Hash(Path.Combine(Path.GetDirectoryName(source),"templates.json"))+"|"+Hash(Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(source)),"assets","index.html"))+"|"+System.Globalization.CultureInfo.CurrentCulture.Name;string images=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ReportImages");if(Directory.Exists(images))foreach(string f in Directory.GetFiles(images,"*.png").OrderBy(v=>v))CacheVersion79+="|"+Hash(f);Stage79("准备生成");}
  static bool ValidCache79(string dir){try{var files=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(dir,"manifest.json"))));if(files.Count==0)return false;foreach(var f in files){if(f.Key!=Path.GetFileName(f.Key)||!File.Exists(Path.Combine(dir,f.Key))||Hash(Path.Combine(dir,f.Key))!=Convert.ToString(f.Value))return false;}return true;}catch{return false;}}
  static void Manifest79(string dir){var files=new Dictionary<string,object>();foreach(string f in Directory.GetFiles(dir))if(Path.GetFileName(f)!="manifest.json")files[Path.GetFileName(f)]=Hash(f);Write(Path.Combine(dir,"manifest.json"),files);}
- static string JobKey79(Dictionary<string,object> job){var input=new Dictionary<string,object>(job);input.Remove("fingerprint");return CacheKey79(input);}
- static bool RestoreJob79(Dictionary<string,object> job,string dir){string cache=Path.Combine(CacheDirectory79,"job-"+JobKey79(job));if(!ValidCache79(cache))return false;try{var r=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(cache,"result.json"))));if(!Convert.ToBoolean(r["ok"])||Arr(r["differences"]).Any())return false;Stage79("复用输入完全一致的已核对结果");foreach(string f in Directory.GetFiles(cache))if(Path.GetFileName(f)!="manifest.json"&&Path.GetFileName(f)!="result.json")File.Copy(f,Path.Combine(dir,Path.GetFileName(f)));r["fingerprint"]=job["fingerprint"];r["cached"]=true;r["verifiedAt"]=r["at"];r["at"]=DateTime.Now.ToString("s");Write(Path.Combine(dir,"result.json"),r);return true;}catch{return false;}}
- static void StoreJob79(Dictionary<string,object> job,string dir){try{var result=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(dir,"result.json"))));if(!Convert.ToBoolean(result["ok"])||Arr(result["differences"]).Any())return;string cache=Path.Combine(CacheDirectory79,"job-"+JobKey79(job));Directory.CreateDirectory(cache);foreach(string f in Directory.GetFiles(dir))if(Path.GetExtension(f)==".pdf"||Path.GetExtension(f)==".xlsm"||Path.GetExtension(f)==".xlsx"||Path.GetFileName(f)=="result.json")File.Copy(f,Path.Combine(cache,Path.GetFileName(f)),true);Manifest79(cache);}catch{}}
+ // Cache completed native outputs, including combined column workbooks. Each
+ // publication is immutable; a small atomic reference selects a complete entry.
+ static string JobKey79(Dictionary<string,object> job){return CacheKey79(job);}
+ static bool VerifiedJob277(Dictionary<string,object> job,string dir,out Dictionary<string,object> result){
+  result=null;
+  try{
+   result=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(dir,"result.json"))));
+   if(!Convert.ToBoolean(result["ok"])||Arr(result["differences"]).Any()||Convert.ToInt32(result["compared"])<=0)return false;
+   string book=Convert.ToString(result["workbook"]);
+   if(String.IsNullOrEmpty(book)||book!=Path.GetFileName(book)||!new[]{".xlsm",".xlsx"}.Contains(Path.GetExtension(book)))return false;
+   if(Hash(Path.Combine(dir,book))!=Convert.ToString(result["workbookHash"])||Convert.ToString(result["fingerprint"])!=Convert.ToString(job["fingerprint"])||Convert.ToString(result["sourceHash"])!=CacheSource277)return false;
+   foreach(var raw in Arr(result["files"])){
+    string name=Convert.ToString(Obj(raw)["file"]);
+    if(String.IsNullOrEmpty(name)||name!=Path.GetFileName(name)||Path.GetExtension(name)!=".pdf"||!File.Exists(Path.Combine(dir,name)))return false;
+   }
+   return true;
+  }catch{return false;}
+ }
+ static bool RestoreJob79(Dictionary<string,object> job,string dir){
+  var copied=new List<string>();
+  try{
+   string key=JobKey79(job),reference=Path.Combine(CacheDirectory79,"entry277-"+key+".json");
+   if(!File.Exists(reference))return false;
+   string name=Convert.ToString(Obj(J.DeserializeObject(File.ReadAllText(reference)))["directory"]);
+   if(name!=Path.GetFileName(name)||!name.StartsWith("job277-"+key+"-",StringComparison.Ordinal))return false;
+   string cache=Path.Combine(CacheDirectory79,name);if(!ValidCache79(cache))return false;
+   Dictionary<string,object> result;if(!VerifiedJob277(job,cache,out result))return false;
+   var manifest=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(cache,"manifest.json"))));
+   if(!manifest.ContainsKey("result.json")||!manifest.ContainsKey(Convert.ToString(result["workbook"]))||Arr(result["files"]).Any(v=>!manifest.ContainsKey(Convert.ToString(Obj(v)["file"]))))return false;
+   foreach(var file in manifest){
+    if(file.Key=="result.json")continue;
+    string target=Path.Combine(dir,file.Key);if(File.Exists(target))throw new Exception("快取目的檔案已存在");
+    copied.Add(target);File.Copy(Path.Combine(cache,file.Key),target);
+    if(Hash(target)!=Convert.ToString(file.Value))throw new Exception("快取檔案複製核對失敗");
+   }
+   result["cached"]=true;result["verifiedAt"]=result["at"];result["at"]=DateTime.Now.ToString("s");
+   Write(Path.Combine(dir,"result.json"),result);Stage79("重用完整已核對 Excel 及原抄；未重新計算");return true;
+  }catch(Exception error){
+   // Only remove files created by this failed restore in the fresh run folder.
+   foreach(string file in copied)try{File.Delete(file);}catch{}
+   CacheNote79("restore completed workbook",error);return false;
+  }
+ }
+ static void StoreJob79(Dictionary<string,object> job,string dir){
+  try{
+   Dictionary<string,object> result;if(!VerifiedJob277(job,dir,out result))return;
+   string key=JobKey79(job),name="job277-"+key+"-"+Guid.NewGuid().ToString("N"),cache=Path.Combine(CacheDirectory79,name);
+   Directory.CreateDirectory(cache);
+   var files=new HashSet<string>(StringComparer.OrdinalIgnoreCase){"result.json",Convert.ToString(result["workbook"])};
+   foreach(var raw in Arr(result["files"]))files.Add(Convert.ToString(Obj(raw)["file"]));
+   foreach(string file in files)File.Copy(Path.Combine(dir,file),Path.Combine(cache,file));
+   Manifest79(cache);Dictionary<string,object> saved;
+   if(!ValidCache79(cache)||!VerifiedJob277(job,cache,out saved))return;
+   string reference=Path.Combine(CacheDirectory79,"entry277-"+key+".json"),pending=reference+"."+Guid.NewGuid().ToString("N")+".tmp";
+   Write(pending,new{directory=name});
+   if(File.Exists(reference))File.Replace(pending,reference,null);else File.Move(pending,reference);
+  }catch(Exception error){CacheNote79("store completed workbook",error);}
+ }
  static string PageCache79(Dictionary<string,object> page,Dictionary<string,object> job){return Path.Combine(CacheDirectory79,"page-"+CacheKey79(new {page=page,number=job.ContainsKey("reportNumber")?job["reportNumber"]:null}));}
  static void CacheNote79(string operation,Exception error){try{File.AppendAllText(Path.Combine(RunDirectory79,"cache-notes.txt"),operation+": "+error.ToString()+"\n");}catch{}}
  static readonly Dictionary<string,object> PageBooks82=new Dictionary<string,object>(StringComparer.OrdinalIgnoreCase);
@@ -464,7 +519,7 @@ static class ExcelBridge {
   dynamic x=null,b=null,other=null;RunDirectory79=dir;
   try{
    string section=Convert.ToString(job["section"]);
-   var parts=Arr(job["columnParts274"]).Select(Obj).ToList();
+   var parts=Arr(job["columnParts274"]).Select(v=>Obj(J.DeserializeObject(J.Serialize(v)))).ToList();
    if(Convert.ToString(job["type"])!="RC"||!new[]{"A","B"}.Contains(section)||parts.Count<2||parts.Count>100)
     throw new Exception("無效的柱合併工作");
    var results=new List<Dictionary<string,object>>();var folders=new List<string>();var files=new List<object>();
@@ -564,8 +619,9 @@ static class ExcelBridge {
    if(kind=="Truss")return TrussJob109(job,dir);
    if(kind!="Overall"&&kind!="RC"&&kind!="Steel"&&kind!="Deflection"&&kind!="Foundation")throw new Exception("未知 Excel 类型");var template=Obj(config[kind]);string source=Path.Combine(root,Path.GetFileName(Convert.ToString(template["file"])));
    if(Hash(source)!=Convert.ToString(template["sha256"]))throw new Exception("Excel 模板已改变，请先更新 App；没有使用旧公式继续核对。");
-   if(job.ContainsKey("columnParts274"))return CombineColumns274(root,dir,job);
-   Start79(dir,source);if(RestoreJob79(job,dir))return 0;Stage79("打开原 Excel 模板");
+   Start79(dir,source);if(RestoreJob79(job,dir))return 0;
+   if(job.ContainsKey("columnParts274")){int code=CombineColumns274(root,dir,job);if(code==0)StoreJob79(job,dir);return code;}
+   Stage79("打开原 Excel 模板");
    bool axis92=kind=="Deflection"&&job.ContainsKey("method")&&Convert.ToString(job["method"])=="BUILDING_AXIS";
    string copy=Path.Combine(dir,kind+(axis92?"-filled.xlsx":"-filled.xlsm"));if(File.Exists(copy))throw new Exception("输出已经存在，请重新生成一个核对任务。");if(!axis92)File.Copy(source,copy);if(kind=="RC")PrepareLoadTable273(copy,job);
    x=Activator.CreateInstance(Type.GetTypeFromProgID("Excel.Application",true));x.Visible=false;x.DisplayAlerts=false;x.ScreenUpdating=false;x.EnableEvents=false;
@@ -660,7 +716,7 @@ static class ExcelBridge {
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("导出前 RC Check 未完成");
     RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);x.EnableEvents=false;EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
-   Stage79("保存已核对结果");CommitPageCaches82(copy);StoreJob79(job,dir);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;GC.Collect();return 0;
+   Stage79("保存已核对结果");CommitPageCaches82(copy);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;StoreJob79(job,dir);GC.Collect();return 0;
   }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if((object)b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}
   finally{if((object)b!=null)try{b.Close(false);}catch{}if((object)x!=null)try{x.Quit();}catch{}}
  }

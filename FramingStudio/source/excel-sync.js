@@ -57,6 +57,14 @@ window.ExcelSync=(()=>{
   return {jobs:combineColumnJobs274(jobs),issues:problems};
  }
 
+ // Only the latest immutable model snapshot is retained; A/B share this prepared set.
+ const reportPlans277=new Map();let planSnapshot277=null;
+ function reportPlan277(snapshot,section,filter){
+  if(snapshot!==planSnapshot277){reportPlans277.clear();planSnapshot277=snapshot;}
+  const key=JSON.stringify([section,filter]);
+  if(!reportPlans277.has(key))reportPlans277.set(key,plan(JSON.parse(snapshot),'Report',section,filter));
+  return Engine.clone(reportPlans277.get(key));
+ }
  async function start(kind,section=null,filter=null){if(busy)return;sizingChanges=[];let snapshot=current();lastSnapshot=snapshot;issues=[];records=[];runSection=kind==='Report'?section:null;runSections=kind==='Report'?(section==='AB'?['A','B']:[section]):[];pendingSections=new Set(runSections);finishes={};
   if(!available()){progress='请在桌面 App 中生成；此浏览器预览不能启动 Microsoft Excel。';for(const sec of runSections)reports[sec]={snapshot:reportSnapshot(sec,JSON.parse(snapshot)),issues:[],message:progress};pendingSections.clear();refresh();return;}
   busy=true;for(const sec of runSections){reports[sec]={snapshot:reportSnapshot(sec,JSON.parse(snapshot)),issues:[],message:'正在生成原 Excel 抄…',generatedAt:null,records:[]};WorkspacePages.clearPDF(sec);}progress='正在整理当前输入…';refresh();try{
@@ -67,7 +75,7 @@ window.ExcelSync=(()=>{
     for(const sec of runSections)reports[sec].snapshot=reportSnapshot(sec,JSON.parse(snapshot));
    }
    const p=JSON.parse(snapshot),jobs=[];
-   if(kind==='Report')for(const sec of runSections){const v=plan(JSON.parse(snapshot),kind,sec,filter);reports[sec].issues=[...v.issues];issues.push(...v.issues.map(x=>({...x,section:sec})));jobs.push(...v.jobs.map(j=>({...j,_reportSection:sec})));}
+   if(kind==='Report')for(const sec of runSections){const v=reportPlan277(snapshot,sec,filter);reports[sec].issues=[...v.issues];issues.push(...v.issues.map(x=>({...x,section:sec})));jobs.push(...v.jobs.map(j=>({...j,_reportSection:sec})));}
    else{const v=plan(p,kind,section,filter);issues=v.issues;jobs.push(...v.jobs);}
    if(!jobs.length){busy=false;pendingSections.clear();progress='没有可生成的完整输入。';for(const sec of runSections)reports[sec].message='请先完成输入并勾选本次要抄的构件。';refresh();return;}
    const stamp=await fingerprint(snapshot);if(kind==='Report'&&current()!==snapshot)throw Error('生成準備期間模型已修改，請重新生成抄。');send({kind:'excel-run',parallelReports:section==='AB',openWhenReady:kind!=='Report',jobs:jobs.map(j=>({...j,fingerprint:stamp,preview:true}))});

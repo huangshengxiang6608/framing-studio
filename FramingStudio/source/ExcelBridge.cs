@@ -382,7 +382,67 @@ static class ExcelBridge {
   finally{if(book!=null)try{book.Close(false);}catch{}if(app!=null)try{app.Quit();Marshal.FinalReleaseComObject(app);}catch{}}
  }
 
+ // Retry only the reproduced, pre-verification RC initialization disconnect.
+ // Each retry gets a fresh AppDomain (all static calculation state) and a new
+ // isolated Excel.Application. Never continue using the disconnected workbook.
+ static bool RetryTransfer272(string directory){
+  try{
+   var result=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(directory,"result.json"))));
+   var job=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(directory,"job.json"))));
+   var progress=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(directory,"progress.json"))));
+   string error=Convert.ToString(result["error"]);
+   return Convert.ToString(job["type"])=="RC"&&!Convert.ToBoolean(result["ok"])
+    &&Convert.ToInt32(result["compared"])==0&&!Arr(result["differences"]).Any()
+    &&(!result.ContainsKey("workbook")||result["workbook"]==null)
+    &&Convert.ToString(progress["message"])=="恢复原 Excel 转换梁计算"
+    &&new[]{"0x800706BA","0x800706BE","0x80010108"}.Any(code=>error.IndexOf(code,StringComparison.OrdinalIgnoreCase)>=0);
+  }catch{return false;}
+ }
+ static void CopyAttempt272(string source,string target){
+  foreach(string file in Directory.GetFiles(source)){
+   string name=Path.GetFileName(file);if(name=="job.json"||name=="result.json"||name=="progress.json")continue;
+   File.Copy(file,Path.Combine(target,name),true);
+  }
+  // Publish status last, after the associated workbook/PDF files are in place.
+  File.Copy(Path.Combine(source,"result.json"),Path.Combine(target,"result.json"),true);
+ }
  [STAThread] static int Main(string[] args){
+  if(args.Length==3&&args[0]=="--recover272")return RunJob272(new[]{args[1],args[2]});
+  int code=RunJob272(args);if(args.Length!=2)return code;
+  string directory=Path.GetDirectoryName(Path.GetFullPath(args[1]));
+  if(code==0||!RetryTransfer272(directory))return code;
+  string archive=Path.Combine(directory,"recovery-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(archive);
+  string first=Path.Combine(archive,"attempt-1");Directory.CreateDirectory(first);
+  foreach(string name in new[]{"job.json","result.json","error-details.txt","timing.jsonl","progress.json","RC-filled.xlsm"}){
+   string file=Path.Combine(directory,name);if(File.Exists(file))File.Copy(file,Path.Combine(first,name));
+  }
+  var attempts=new List<object>();attempts.Add(new{attempt=1,directory=Path.GetFileName(archive)+"/attempt-1",error=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(first,"result.json"))))["error"]});
+  for(int attempt=2;attempt<=3;attempt++){
+   string run=Path.Combine(archive,"attempt-"+attempt);Directory.CreateDirectory(run);
+   string jobPath=Path.Combine(run,"job.json");File.Copy(args[1],jobPath);
+   string prefix="Excel 转换梁初始化中断，正在以全新 Excel 重新核对（"+attempt+"/3） · ";
+   Write(Path.Combine(directory,"progress.json"),new{message=prefix+"准备生成",seconds=Timer79.Elapsed.TotalSeconds});
+   AppDomain domain=AppDomain.CreateDomain("ExcelRecovery272-"+attempt);
+   // Relay progress while the STA thread executes the isolated native worker.
+   using(var relay=new System.Threading.Timer(delegate(object unused){try{
+    var progress=Obj(new JavaScriptSerializer().DeserializeObject(File.ReadAllText(Path.Combine(run,"progress.json"))));
+    progress["message"]=prefix+Convert.ToString(progress["message"]);
+    File.WriteAllText(Path.Combine(directory,"progress.json"),new JavaScriptSerializer().Serialize(progress));
+   }catch{}},null,400,400)){
+    try{code=domain.ExecuteAssembly(typeof(ExcelBridge).Assembly.Location,new[]{"--recover272",Path.GetFullPath(args[0]),jobPath});}
+    finally{AppDomain.Unload(domain);}
+   }
+   if(!File.Exists(Path.Combine(run,"result.json")))break;
+   var result=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(run,"result.json"))));
+   attempts.Add(new{attempt=attempt,directory=Path.GetFileName(archive)+"/attempt-"+attempt,error=result.ContainsKey("error")?result["error"]:null});
+   result["recoveryAttempts"]=attempt;Write(Path.Combine(run,"result.json"),result);
+   CopyAttempt272(run,directory);
+   Write(Path.Combine(directory,"recovery272.json"),new{attempts=attempts});
+   if(code==0||!RetryTransfer272(run))return code;
+  }
+  return code;
+ }
+ static int RunJob272(string[] args){
   if(args.Length==3&&(args[0]=="--open"||args[0]=="--verify-open"))return OpenWorkbook(args[1],args[2],args[0]=="--open");
   if(args.Length!=2)return 2;string root=Path.GetFullPath(args[0]),jobPath=Path.GetFullPath(args[1]),dir=Path.GetDirectoryName(jobPath);dynamic x=null,b=null;
   try{

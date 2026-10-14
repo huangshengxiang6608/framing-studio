@@ -20,6 +20,19 @@ window.LocalExcel251=(()=>{
  setTimeout(probe,0);
  return {available:()=>ready,send,probe};
 })();
+// Keep native single-column calculations separate, deliver their isolated sheets together.
+function combineColumnJobs274(jobs){
+ const output=[...jobs];
+ for(const section of ['A','B']){
+  const candidates=jobs.filter(j=>j.type==='RC'&&j.section===section&&j.members?.some(m=>m.kind==='COL'));
+  const first=candidates[0];if(!first)continue;
+  const extra=candidates.slice(1).filter(j=>j.members.length===1&&j.members[0].kind==='COL');
+  if(!extra.length)continue;
+  const parts=[first,...extra].map(({reportPages,...part})=>part),merged={...first,columnParts274:parts,members:parts.flatMap(j=>j.members),label:first.label.replace(/ · 第 \d+ 份$/,'')+' · 合併柱計算'};
+  output[output.indexOf(first)]=merged;for(const j of extra)output.splice(output.indexOf(j),1);
+ }
+ return output;
+}
 window.ExcelSync=(()=>{
  let busy=false,progress='',records=[],issues=[],lastSnapshot='',runSection=null,runSections=[],pendingSections=new Set(),finishes={},sizingChanges=[];
  const reports={A:{snapshot:null,issues:[],message:'',records:[]},B:{snapshot:null,issues:[],message:'',records:[]}};
@@ -41,7 +54,7 @@ window.ExcelSync=(()=>{
   const rank={SLAB:1,CS:1,SB:2,MB:3,CB:3,TB:4,COL:5};
   for(const sec of ['A','B']){const selected=jobs.filter(j=>j.type==='RC'&&(j.section===sec||j.section==='Check')).flatMap(j=>j.members.filter(m=>m.selected!==false));selected.sort((a,b)=>rank[a.kind]-rank[b.kind]);selected.forEach((m,i)=>m.reportOrdinal=i+1);if(sec==='B')for(const j of jobs.filter(j=>j.type==='Foundation'))j.foundationNumberB=selected.length+4;}
   if(kind==='Report'&&section==='A')ReportContent.decorate(p,jobs,section);else if(kind==='RC')ReportContent.decorate(p,jobs.filter(j=>j.section==='A'),'A');
-  return {jobs,issues:problems};
+  return {jobs:combineColumnJobs274(jobs),issues:problems};
  }
 
  async function start(kind,section=null,filter=null){if(busy)return;sizingChanges=[];const snapshot=current();lastSnapshot=snapshot;issues=[];records=[];runSection=kind==='Report'?section:null;runSections=kind==='Report'?(section==='AB'?['A','B']:[section]):[];pendingSections=new Set(runSections);finishes={};

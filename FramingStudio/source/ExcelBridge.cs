@@ -220,7 +220,7 @@ static class ExcelBridge {
  static void CaptureDesign265(dynamic x,dynamic b,Dictionary<string,object> job,Dictionary<string,object> member){
   if(Convert.ToString(job["section"])=="A"||(member.ContainsKey("selected")&&!Convert.ToBoolean(member["selected"])))return;
   if(differences.Count>0)throw new Exception("构件核对未通过，不能生成独立计算页");
-  string source=Convert.ToString(member["sheet"]),id=Convert.ToString(member["id"]);if(!source.StartsWith("Section B "))throw new Exception("未知构件 design sheet："+source);
+  string source=Convert.ToString(member["sheet"]),id=Convert.ToString(member["id"]);if(!source.StartsWith("Section B ")&&!(job.ContainsKey("columnCopies274")&&source=="Section A Column Loading"))throw new Exception("未知构件 design sheet："+source);
   dynamic original=b.Worksheets[source];string address=Convert.ToString(original.UsedRange.Address);object[,] values=(object[,])original.Range[address].Value2;
   string name=UniqueDesignName265(b,member.ContainsKey("designName265")?Convert.ToString(member["designName265"]):id),tail;int mode=Convert.ToInt32(x.Calculation);bool events=Convert.ToBoolean(x.EnableEvents);
   try{
@@ -442,6 +442,120 @@ static class ExcelBridge {
   }
   return code;
  }
+ // Column calculations retain the original single-column input context. Each
+ // part completes the unchanged native generation before its private sheets
+ // and native report copy are collected into one checked workbook.
+ sealed class SheetSnapshot274 {
+  public string Name,Address; public object[,] Values,Formulas;
+ }
+ static SheetSnapshot274 Snapshot274(dynamic sheet){
+  string address=Convert.ToString(sheet.UsedRange.Address);
+  return new SheetSnapshot274{Name=Convert.ToString(sheet.Name),Address=address,Values=(object[,])sheet.Range[address].Value2,Formulas=(object[,])sheet.Range[address].Formula};
+ }
+ static void VerifySheet274(dynamic book,SheetSnapshot274 snapshot,bool calculate){
+  dynamic sheet=book.Worksheets[snapshot.Name];if(calculate)sheet.Calculate();
+  object[,] values=(object[,])sheet.Range[snapshot.Address].Value2,formulas=(object[,])sheet.Range[snapshot.Address].Formula;
+  for(int r=1;r<=values.GetLength(0);r++)for(int c=1;c<=values.GetLength(1);c++){
+   if(!Same(values[r,c],snapshot.Values[r,c])||!Same(formulas[r,c],snapshot.Formulas[r,c]))
+    throw new Exception("合併後公式或數值改變："+snapshot.Name+" · R"+r+"C"+c);
+  }
+ }
+ static int CombineColumns274(string root,string dir,Dictionary<string,object> job){
+  dynamic x=null,b=null,other=null;RunDirectory79=dir;
+  try{
+   string section=Convert.ToString(job["section"]);
+   var parts=Arr(job["columnParts274"]).Select(Obj).ToList();
+   if(Convert.ToString(job["type"])!="RC"||!new[]{"A","B"}.Contains(section)||parts.Count<2||parts.Count>100)
+    throw new Exception("無效的柱合併工作");
+   var results=new List<Dictionary<string,object>>();var folders=new List<string>();var files=new List<object>();
+   int total=0;
+   for(int i=0;i<parts.Count;i++){
+    var part=parts[i];if(i==0&&job.ContainsKey("reportPages"))part["reportPages"]=job["reportPages"];
+    if(part.ContainsKey("columnParts274")||Convert.ToString(part["type"])!="RC"||Convert.ToString(part["section"])!=section
+      ||(i>0&&(Arr(part["members"]).Count()!=1||Convert.ToString(Obj(Arr(part["members"]).First())["kind"])!="COL")))
+     throw new Exception("合併部分必須是同一 Section 的獨立柱工作");
+    part["fingerprint"]=job["fingerprint"];part["preview"]=job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"]);
+    string folder=Path.Combine(dir,"column-part-"+(i+1));Directory.CreateDirectory(folder);folders.Add(folder);
+    string path=Path.Combine(folder,"job.json");Write(path,part);
+    AppDomain domain=AppDomain.CreateDomain("ColumnPart274-"+i);int code;
+    using(var relay=new System.Threading.Timer(delegate(object unused){try{
+     var progress=Obj(new JavaScriptSerializer().DeserializeObject(File.ReadAllText(Path.Combine(folder,"progress.json"))));
+     progress["message"]="柱資料獨立核對 · "+Convert.ToString(progress["message"]);Write(Path.Combine(dir,"progress.json"),progress);
+    }catch{}},null,400,400)){
+     try{code=domain.ExecuteAssembly(typeof(ExcelBridge).Assembly.Location,new[]{"--recover272",root,path});}
+     finally{AppDomain.Unload(domain);}
+    }
+    var result=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(folder,"result.json"))));
+    if(code!=0||!Convert.ToBoolean(result["ok"])||Arr(result["differences"]).Any())
+     throw new Exception("柱工作未通過，沒有合併："+Convert.ToString(part["label"])+" · "+(result.ContainsKey("error")?Convert.ToString(result["error"]):"核對有差異"));
+    results.Add(result);total+=Convert.ToInt32(result["compared"]);
+    foreach(var raw in Arr(result["files"])){
+     var f=new Dictionary<string,object>(Obj(raw));string name=Convert.ToString(f["file"]);
+     if(name!=Path.GetFileName(name))throw new Exception("無效的原抄檔名");
+     string target="Part"+(i+1)+"-"+name;File.Copy(Path.Combine(folder,name),Path.Combine(dir,target));f["file"]=target;files.Add(f);
+    }
+   }
+   string output=Path.Combine(dir,"RC-filled.xlsm");File.Copy(Path.Combine(folders[0],Convert.ToString(results[0]["workbook"])),output);
+   Stage79("合併已核對的柱計算頁及原抄，保留原公式與格式");
+   x=Activator.CreateInstance(Type.GetTypeFromProgID("Excel.Application",true));x.Visible=false;x.DisplayAlerts=false;x.EnableEvents=false;x.ScreenUpdating=false;x.AutomationSecurity=1;
+   b=x.Workbooks.Open(output,0,false);x.Calculation=-4135;x.CalculateBeforeSave=false;
+   var snapshots=new List<SheetSnapshot274>();var imported=new List<object>();
+   // Section A gets its own independent native column-loading calculation page.
+   if(section=="A")foreach(var member in Arr(parts[0]["members"]).Select(Obj).Where(m=>Convert.ToString(m["kind"])=="COL")){
+    DesignCopies265.Clear();DesignTail265.Clear();CaptureDesign265(x,b,new Dictionary<string,object>{{"section","B"},{"columnCopies274",true}},member);
+   }
+   foreach(dynamic sheet in b.Worksheets)if(Convert.ToString(sheet.Name).StartsWith("_D")||IsDesign274(sheet))snapshots.Add(Snapshot274(sheet));
+   string report="Section "+section+" 抄";
+   snapshots.Add(Snapshot274(b.Worksheets[report]));
+   string columnTail274=null;
+   for(int i=1;i<parts.Count;i++){
+    // Excel cannot open two workbooks of the same basename in one instance.
+    string temp=Path.Combine(dir,"column-source-"+(i+1)+".xlsm");File.Copy(Path.Combine(folders[i],Convert.ToString(results[i]["workbook"])),temp);
+    other=x.Workbooks.Open(temp,0,true);x.Calculation=-4135;
+    var member=Obj(Arr(parts[i]["members"]).Single());
+    if(section=="A"){
+     DesignCopies265.Clear();DesignTail265.Clear();CaptureDesign265(x,other,new Dictionary<string,object>{{"section","B"},{"columnCopies274",true}},member);
+    }
+    var names=new List<string>();string design=null;
+    foreach(dynamic sheet in other.Worksheets){
+     if(IsDesign274(sheet)){if(design!=null)throw new Exception("額外柱工作含多個計算頁");design=Convert.ToString(sheet.Name);names.Add(design);}
+     else if(Convert.ToString(sheet.Name).StartsWith("_D")){
+      sheet.Name="_M"+(i+1).ToString("000")+Convert.ToString(sheet.Name);names.Add(Convert.ToString(sheet.Name));
+     }
+    }
+    if(design==null)throw new Exception("缺少柱獨立計算頁");
+    dynamic reportSheet=other.Worksheets[report];
+    // Native report cells are rendered values; do not flatten any equations.
+    foreach(dynamic cell in reportSheet.UsedRange.Cells)if(Convert.ToBoolean(cell.HasFormula))throw new Exception("原抄含未隔離的公式，停止合併");
+    reportSheet.Name=UniqueDesignName265(b,report+" - "+Convert.ToString(member["id"]));names.Add(Convert.ToString(reportSheet.Name));
+    var existing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(dynamic s in b.Worksheets)existing.Add(Convert.ToString(s.Name));
+    if(names.Any(existing.Contains))throw new Exception("合併工作表名稱重複");
+    var captured=names.Select(n=>Snapshot274(other.Worksheets[n])).ToList();
+    // Copy the dependency closure as a group so Excel keeps references local.
+    other.Worksheets[names.Cast<object>().ToArray()].Copy(Type.Missing,b.Worksheets[b.Worksheets.Count]);
+    foreach(var snapshot in captured){VerifySheet274(b,snapshot,false);snapshots.Add(snapshot);}
+    string after=section=="B"?"Section B Column Check":"Section A Column Loading";
+    foreach(dynamic s in b.Worksheets)if(Convert.ToString(s.Name)!=design&&IsDesign274(s)&&Convert.ToString(s.Range[section=="B"?"C13":"B4"].Value2)==Convert.ToString(Arr(parts[0]["members"]).Select(Obj).First(m=>Convert.ToString(m["kind"])=="COL")["id"]))after=Convert.ToString(s.Name);
+    if(columnTail274!=null)after=columnTail274;
+    b.Worksheets[design].Move(Type.Missing,b.Worksheets[after]);columnTail274=design;
+    imported.Add(new{member=member["id"],design=design,report=Convert.ToString(reportSheet.Name),sheets=names});
+    other.Close(false);other=null;File.Delete(temp);
+   }
+   object links=b.LinkSources(1);if(links!=null)throw new Exception("合併產生外部 Excel 連結，停止輸出");
+   foreach(var snapshot in snapshots)VerifySheet274(b,snapshot,IsDesign274(b.Worksheets[snapshot.Name]));
+   EditableWorkbook270(b);b.Worksheets["Input"].Activate();b.Save();b.Close(false);b=null;
+   // Reopen the saved artifact and recheck both columns' private equations.
+   b=x.Workbooks.Open(output,0,true);x.Calculation=-4135;
+   foreach(var snapshot in snapshots)VerifySheet274(b,snapshot,IsDesign274(b.Worksheets[snapshot.Name]));
+   if(b.LinkSources(1)!=null)throw new Exception("重開後發現外部連結");
+   b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;
+   Write(Path.Combine(dir,"result.json"),new{ok=true,type="RC",workbook="RC-filled.xlsm",files=files,compared=total,differences=new object[0],sourceHash=results[0]["sourceHash"],fingerprint=job["fingerprint"],workbookHash=Hash(output),at=DateTime.Now.ToString("s"),mergedColumns274=imported,privateSheetsVerified274=snapshots.Count});
+   Stage79("柱計算頁及原抄合併完成，儲存後重開核對通過");return 0;
+  }catch(Exception e){File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());Write(Path.Combine(dir,"result.json"),new{ok=false,error=e.Message,compared=0,differences=new object[0]});return 1;}
+  finally{if((object)other!=null)try{other.Close(false);}catch{}if((object)b!=null)try{b.Close(false);}catch{}if((object)x!=null)try{x.Quit();}catch{}}
+ }
+ static bool IsDesign274(dynamic sheet){try{object name=sheet.Names.Item("_RCDesign265");return name!=null;}catch{return false;}}
+
  static int RunJob272(string[] args){
   if(args.Length==3&&(args[0]=="--open"||args[0]=="--verify-open"))return OpenWorkbook(args[1],args[2],args[0]=="--open");
   if(args.Length!=2)return 2;string root=Path.GetFullPath(args[0]),jobPath=Path.GetFullPath(args[1]),dir=Path.GetDirectoryName(jobPath);dynamic x=null,b=null;
@@ -450,6 +564,7 @@ static class ExcelBridge {
    if(kind=="Truss")return TrussJob109(job,dir);
    if(kind!="Overall"&&kind!="RC"&&kind!="Steel"&&kind!="Deflection"&&kind!="Foundation")throw new Exception("未知 Excel 类型");var template=Obj(config[kind]);string source=Path.Combine(root,Path.GetFileName(Convert.ToString(template["file"])));
    if(Hash(source)!=Convert.ToString(template["sha256"]))throw new Exception("Excel 模板已改变，请先更新 App；没有使用旧公式继续核对。");
+   if(job.ContainsKey("columnParts274"))return CombineColumns274(root,dir,job);
    Start79(dir,source);if(RestoreJob79(job,dir))return 0;Stage79("打开原 Excel 模板");
    bool axis92=kind=="Deflection"&&job.ContainsKey("method")&&Convert.ToString(job["method"])=="BUILDING_AXIS";
    string copy=Path.Combine(dir,kind+(axis92?"-filled.xlsx":"-filled.xlsm"));if(File.Exists(copy))throw new Exception("输出已经存在，请重新生成一个核对任务。");if(!axis92)File.Copy(source,copy);if(kind=="RC")PrepareLoadTable273(copy,job);

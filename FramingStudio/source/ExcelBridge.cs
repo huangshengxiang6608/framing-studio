@@ -452,7 +452,7 @@ static class ExcelBridge {
    if(Hash(source)!=Convert.ToString(template["sha256"]))throw new Exception("Excel 模板已改变，请先更新 App；没有使用旧公式继续核对。");
    Start79(dir,source);if(RestoreJob79(job,dir))return 0;Stage79("打开原 Excel 模板");
    bool axis92=kind=="Deflection"&&job.ContainsKey("method")&&Convert.ToString(job["method"])=="BUILDING_AXIS";
-   string copy=Path.Combine(dir,kind+(axis92?"-filled.xlsx":"-filled.xlsm"));if(File.Exists(copy))throw new Exception("输出已经存在，请重新生成一个核对任务。");if(!axis92)File.Copy(source,copy);
+   string copy=Path.Combine(dir,kind+(axis92?"-filled.xlsx":"-filled.xlsm"));if(File.Exists(copy))throw new Exception("输出已经存在，请重新生成一个核对任务。");if(!axis92)File.Copy(source,copy);if(kind=="RC")PrepareLoadTable273(copy,job);
    x=Activator.CreateInstance(Type.GetTypeFromProgID("Excel.Application",true));x.Visible=false;x.DisplayAlerts=false;x.ScreenUpdating=false;x.EnableEvents=false;
    // Only the packaged, hash-verified user templates run macros, in this isolated instance.
    x.AutomationSecurity=1;if(axis92){b=x.Workbooks.Add();b.SaveAs(copy,51);}else b=x.Workbooks.Open(copy,0,false);x.EnableEvents=false;Stage79("模板已打开");
@@ -1098,6 +1098,39 @@ static class ExcelBridge {
   } finally { x.Calculation=previousCalculation; }
  }
 
+ // RCLoads73 is passed as a Range to the original FullAction73 UDFs. Growing
+ // that table after Excel has loaded the paused dependent sheets can corrupt
+ // the native calculation graph; its next walk (e.g. FreezeTB79(false)) then
+ // crashes Excel before a UDF is entered. Establish the submitted row count
+ // before Excel opens the output copy. Do not change any formulas or VBA.
+ static void PrepareLoadTable273(string copy,Dictionary<string,object> job){
+  if(!job.ContainsKey("fullLoads"))return;
+  long count=Arr(job["fullLoads"]).Select(Obj).Sum(beam=>(long)Arr(beam["loads"]).Count());
+  if(count>1048572)throw new Exception("Excel 荷载明细超出行数限制");
+  string address="A4:G"+(4+Math.Max(1,count));
+  const string ns="http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  using(var package=System.IO.Packaging.Package.Open(copy,FileMode.Open,FileAccess.ReadWrite)){
+   bool found=false;
+   foreach(var part in package.GetParts().Where(p=>p.ContentType=="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml").ToArray()){
+    var doc=new System.Xml.XmlDocument();doc.PreserveWhitespace=true;doc.XmlResolver=null;
+    using(var stream=part.GetStream(FileMode.Open,FileAccess.Read))
+    using(var reader=System.Xml.XmlReader.Create(stream,new System.Xml.XmlReaderSettings{DtdProcessing=System.Xml.DtdProcessing.Prohibit,XmlResolver=null}))doc.Load(reader);
+    var table=doc.DocumentElement;if(table.GetAttribute("name")!="RCLoads73")continue;
+    if(found)throw new Exception("Excel 荷载明细表名称重复");found=true;
+    var names=new System.Xml.XmlNamespaceManager(doc.NameTable);names.AddNamespace("m",ns);
+    var columns=table.SelectNodes("m:tableColumns/m:tableColumn",names);
+    string[] expected={"Member","Type","Start","End","G","Q","Source"};
+    if(columns.Count!=expected.Length||!System.Text.RegularExpressions.Regex.IsMatch(table.GetAttribute("ref"),"^A4:G[0-9]+$"))throw new Exception("Excel 荷载明细表结构不匹配");
+    for(int i=0;i<expected.Length;i++)if(((System.Xml.XmlElement)columns[i]).GetAttribute("name")!=expected[i])throw new Exception("Excel 荷载明细表栏位不匹配");
+    var filter=(System.Xml.XmlElement)table.SelectSingleNode("m:autoFilter",names);if(filter==null)throw new Exception("Excel 荷载明细表筛选范围缺失");
+    table.SetAttribute("ref",address);filter.SetAttribute("ref",address);
+    using(var stream=part.GetStream(FileMode.Create,FileAccess.Write))
+    using(var writer=System.Xml.XmlWriter.Create(stream,new System.Xml.XmlWriterSettings{Encoding=new UTF8Encoding(false),Indent=false}))doc.Save(writer);
+   }
+   if(!found)throw new Exception("Excel 荷载明细表缺失");
+  }
+ }
+
  static void FullLoadsJob(dynamic b, Dictionary<string,object> job) {
   if(!job.ContainsKey("fullLoads"))return;
   bool autoFill=Convert.ToBoolean(b.Application.AutoCorrect.AutoFillFormulasInLists);
@@ -1110,7 +1143,7 @@ static class ExcelBridge {
    var l=Obj(raw);detail.Add(new object[]{"'"+Convert.ToString(beam["id"]),"'"+Convert.ToString(l["type"]),l["start"],l["end"],l["g"],l["q"],"'"+Convert.ToString(l.ContainsKey("label")?l["label"]:"")});
   }
   dynamic table=loads.ListObjects["RCLoads73"];
-  table.Resize(loads.Range["A4:G"+(4+Math.Max(1,detail.Count))]);loads.Range["A5:G"+(4+Math.Max(1,detail.Count))].ClearContents();
+  if(Convert.ToString(table.Range.Address)!="$A$4:$G$"+(4+Math.Max(1,detail.Count)))throw new Exception("Excel 荷载明细范围未正确准备");loads.Range["A5:G"+(4+Math.Max(1,detail.Count))].ClearContents();
   if(detail.Count>0){object[,] v=new object[detail.Count,7];for(int i=0;i<detail.Count;i++)for(int j=0;j<7;j++)v[i,j]=detail[i][j];loads.Range["A5:G"+(4+detail.Count)].Value2=v;}
   loads.Range["A5:G"+(4+Math.Max(1,detail.Count))].Interior.Color=12579839;
   Set(results,"K4","Source sheet");Set(results,"L4","Source row");

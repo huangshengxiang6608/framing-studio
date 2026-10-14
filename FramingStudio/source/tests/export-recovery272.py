@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='framing-recovery272-',dir=Path.cwd()) a
  assert Path(tmp).resolve().is_relative_to(Path.cwd().resolve())
  d=Path(tmp);cs=d/'Recovery.cs';cs.write_text(base,encoding='utf8');exe=d/'Recovery.exe'
  compiler=Path(os.environ['WINDIR'])/'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
- subprocess.run([str(compiler),'/nologo','/target:exe','/platform:x64','/out:'+str(exe),'/reference:System.Web.Extensions.dll','/reference:Microsoft.CSharp.dll',str(cs)],check=True)
+ subprocess.run([str(compiler),'/nologo','/target:exe','/platform:x64','/out:'+str(exe),'/reference:System.Web.Extensions.dll','/reference:Microsoft.CSharp.dll','/reference:'+str(compiler.parent/'WPF/WindowsBase.dll'),str(cs)],check=True)
  for scenario,count in [('recover',2),('permanent',3),('validation',1),('later',1),('partial',1),('compared',1),('other-kind',1)]:
   run=d/scenario;run.mkdir();job=run/'job.json';payload=json.dumps({'type':'Steel' if scenario=='other-kind' else 'RC','scenario':scenario,'unchangedInput':[1,2,3]});job.write_text(payload)
   completed=subprocess.run([str(exe),str(d),str(job)],timeout=30)

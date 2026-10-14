@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -205,7 +205,7 @@ static class ExcelBridge {
   try{x.Calculation=-4135;foreach(string name in CalculationSheets254){dynamic sheet=b.Worksheets[name];enabled[name]=Convert.ToBoolean(sheet.EnableCalculation);sheet.EnableCalculation=true;}AdoptInputs254(x,b,member,false);}
   finally{foreach(var pair in enabled)b.Worksheets[pair.Key].EnableCalculation=pair.Value;x.Calculation=mode;}
  }
- // Per-member, read-only calculation copies. Capture only after the original
+ // Per-member, independently editable calculation copies. Capture only after the original
  // design has passed comparison. Cross-sheet inputs are private value captures;
  // the design's equations remain formulas, including native reinforcement UDFs.
  sealed class DesignCopy265 { public string Name,Source,Member,Address; public object[,] Values; }
@@ -232,7 +232,7 @@ static class ExcelBridge {
     dynamic from=b.Worksheets[key];dynamic hidden=b.Worksheets.Add(Type.Missing,b.Worksheets[b.Worksheets.Count]);string hiddenName=UniqueDesignName265(b,"_D"+serial.ToString("000")+"_"+(captures.Count+1));hidden.Name=hiddenName;
     string area=Convert.ToString(from.UsedRange.Address);object[,] data=(object[,])from.Range[area].Value2;
     for(int r=data.GetLowerBound(0);r<=data.GetUpperBound(0);r++)for(int c=data.GetLowerBound(1);c<=data.GetUpperBound(1);c++)if(data[r,c] is string)data[r,c]="'"+(string)data[r,c];
-    hidden.Range[area].Value2=data;hidden.Protect(Type.Missing,true,true,true);copy.Activate();hidden.Visible=0;captures.Add(key,hiddenName);return hiddenName;
+    hidden.Range[area].Value2=data;copy.Activate();hidden.Visible=0;captures.Add(key,hiddenName);return hiddenName;
    };
    string loadRange=null;
    foreach(dynamic cell in copy.UsedRange.SpecialCells(-4123).Cells){
@@ -249,11 +249,34 @@ static class ExcelBridge {
     if(loadRange==null)loadRange="'"+capture("RC Loads")+"'!"+Convert.ToString(b.Worksheets["RC Loads"].ListObjects["RCLoads73"].DataBodyRange.Address);
     copy.Names.Add("_RCLoads265","="+loadRange,false);
    }
-   foreach(dynamic shape in copy.Shapes){try{if(!string.IsNullOrEmpty(Convert.ToString(shape.OnAction))){shape.OnAction="";try{shape.TextFrame2.TextRange.Text="Read-only design copy";}catch{}shape.AlternativeText="Read-only member calculation captured at generation. Update the model and regenerate to refresh.";}}catch{}}
-   copy.EnableCalculation=true;copy.Calculate();copy.UsedRange.Locked=true;copy.Protect(Type.Missing,true,true,true);
+   foreach(dynamic shape in copy.Shapes){try{if(!string.IsNullOrEmpty(Convert.ToString(shape.OnAction))){shape.OnAction="";try{shape.TextFrame2.TextRange.Text="Independent calculation sheet";}catch{}shape.AlternativeText="Editable independent calculation. Enter inputs directly; original shared-sheet macros are not attached.";}}catch{}}
+   copy.EnableCalculation=true;copy.Calculate();copy.UsedRange.Locked=true;
    DesignCopies265.Add(new DesignCopy265{Name=name,Source=source,Member=id,Address=address,Values=values});DesignTail265[source]=name;
    VerifyDesign265(b,DesignCopies265[DesignCopies265.Count-1]);original.Activate();
   }finally{x.EnableEvents=events;x.Calculation=mode;}
+ }
+ // Export editing permissions only: no values, formulas, dimensions or print settings change.
+ static void EditableWorkbook270(dynamic b){
+  b.Unprotect();
+  foreach(dynamic sheet in b.Worksheets){
+   sheet.Unprotect();sheet.EnableSelection=0;sheet.ScrollArea="";
+   // Ordinary hidden sheets can be revealed by Excel's Unhide command.
+   if(Convert.ToInt32(sheet.Visible)==2)sheet.Visible=0;
+   string name=Convert.ToString(sheet.Name);
+   bool beam=new[]{"Section B Secondary Beam Design","Section B Main Beam Design","Section B Transfer Beam Check","Section B Cantilever Beam Check"}.Contains(name)
+    ||DesignCopies265.Any(d=>d.Name==name&&new[]{"Section B Secondary Beam Design","Section B Main Beam Design","Section B Transfer Beam Check","Section B Cantilever Beam Check"}.Contains(d.Source));
+   if(beam){
+    // All eight layers of both faces accept typed counts, including zero.
+    // Diameter choices and native design checks remain unchanged.
+    foreach(string address in new[]{"C40:C47","C110:C117"}){
+     dynamic validation=sheet.Range[address].Validation;validation.Delete();
+     validation.Add(1,1,7,"0");validation.IgnoreBlank=true;validation.InCellDropdown=false;
+     validation.ShowError=true;validation.ErrorTitle="Invalid bar count";validation.ErrorMessage="Enter a whole number of bars, zero or greater.";
+    }
+   }
+   if(Convert.ToBoolean(sheet.ProtectContents)||Convert.ToBoolean(sheet.ProtectDrawingObjects)||Convert.ToBoolean(sheet.ProtectScenarios))throw new Exception("工作表未能解除保護："+name);
+  }
+  if(Convert.ToBoolean(b.ProtectStructure)||Convert.ToBoolean(b.ProtectWindows))throw new Exception("工作簿未能解除保護");
  }
  static void VerifyDesign265(dynamic b,DesignCopy265 item){
   dynamic sheet=b.Worksheets[item.Name];sheet.Calculate();object[,] values=(object[,])sheet.Range[item.Address].Value2;
@@ -390,13 +413,13 @@ static class ExcelBridge {
     // Generate the native copy for every governing face; preserve the editable workbook.
     foreach(string face in picked){Run(x,b,"View"+face);Run(x,b,"GenerateEricCopy");OverallCopy98(b,job,face);RemovePaperNumbers111(b.Worksheets["抄"]);OverallPresentation112(b,job,face);string label=Convert.ToString(Val(b.Worksheets["抄"].Range["D3"]));if(label.Contains("--")||!label.StartsWith(face))throw new Exception("原 Excel 抄未生成");if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"]))files.Add(ExportCopy(b.Worksheets["抄"],dir,"Overall-"+face+".pdf"));}
     compare.Activate();
-    ReportPages75(b,job,files,dir);ReportInks84(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,governing=governing,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    ReportPages75(b,job,files,dir);ReportInks84(b);EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,governing=governing,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }else if(kind=="Foundation"){
-    FoundationJob76(x,b,job,files,dir);ReportPages75(b,job,files,dir);ReportInks84(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    FoundationJob76(x,b,job,files,dir);ReportPages75(b,job,files,dir);ReportInks84(b);EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }else if(kind=="Deflection"){
-    DeflectionJob(x,b,job,files,dir);ReportPages75(b,job,files,dir);ReportInks84(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    DeflectionJob(x,b,job,files,dir);ReportPages75(b,job,files,dir);ReportInks84(b);EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }else if(kind=="Steel"){
-    SteelJob(x,b,job,files,dir);ReportPages75(b,job,files,dir);ReportInks84(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    SteelJob(x,b,job,files,dir);ReportPages75(b,job,files,dir);ReportInks84(b);EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }else{
     dynamic input=b.Worksheets["Input"],engine=b.Worksheets["_Input Engine"];Stage79("准备输入");int inputCalculation80=Convert.ToInt32(x.Calculation);
     string reset="A9:H28,J9:K28,M9:M28,A34:H43,A49:G68,A74:E93,A99:D118,A124:M143";
@@ -460,7 +483,7 @@ static class ExcelBridge {
     // the native check once at export time, so opening need not regenerate it.
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("导出前 RC Check 未完成");
-    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);x.EnableEvents=false;b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);x.EnableEvents=false;EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
    Stage79("保存已核对结果");CommitPageCaches82(copy);StoreJob79(job,dir);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;GC.Collect();return 0;
   }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if((object)b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}

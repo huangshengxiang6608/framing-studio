@@ -13,7 +13,7 @@ for member in job['members']:
  if member.get('selected') is False:continue
  name=re.sub(r'[\\/:?*\[\]]','',member.get('designName265',member['id'])).strip().strip("'")[:31]
  sheet=formula[name];source=formula[member['sheet']]
- assert sheet.protection.sheet and sheet.sheet_state=='visible'
+ assert not sheet.protection.sheet and sheet.sheet_state=='visible'
  assert '_RCDesign265' in sheet.defined_names and sheet.defined_names['_RCDesign265'].attr_text=='TRUE'
  assert formula.sheetnames.index(name)>formula.sheetnames.index(source.title)
  previous=counts.get(source.title,source.title);assert formula.sheetnames.index(name)==formula.sheetnames.index(previous)+1;counts[source.title]=name

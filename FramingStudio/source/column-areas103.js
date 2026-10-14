@@ -138,23 +138,23 @@ const ColumnAreas103=(()=>{
   if(scoped)scoped.routes.set(f,memo);
   const columnInput=(n,c)=>{const token=Loading.token('COL',c),key=n+'|'+token;if(!columnInputs.has(key))columnInputs.set(key,Loading.input(p,n,token));return columnInputs.get(key);};
   const geometry=(m,c)=>{let values=shapeCache.get(m);if(!values){values=new Map();shapeCache.set(m,values);}const key=Loading.token('COL',c);if(!values.has(key))values.set(key,footprint(p,m,c));return values.get(key);},baseShape=geometry(base,selected);
-  const inside=(c,q)=>{const r=Engine.columnRect(c);return Math.abs(r.x-q[0])<=r.w/2+eps&&Math.abs(r.y-q[1])<=r.d/2+eps;};
-  const on=(q,b)=>{const u=a(b),v=z(b),dx=v[0]-u[0],dy=v[1]-u[1],l2=dx*dx+dy*dy;if(l2<eps)return false;const t=((q[0]-u[0])*dx+(q[1]-u[1])*dy)/l2;return Math.abs((q[0]-u[0])*dy-(q[1]-u[1])*dx)<eps*Math.sqrt(l2)&&t>=-eps&&t<=1+eps;};
   const merge=entries=>{const map=new Map();for(const e of entries){const t=Loading.token('COL',e.column),old=map.get(t);if(old)old.weight+=e.weight;else map.set(t,{...e});}return [...map.values()];};
-  function beamLanding(m,n,b,q,path=new Set()){
-   const bt=Loading.token(b.kind,b);if(path.has(bt))return {entries:[],errors:['转换路径梁相互支承：'+b.id]};path=new Set(path);path.add(bt);
-   const u=a(b),v=z(b),dx=v[0]-u[0],dy=v[1]-u[1],l2=dx*dx+dy*dy,o=Loading.input(p,n,bt);if(l2<eps)return {entries:[],errors:['转换梁跨度无效：'+b.id]};
-   const t=Math.max(0,Math.min(1,((q[0]-u[0])*dx+(q[1]-u[1])*dy)/l2)),root=b.displayKind==='CB'?Loading.cbRoot(p,result,n,b).fixedEnd:null,weights=b.displayKind==='CB'?(root==='a'?[1,0]:root==='z'?[0,1]:null):[1-t,t];
-   if(!weights)return {entries:[],errors:['CB 固定端待确认：'+b.id]};
-   const entries=[],err=[];
-   for(let i=0;i<2;i++){if(weights[i]<eps)continue;const endpoint=i?v:u,end=i?'z':'a',manual=Loading.manualSupport(p,m,n,b,end);let sink;
-    if(manual){if(manual.invalid){err.push(b.id+' 手动支承待确认');continue;}sink=manual;}
-    else{const cs=active(m).filter(c=>inside(c,endpoint)),ws=m.walls.filter(w=>on(endpoint,w)),bs=m.beams.filter(x=>x!==b&&Loading.contact(endpoint,x)&&!path.has(Loading.token(x.kind,x)));if(cs.length===1)sink={type:'COL',member:cs[0]};else if(!cs.length&&ws.length)sink={type:'WALL'};else if(!cs.length&&!ws.length&&bs.length===1)sink={type:'BEAM',member:bs[0]};}
-    if(!sink){err.push(b.id+' '+(i?'终点':'起点')+' 支承待确认');continue;}
-    if(sink.type==='COL')entries.push({column:sink.member,weight:weights[i]});
-    else if(sink.type==='BEAM'){const next=beamLanding(m,n,sink.member,endpoint,path);entries.push(...next.entries.map(e=>({...e,weight:e.weight*weights[i]})));err.push(...next.errors);}
-   }
-   return {entries:merge(entries),errors:[...new Set(err)]};
+  // Column design accumulates tributary areas independently of beam reactions.
+  // Use the upper column's physical centre and the actual clipped polygons,
+  // not a bounding rectangle or a TB lever-arm fraction. Shared edges require
+  // confirmation rather than an arbitrary first-column / half-load assignment.
+  const contains=(poly,q)=>{
+   let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const u=poly[j],v=poly[i],dx=v[0]-u[0],dy=v[1]-u[1],len=Math.hypot(dx,dy);
+    if(len>eps&&Math.abs(dx*(q[1]-u[1])-dy*(q[0]-u[0]))<=eps*len&&q[0]>=Math.min(u[0],v[0])-eps&&q[0]<=Math.max(u[0],v[0])+eps&&q[1]>=Math.min(u[1],v[1])-eps&&q[1]<=Math.max(u[1],v[1])+eps)return true;
+    if((u[1]>q[1])!==(v[1]>q[1])&&q[0]<(v[0]-u[0])*(q[1]-u[1])/(v[1]-u[1])+u[0])inside=!inside;
+   }return inside;
+  };
+  function tributaryLanding(n,c,below){
+   const q=point(p,Engine.floorModel(result,n),c),owners=active(below).filter(d=>pieces(geometry(below,d)).some(poly=>contains(poly,q)));
+   if(owners.length===1)return {entries:[{column:owners[0],weight:1}],errors:[]};
+   const message=owners.length?'上層柱中心位於多個柱 tributary area 的共邊／重疊位置（'+owners.map(d=>d.id).join('、')+'），請核對':'上層柱中心不在任何下層柱 tributary area 內，請核對';
+   return {entries:[],errors:[FloorLevels.name(p,n)+' 柱 '+c.id+'：'+message]};
   }
   const overrides=(n,c,source)=>{const o=columnInput(n,c);return !!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto'||Object.hasOwn(o.sectionAAreaOverrides115||{},source));};
   function route(n,c,source=n,bypass=false){
@@ -162,7 +162,7 @@ const ColumnAreas103=(()=>{
    if(n===f){const answer={entries:[{column:c,weight:1}],errors:[]};memo.set(k,answer);return answer;}
    const below=Engine.floorModel(result,n-1),matches=active(below).filter(d=>Engine.overlap(Engine.columnRect(c),Engine.columnRect(d)));let landing;
    if(matches.length===1)landing={entries:[{column:matches[0],weight:1}],errors:[]};
-   else{const node=Loading.columnLoadPoint(p,Engine.floorModel(result,n),c),target=Engine.transferBeamAt(p,below,n-1,node),tbs=target?.kind==='TB'?[target]:[];landing=tbs.length===1?beamLanding(below,n-1,tbs[0],node):{entries:[],errors:[FloorLevels.name(p,n)+' 柱 '+c.id+' 至下层的柱／TB 关系待确认']};}
+   else landing=tributaryLanding(n,c,below);
    const entries=[],err=[...landing.errors];for(const e of landing.entries){const next=route(n-1,e.column,source);entries.push(...next.entries.map(q=>({...q,weight:q.weight*e.weight})));err.push(...next.errors);}const answer={entries:merge(entries),errors:[...new Set(err)]};memo.set(k,answer);return answer;
   }
   for(let n=f;n<=p.total;n++){
@@ -178,11 +178,11 @@ const ColumnAreas103=(()=>{
    }
   }
   // A confirmed upper-column area replaces its geometric contribution exactly
-  // once along the same column/TB route, including further transfers below it.
+  // once along the same column/tributary route, including further transfers below it.
   for(let n=f+1;n<=p.total;n++)for(const c of active(Engine.floorModel(result,n))){
    const o=columnInput(n,c);if(!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto')&&!Object.keys(o.sectionAAreaOverrides115||{}).length)continue;
    const a=Reports.columnA(p,{floor:n,token:Loading.token('COL',c),id:c.id},result);
-   for(let source=n;source<=p.total;source++){if(!overrides(n,c,source))continue;const routing=route(n,c,source,true),weight=routing.entries.filter(e=>Loading.token('COL',e.column)===target).reduce((v,e)=>v+e.weight,0);if(weight<eps)continue;errors.push(...routing.errors,...a.errors);
+   for(let source=n;source<=p.total;source++){if(!overrides(n,c,source))continue;const routing=route(n,c,source,true),weight=routing.entries.filter(e=>Loading.token('COL',e.column)===target).reduce((v,e)=>v+e.weight,0);if(routing.errors.length){const q=point(p,Engine.floorModel(result,n),c),box=baseShape.box;if(weight>eps||box&&q[0]>=box.x0-eps&&q[0]<=box.x1+eps&&q[1]>=box.y0-eps&&q[1]<=box.y1+eps)errors.push(...routing.errors);}if(weight<eps)continue;errors.push(...a.errors);
     for(const x of a.rows.filter(x=>x.lo<=source&&x.hi>=source)){const named=x.areaName&&x.areaName!=='整层默认',load=named?LoadData.areas(p,source).find(l=>l.name===x.areaName||l.id===x.areaName):null;groups.push({lo:source,hi:source,area:x.area*weight,b:null,d:null,areaId:load?.id??null,areaName:load?.name||'整层默认',automatic:true,manualArea:true,rects:[],polygons:[],sourceColumn:c.id,transferWeight:weight});}
    }
   }

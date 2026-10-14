@@ -59,3 +59,15 @@ space SBs across intervening MB/CB/TB boundaries. Preserve walls as valid bay
 boundaries. CB defaults to support-column width. Existing CBs were explicitly
 authorized to migrate to column-dependent width in E2.171; later explicit manual
 width overrides must remain intact.
+
+## Column loads use tributary ownership
+
+User clarification on 2026-10-14: column design loads use tributary areas,
+independently of slab -> SB -> primary beam reactions. An offset upper column
+is assigned 100% to the lower column whose actual tributary area contains its
+physical centre. Do not split this column load using TB end-reaction ratios.
+For the current model, 4/F C1 contributes 100% to 3/F AC10 and 0% to AC16.
+Accumulate upper floors and confirmed area overrides once along this route.
+Shared boundaries or missing ownership require an explicit unresolved result,
+not an arbitrary fraction or duplicate assignment. Preserve the separate beam
+analysis and the original Section A/B report formulas and formatting.

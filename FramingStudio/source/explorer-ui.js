@@ -2,6 +2,8 @@
 const BeamRepresentatives250=(()=>{
  const maps=['selected','reportA','reportB'],kinds=['MB','CB','TB','SB'];
  const key=r=>r.floor+'|'+r.token;
+ // Slab D22 is the existing design moment per metre, not a beam reaction.
+ const moment=r=>r?.kind==='SLAB'?r.result?.values?.D22:r?.actions?.M;
  function select(rows){
   const groups=new Map();
   const order=(a,b)=>a.floor-b.floor||String(a.id).localeCompare(String(b.id),'en',{numeric:true})||a.token.localeCompare(b.token);
@@ -10,6 +12,13 @@ const BeamRepresentatives250=(()=>{
    const id=JSON.stringify([row.framing,kind,depth]),g=groups.get(id)||{id,framing:row.framing,kind,depth,count:0,missing:0,winner:null};groups.set(id,g);g.count++;
    const M=row.actions?.M;if(!Number.isFinite(M)||row.loadErrors?.length){g.missing++;continue;}
    if(!g.winner||Math.abs(M)>Math.abs(g.winner.actions.M)||Math.abs(M)===Math.abs(g.winner.actions.M)&&order(row,g.winner)<0)g.winner=row;
+  }
+  // One maximum across every floor for each native slab design type.
+  for(const row of rows.filter(r=>r.kind==='SLAB')){
+   const kind=row.displayType==='CS'||row.input?.slabType==='CS'?'CS':'SLAB',id='SLAB|'+kind;
+   const g=groups.get(id)||{id,framing:'',kind,count:0,missing:0,winner:null};groups.set(id,g);g.count++;
+   const M=moment(row);if(!Number.isFinite(M)||row.loadErrors?.length){g.missing++;continue;}
+   if(!g.winner||Math.abs(M)>Math.abs(moment(g.winner))||Math.abs(M)===Math.abs(moment(g.winner))&&order(row,g.winner)<0)g.winner=row;
   }
   // Global model bottom floor, not each Framing's first occurrence.
   const bottom=Math.min(...rows.map(r=>r.floor)),columns=rows.filter(r=>r.floor===bottom&&r.kind==='COL');
@@ -32,7 +41,7 @@ const BeamRepresentatives250=(()=>{
   return before!==JSON.stringify(ex);
  }
  function manual(ex,k,name,value){ex[name]??={};ex[name][k]=value;const state=ex.representatives250??={owned:{},overrides:{}};(state.overrides[k]??={})[name]=value;if(state.owned[k])delete state.owned[k][name];}
- return {select,sync,manual,key};
+ return {select,sync,manual,key,moment};
 })();
 function ExplorerUI(host){
  let cache228=null;
@@ -340,8 +349,8 @@ return html;}
   if(h.selected&&h.selected.kind!=='WALL')keys.add(h.floor+'|'+h.selected.token);
   const floorKeys=new Set([...keys].map(k=>Number(k.split('|')[0])));
   const items=shownFloors(h).filter(f=>floorKeys.has(f.n)).flatMap(f=>Loading.members(h.p,h.result,f.n).filter(m=>keys.has(f.n+'|'+m.token)).map(m=>({...m,floor:f.n,framing:f.type})));
-  const status=repError250?'代表構件抽選未完成：'+esc(repError250)+btn('重試','representatives-retry250'):!fresh(h.p)?(auditBusy131?'全樓檢查完成後自動抽選代表梁／柱。':'正在按 Framing／類型／D 比較彎矩及最低層柱軸力…'):groups.some(g=>g.missing)?'荷載／傳荷歸屬未齊：'+groups.filter(g=>g.missing).map(g=>esc((g.kind==='COL'?'最低層柱 · '+(g.transfer?'承接轉換柱':'不承接轉換柱'):g.framing+' '+g.kind+' D='+num(g.depth)+' mm')+'（缺 '+g.missing+'/'+g.count+' 條）')).join('；')+'。最大值待確認，不自動勾選。':'';
-  return '<details id="ex-selected-members"'+(memberTableOpen?' open':'')+'><summary>'+(viewFraming==='all'?'全部 Framing':esc(viewFraming))+' · 代表梁／柱／已選構件 · '+items.length+'</summary><p class="muted" style="margin:6px 0">按 Framing × MB／CB／TB／SB × 實際 D，跨共用樓層抽選最大 |M|；整棟最低層的柱分為承接／不承接轉換柱荷載兩類，各選最大 ULS 軸力 N（含累積上層荷載）。確認後自動勾選 Check／A 抄／B 抄，保留手動選取及取消。</p>'+(status?'<p data-representatives-status250 role="status">'+status+'</p>':'')+'<div class="table-wrap ex-members" style="max-height:200px;overflow:auto"><table><thead><tr><th aria-label="移出清單"></th><th>楼层</th><th>Framing</th><th>构件</th><th>D mm</th><th>|M| kNm</th><th>N kN</th><th>Check</th><th>A 抄</th><th>B 抄</th></tr></thead><tbody>'+items.map(m=>{const k=m.floor+'|'+m.token,g=automatic.get(k),rr=rowMap.get(k),attrs=`data-floor="${m.floor}" data-token="${esc(m.token)}"`;return '<tr data-representative250="'+(g?(g.missing?'pending':'maximum'):'manual')+'" data-member-floor="'+m.floor+'" data-member-framing="'+esc(m.framing)+'"><td>'+(['selected','reportA','reportB'].some(name=>e[name]?.[k]===true)?btn('×','remove-member233',attrs+' title="取消 Check／A 抄／B 抄勾選；自動代表構件仍保留在表內" aria-label="取消 '+esc(m.id)+' 的選取"'):'')+'</td><td>'+esc(FloorLevels.name(h.p,m.floor))+'</td><td>'+esc(m.framing)+'</td><td>'+btn(esc(m.id),'choose',attrs)+(g?'<small style="display:block">'+(g.kind==='COL'?(g.transfer?'承接轉換柱':'不承接轉換柱'):g.kind)+' · '+(g.missing?'最大值待確認':g.kind==='COL'?'最大 N':'最大 |M|')+'</small>':'')+'</td><td>'+(['MB','CB','TB','SB','COL'].includes(m.kind)?num(m.member.d*1000):'—')+'</td><td>'+(Number.isFinite(rr?.actions?.M)?num(Math.abs(rr.actions.M)):'—')+'</td><td>'+(m.kind==='COL'&&Number.isFinite(rr?.result?.inputs?.C28)?num(rr.result.inputs.C28):'—')+'</td><td>'+`<input type="checkbox" ${h.selected?.token===m.token&&h.floor===m.floor?'id="ex-include"':''} data-ex="include-row" ${attrs} ${e.selected?.[k]?'checked':''}>`+'</td>'+['A','B'].map(x=>`<td><input type="checkbox" data-report="${x}" ${attrs} ${e['report'+x]?.[k]?'checked':''}></td>`).join('')+'</tr>';}).join('')+'</tbody></table></div></details><p class="muted">图中玫红边框：已勾选 Check；蓝色：当前点选。A／B 抄页面按各自勾选范围高亮。列表按查看 Framing 汇总各层；点构件编号可定位该层。</p>';
+  const status=repError250?'代表構件抽選未完成：'+esc(repError250)+btn('重試','representatives-retry250'):!fresh(h.p)?(auditBusy131?'全樓檢查完成後自動抽選代表梁／柱／板。':'正在比較梁彎矩、最低層柱軸力及全樓板彎矩…'):groups.some(g=>g.missing)?'荷載／傳荷歸屬未齊：'+groups.filter(g=>g.missing).map(g=>esc((g.kind==='COL'?'最低層柱 · '+(g.transfer?'承接轉換柱':'不承接轉換柱'):['SLAB','CS'].includes(g.kind)?'全樓 '+g.kind:g.framing+' '+g.kind+' D='+num(g.depth)+' mm')+'（缺 '+g.missing+'/'+g.count+' 條）')).join('；')+'。最大值待確認，不自動勾選。':'';
+  return '<details id="ex-selected-members"'+(memberTableOpen?' open':'')+'><summary>'+(viewFraming==='all'?'全部 Framing':esc(viewFraming))+' · 代表梁／柱／板／已選構件 · '+items.length+'</summary><p class="muted" style="margin:6px 0">按 Framing × MB／CB／TB／SB × 實際 D，跨共用樓層抽選最大 |M|；整棟最低層的柱分為承接／不承接轉換柱荷載兩類，各選最大 ULS 軸力 N（含累積上層荷載）。普通板 SLAB／懸臂板 CS 各從全樓抽選最大 |M|（kNm/m），同值按樓層及編號選取。確認後自動勾選 Check／A 抄／B 抄，保留手動選取及取消。</p>'+(status?'<p data-representatives-status250 role="status">'+status+'</p>':'')+'<div class="table-wrap ex-members" style="max-height:200px;overflow:auto"><table><thead><tr><th aria-label="移出清單"></th><th>楼层</th><th>Framing</th><th>构件</th><th>D mm</th><th>|M|<small style="display:block">梁 kNm · 板 kNm/m</small></th><th>N kN</th><th>Check</th><th>A 抄</th><th>B 抄</th></tr></thead><tbody>'+items.map(m=>{const k=m.floor+'|'+m.token,g=automatic.get(k),rr=rowMap.get(k),attrs=`data-floor="${m.floor}" data-token="${esc(m.token)}"`;return '<tr data-representative250="'+(g?(g.missing?'pending':'maximum'):'manual')+'" data-member-floor="'+m.floor+'" data-member-framing="'+esc(m.framing)+'"><td>'+(['selected','reportA','reportB'].some(name=>e[name]?.[k]===true)?btn('×','remove-member233',attrs+' title="取消 Check／A 抄／B 抄勾選；自動代表構件仍保留在表內" aria-label="取消 '+esc(m.id)+' 的選取"'):'')+'</td><td>'+esc(FloorLevels.name(h.p,m.floor))+'</td><td>'+esc(m.framing)+'</td><td>'+btn(esc(m.id),'choose',attrs)+(g?'<small style="display:block">'+(g.kind==='COL'?(g.transfer?'承接轉換柱':'不承接轉換柱'):g.kind)+' · '+(g.missing?'最大值待確認':g.kind==='COL'?'最大 N':'最大 |M|')+'</small>':'')+'</td><td>'+(m.kind==='SLAB'?num(m.member.thickness):['MB','CB','TB','SB','COL'].includes(m.kind)?num(m.member.d*1000):'—')+'</td><td>'+(Number.isFinite(BeamRepresentatives250.moment(rr))?num(Math.abs(BeamRepresentatives250.moment(rr))):'—')+'</td><td>'+(m.kind==='COL'&&Number.isFinite(rr?.result?.inputs?.C28)?num(rr.result.inputs.C28):'—')+'</td><td>'+`<input type="checkbox" ${h.selected?.token===m.token&&h.floor===m.floor?'id="ex-include"':''} data-ex="include-row" ${attrs} ${e.selected?.[k]?'checked':''}>`+'</td>'+['A','B'].map(x=>`<td><input type="checkbox" data-report="${x}" ${attrs} ${e['report'+x]?.[k]?'checked':''}></td>`).join('')+'</tr>';}).join('')+'</tbody></table></div></details><p class="muted">图中玫红边框：已勾选 Check；蓝色：当前点选。A／B 抄页面按各自勾选范围高亮。列表按查看 Framing 汇总各层；点构件编号可定位该层。</p>';
  }
  function selectionFloor(h,data){const f=data.floor===undefined?h.floor:Number(data.floor);if(!Number.isInteger(f)||!h.result.floors.some(x=>x.n===f))throw Error('楼层已改变，请重新选择构件');return f;}
 

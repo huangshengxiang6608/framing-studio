@@ -38,7 +38,7 @@ function setup(){const c=context(),{document,window}=parseHTML('<html><body><asi
  c.run('host250.refresh()');await pause();assert.equal(c.run('calls250'),1);
  // A real changed loading must invalidate demand and update winners automatically.
  c.run(`LoadData.setFloor(nav250.p,2,{usage:'Dormitory',dl:18,sdl:0,ll:7});nav250.result=Engine.generate(nav250.p);host250.refresh()`);
- assert(c.document.querySelector('[data-representatives-status250]').textContent.includes('比較彎矩'));
+ assert(c.document.querySelector('[data-representatives-status250]').textContent.includes('比較梁彎矩'));
  await until(()=>c.run('calls250')===2&&!c.document.querySelector('[data-representatives-status250]'));
  assert.equal(c.run(`nav250.p.explorer.reportA[${JSON.stringify(floor+'|'+token)}]`),false);
  console.log('PASS automatic real-solver extraction, all flags, cross-floor navigation, unchanged-input reuse and changed-load refresh');

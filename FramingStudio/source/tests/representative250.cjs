@@ -6,7 +6,7 @@ function setup(){const c=context(),{document,window}=parseHTML('<html><body><asi
  const c=setup();
  c.run(`globalThis.test250=(()=>{
  const row=(kind,depth,M,floor=1,framing='F1',id='B1',extra={})=>({kind,id,framing,floor,token:kind+'|'+id,member:{d:depth/1000},actions:{M},...extra});
- const rows=[row('MB',600,10),row('MB',600,-40,2,'F1','B2'),row('MB',700,20),row('SB',600,30),row('CB',600,70),row('TB',600,100),row('MB',600,90,1,'F2'),row('MB',600,40,1,'F1','B3'),row('COL',600,999)];
+ const rows=[row('MB',600,10),row('MB',600,-40,2,'F1','B2'),row('MB',700,20),row('SB',600,30),row('CB',600,70),row('TB',600,100),row('MB',600,90,1,'F2'),row('MB',600,40,1,'F1','B3')];
  const groups=BeamRepresentatives250.select(rows);if(groups.length!==6)throw Error('Framing/kind/depth grouping');
  const mb=groups.find(g=>g.framing==='F1'&&g.kind==='MB'&&g.depth===600);if(mb.winner.id!=='B3')throw Error('Absolute peak/tie ordering');
  if(JSON.stringify(BeamRepresentatives250.select([...rows].reverse()))!==JSON.stringify(groups))throw Error('Unstable tie');

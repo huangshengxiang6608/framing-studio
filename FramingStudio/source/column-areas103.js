@@ -138,7 +138,8 @@ const ColumnAreas103=(()=>{
   if(scoped)scoped.routes.set(f,memo);
   const columnInput=(n,c)=>{const token=Loading.token('COL',c),key=n+'|'+token;if(!columnInputs.has(key))columnInputs.set(key,Loading.input(p,n,token));return columnInputs.get(key);};
   const geometry=(m,c)=>{let values=shapeCache.get(m);if(!values){values=new Map();shapeCache.set(m,values);}const key=Loading.token('COL',c);if(!values.has(key))values.set(key,footprint(p,m,c));return values.get(key);},baseShape=geometry(base,selected);
-  const merge=entries=>{const map=new Map();for(const e of entries){const t=Loading.token('COL',e.column),old=map.get(t);if(old)old.weight+=e.weight;else map.set(t,{...e});}return [...map.values()];};
+  const sources271=entries=>[...new Map(entries.flatMap(e=>e.transferSources271||[]).map(e=>[e.floor+"|"+e.token,e])).values()];
+  const merge=entries=>{const map=new Map();for(const e of entries){const t=Loading.token('COL',e.column),old=map.get(t);if(old){old.weight+=e.weight;old.transferSources271=sources271([old,e]);}else map.set(t,{...e});}return [...map.values()];};
   // Column design accumulates tributary areas independently of beam reactions.
   // Use the upper column's physical centre and the actual clipped polygons,
   // not a bounding rectangle or a TB lever-arm fraction. Shared edges require
@@ -152,7 +153,7 @@ const ColumnAreas103=(()=>{
   };
   function tributaryLanding(n,c,below){
    const q=point(p,Engine.floorModel(result,n),c),owners=active(below).filter(d=>pieces(geometry(below,d)).some(poly=>contains(poly,q)));
-   if(owners.length===1)return {entries:[{column:owners[0],weight:1}],errors:[]};
+   if(owners.length===1)return {entries:[{column:owners[0],weight:1,transferSources271:[{floor:n,token:Loading.token("COL",c),id:c.id}]}],errors:[]};
    const message=owners.length?'上層柱中心位於多個柱 tributary area 的共邊／重疊位置（'+owners.map(d=>d.id).join('、')+'），請核對':'上層柱中心不在任何下層柱 tributary area 內，請核對';
    return {entries:[],errors:[FloorLevels.name(p,n)+' 柱 '+c.id+'：'+message]};
   }
@@ -163,7 +164,7 @@ const ColumnAreas103=(()=>{
    const below=Engine.floorModel(result,n-1),matches=active(below).filter(d=>Engine.overlap(Engine.columnRect(c),Engine.columnRect(d)));let landing;
    if(matches.length===1)landing={entries:[{column:matches[0],weight:1}],errors:[]};
    else landing=tributaryLanding(n,c,below);
-   const entries=[],err=[...landing.errors];for(const e of landing.entries){const next=route(n-1,e.column,source);entries.push(...next.entries.map(q=>({...q,weight:q.weight*e.weight})));err.push(...next.errors);}const answer={entries:merge(entries),errors:[...new Set(err)]};memo.set(k,answer);return answer;
+   const entries=[],err=[...landing.errors];for(const e of landing.entries){const next=route(n-1,e.column,source);entries.push(...next.entries.map(q=>({...q,weight:q.weight*e.weight,transferSources271:sources271([q,e])})));err.push(...next.errors);}const answer={entries:merge(entries),errors:[...new Set(err)]};memo.set(k,answer);return answer;
   }
   for(let n=f;n<=p.total;n++){
    const m=Engine.floorModel(result,n);
@@ -173,7 +174,7 @@ const ColumnAreas103=(()=>{
     if(weight<eps)continue;
     const shape=geometry(m,c);let free=pieces(shape);errors.push(...shape.errors.map(e=>FloorLevels.name(p,n)+' '+e));
     const loads=geometricAreas158(p,n,m);for(let i=0;i<loads.length;i++)for(let j=0;j<i;j++)if(R.region(loads[i]).some(a=>R.region(loads[j]).some(b=>{const hit=R.intersect(a,b);return hit&&free.some(poly=>clipPolygon(poly,hit).length);})))errors.push(FloorLevels.name(p,n)+' 柱 '+c.id+' 的荷载区域重叠，请核对 Loading');
-    function add(ps,load){const s=format(ps),A=s.area*weight;if(A<eps)return;groups.push({lo:n,hi:n,area:A,b:Math.abs(weight-1)<eps?s.b:null,d:Math.abs(weight-1)<eps?s.d:null,areaId:load?.id??null,areaName:load?.name||'整层默认',automatic:true,geometric103:true,rects:s.rects.map(r=>({...r,fraction:weight})),polygons:s.polygons.map(q=>({...q,fraction:weight})),partitioned:shape.partitioned,sourceColumn:c.id,transferWeight:weight,method:weight===1?'geometric-half-bay':'geometric-area-transfer'});}
+    function add(ps,load){const s=format(ps),A=s.area*weight;if(A<eps)return;groups.push({lo:n,hi:n,area:A,b:Math.abs(weight-1)<eps?s.b:null,d:Math.abs(weight-1)<eps?s.d:null,areaId:load?.id??null,areaName:load?.name||'整层默认',automatic:true,geometric103:true,rects:s.rects.map(r=>({...r,fraction:weight})),polygons:s.polygons.map(q=>({...q,fraction:weight})),partitioned:shape.partitioned,sourceColumn:c.id,transferWeight:weight,transferSources271:sources271(routing.entries.filter(e=>Loading.token("COL",e.column)===target)),method:weight===1?'geometric-half-bay':'geometric-area-transfer'});}
     for(const load of loads){const regions=R.union(R.region(load)),ps=free.flatMap(poly=>regions.map(r=>clipPolygon(poly,r)).filter(q=>q.length));add(ps,load);for(const r of regions)free=free.flatMap(poly=>subtractPolygon(poly,r));}add(free,null);
    }
   }
@@ -183,16 +184,16 @@ const ColumnAreas103=(()=>{
    const o=columnInput(n,c);if(!(String(o.sectionAAreas||'').trim()&&o.sectionAAreaMode!=='auto')&&!Object.keys(o.sectionAAreaOverrides115||{}).length)continue;
    const a=Reports.columnA(p,{floor:n,token:Loading.token('COL',c),id:c.id},result);
    for(let source=n;source<=p.total;source++){if(!overrides(n,c,source))continue;const routing=route(n,c,source,true),weight=routing.entries.filter(e=>Loading.token('COL',e.column)===target).reduce((v,e)=>v+e.weight,0);if(routing.errors.length){const q=point(p,Engine.floorModel(result,n),c),box=baseShape.box;if(weight>eps||box&&q[0]>=box.x0-eps&&q[0]<=box.x1+eps&&q[1]>=box.y0-eps&&q[1]<=box.y1+eps)errors.push(...routing.errors);}if(weight<eps)continue;errors.push(...a.errors);
-    for(const x of a.rows.filter(x=>x.lo<=source&&x.hi>=source)){const named=x.areaName&&x.areaName!=='整层默认',load=named?LoadData.areas(p,source).find(l=>l.name===x.areaName||l.id===x.areaName):null;groups.push({lo:source,hi:source,area:x.area*weight,b:null,d:null,areaId:load?.id??null,areaName:load?.name||'整层默认',automatic:true,manualArea:true,rects:[],polygons:[],sourceColumn:c.id,transferWeight:weight});}
+    for(const x of a.rows.filter(x=>x.lo<=source&&x.hi>=source)){const named=x.areaName&&x.areaName!=='整层默认',load=named?LoadData.areas(p,source).find(l=>l.name===x.areaName||l.id===x.areaName):null;groups.push({lo:source,hi:source,area:x.area*weight,b:null,d:null,areaId:load?.id??null,areaName:load?.name||'整层默认',automatic:true,manualArea:true,transferUnknown271:a.transfer271?.known!==true,rects:[],polygons:[],sourceColumn:c.id,transferWeight:weight,transferSources271:sources271(routing.entries.filter(e=>Loading.token("COL",e.column)===target))});}
    }
   }
   // One row per source floor and load region, including several columns carried by a TB.
-  const grouped=new Map();for(const g of groups){const k=g.lo+'|'+g.areaId;const previous=grouped.get(k);if(previous){previous.area+=g.area;previous.rects.push(...g.rects);previous.polygons.push(...g.polygons);previous.partitioned||=g.partitioned;previous.manualArea||=g.manualArea;previous.sourceColumns.push({id:g.sourceColumn,weight:g.transferWeight});}else grouped.set(k,{...g,sourceColumns:[{id:g.sourceColumn,weight:g.transferWeight}]});}
+  const grouped=new Map();for(const g of groups){const k=g.lo+'|'+g.areaId;const previous=grouped.get(k);if(previous){previous.area+=g.area;previous.transferUnknown271||=g.transferUnknown271;previous.transferSources271=sources271([previous,g]);previous.rects.push(...g.rects);previous.polygons.push(...g.polygons);previous.partitioned||=g.partitioned;previous.manualArea||=g.manualArea;previous.sourceColumns.push({id:g.sourceColumn,weight:g.transferWeight});}else grouped.set(k,{...g,sourceColumns:[{id:g.sourceColumn,weight:g.transferWeight}]});}
   for(const g of grouped.values()){
    const rects=new Map();for(const r of g.rects){const k=JSON.stringify([r.x0,r.x1,r.y0,r.y1]),prev=rects.get(k);if(prev)prev.fraction+=r.fraction;else rects.set(k,{...r});}g.rects=[...rects.values()];
    const points=pieces(g).flat(),box=points.length?bounds(points):null,rectangular=box&&[...g.rects,...g.polygons].every(r=>Math.abs(r.fraction-1)<eps)&&Math.abs(area(box)-g.area)<eps;g.b=rectangular?box.x1-box.x0:null;g.d=rectangular?box.y1-box.y0:null;if(g.sourceColumns.length>1){delete g.sourceColumn;delete g.transferWeight;}
   }
-  const answer={groups:[...grouped.values()],errors:[...new Set(errors)],method:'geometric-half-bay'};cache.set(id,answer);return copy(answer);
+  const answer={groups:[...grouped.values()],errors:[...new Set(errors)],method:'geometric-half-bay',transfer271:{known:!errors.length&&(sources271(groups.filter(g=>g.area>eps)).length>0||!groups.some(g=>g.area>eps&&g.transferUnknown271)),sources:sources271(groups.filter(g=>g.area>eps))}};cache.set(id,answer);return copy(answer);
  }
  return {snapshot228,calculate,footprint,wallShapes,wallSchedule,polygonArea,clipPolygon,subtractPolygon};
 })();

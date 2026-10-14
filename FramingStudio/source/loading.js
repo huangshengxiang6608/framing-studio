@@ -73,7 +73,7 @@ const Loading=(()=>{
    if(sum>0)groups.push(...old.map(g=>({...g,area:g.area*value/sum,b:null,d:null,rects:[],polygons:[],manualArea:true})));
    else groups.push({lo:n,hi:n,area:value,b:null,d:null,rects:[],polygons:[],manualArea:true,automatic:true,areaId:null,areaName:'整层默认'});
   }
-  return {...data,groups:groups.sort((a,b)=>a.lo-b.lo)};
+  return {...data,transfer271:manual?{known:false,sources:[],reason:'手動柱面積表未記錄 transfer column 來源'}:data.transfer271?{...data.transfer271,sources:[...new Map(groups.filter(g=>g.area>0).flatMap(g=>g.transferSources271||[]).map(e=>[e.floor+'|'+e.token,e])).values()]}:undefined,groups:groups.sort((a,b)=>a.lo-b.lo)};
  }
  function supportSummary(p,r,f,c){const model=E.floorModel(r,f),root=c.displayKind==='CB'?cbRoot(p,r,f,c):null;
   return ['a','z'].map(end=>{const label=end==='a'?'A':'B';if(root&&root.fixedEnd!==end)return {end:label,text:root.fixedEnd?'自由端':'固定端未确认'};

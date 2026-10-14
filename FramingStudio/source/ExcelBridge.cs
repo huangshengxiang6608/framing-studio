@@ -565,7 +565,14 @@ static class ExcelBridge {
     sheet.ResetAllPageBreaks();sheet.PageSetup.PrintArea="$A$"+begin+":$H$"+end;
     string file="Section-"+section+"-RC-"+i+".pdf";ExportCopy(sheet,dir,file,true);files.Add(new{file=file,reportOrder=(section=="A"?11:1)+rank+serial/10000});
    }
-  }finally{SetFooters80(sheet,footers80);sheet.PageSetup.PrintArea=area;if(Convert.ToString(sheet.PageSetup.CenterHeader)!=oldHeader)sheet.PageSetup.CenterHeader=oldHeader;sheet.ResetAllPageBreaks();foreach(int row in breaks)sheet.HPageBreaks.Add(sheet.Cells[row,1]);}
+   }finally{
+   SetFooters80(sheet,footers80);if(Convert.ToString(sheet.PageSetup.CenterHeader)!=oldHeader)sheet.PageSetup.CenterHeader=oldHeader;
+   // A later batch can start exactly on a saved manual page break. Excel
+   // rejects Add at the first print row: restore breaks under the full range,
+   // then restore the exact original print area (and hidden rows) unchanged.
+   try{sheet.PageSetup.PrintArea="$A$1:$H$"+last;sheet.ResetAllPageBreaks();foreach(int row in breaks)sheet.HPageBreaks.Add(sheet.Cells[row,1]);}
+   finally{sheet.PageSetup.PrintArea=area;}
+  }
  }
 
  static int Color75(string hex){hex=hex.TrimStart('#');int r=Convert.ToInt32(hex.Substring(0,2),16),g=Convert.ToInt32(hex.Substring(2,2),16),b=Convert.ToInt32(hex.Substring(4,2),16);return r+256*g+65536*b;}

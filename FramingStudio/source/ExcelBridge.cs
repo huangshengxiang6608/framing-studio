@@ -180,6 +180,11 @@ static class ExcelBridge {
  }
  static void AdoptAll254(dynamic x,dynamic b,Dictionary<string,object> job){
   var members=Arr(job["members"]).Select(Obj).Where(m=>m.ContainsKey("adopt254")&&m["adopt254"]!=null).ToList();if(members.Count==0)return;
+  // Restore the paired transfer sheets using the template's original routine
+  // before entering the manual-calculation adoption scope. Directly enabling
+  // a paused transfer sheet here through COM can crash Excel during UDF rebuild.
+  Stage79("恢复原 Excel 转换梁计算");
+  x.Run("'"+b.Name+"'!TransferUI79.FreezeTB79",false);
   Stage79("带入 App 已计算配筋，保留原 Excel 公式");
   var enabled=new Dictionary<string,bool>();int mode=Convert.ToInt32(x.Calculation);
   try{
@@ -298,7 +303,7 @@ static class ExcelBridge {
    if(visible){x.Visible=true;b=null;Marshal.FinalReleaseComObject(x);x=null;}
    return 0;
   }catch(Exception e){Write(Path.Combine(directory,visible?"open-result.json":"reopen-check.json"),new {ok=false,error=e.Message});if(visible&&x!=null&&b!=null){x.EnableEvents=true;x.DisplayAlerts=true;x.Visible=true;b=null;x=null;}return 1;}
-  finally{if(b!=null)try{b.Close(false);}catch{}if(x!=null)try{x.Quit();}catch{}}
+  finally{if((object)b!=null)try{b.Close(false);}catch{}if((object)x!=null)try{x.Quit();}catch{}}
  }
 
  // A new, macro-free workbook; no RC/Steel template formulas are reused.
@@ -435,6 +440,7 @@ static class ExcelBridge {
      Run(x,b,"GenerateSectionBCopy");
     }
     CompareFullLoads(b,job);
+    if(differences.Count>0)throw new Exception("App 与 Excel 结果有差异，未生成已核对抄；请查看差异。");
     Stage79("原抄生成完成，整理版式");int formatCalc82=Convert.ToInt32(x.Calculation);bool formatScreen82=Convert.ToBoolean(x.ScreenUpdating),formatEvents82=Convert.ToBoolean(x.EnableEvents);
     try{x.Calculation=-4135;x.ScreenUpdating=false;x.EnableEvents=false;
     Intro111(b.Worksheets["Section A 抄"],job);ReportNumbers79(b.Worksheets["Section A 抄"]);ReportNumbers79(b.Worksheets["Section B 抄"]);ReportHeader75(b.Worksheets["Section A 抄"],job);ReportHeader75(b.Worksheets["Section B 抄"],job);
@@ -448,8 +454,8 @@ static class ExcelBridge {
     RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);x.EnableEvents=false;b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
    Stage79("保存已核对结果");CommitPageCaches82(copy);StoreJob79(job,dir);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;GC.Collect();return 0;
-  }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if(b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}
-  finally{if(b!=null)try{b.Close(false);}catch{}if(x!=null)try{x.Quit();}catch{}}
+  }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if((object)b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}
+  finally{if((object)b!=null)try{b.Close(false);}catch{}if((object)x!=null)try{x.Quit();}catch{}}
  }
   static double D(Dictionary<string,object> a,string k,double fallback=0){return a.ContainsKey(k)&&a[k]!=null?Convert.ToDouble(a[k]):fallback;}
  static void FoundationJob76(dynamic x,dynamic b,Dictionary<string,object> job,List<object> files,string dir){
@@ -1023,7 +1029,17 @@ static class ExcelBridge {
    string[] codes={"M","V","RA","RB","G","Q","X","VALID"};
    for(int j=0;j<codes.Length;j++)resultFormulas[i,j+2]="=FullAction73(A"+row+",B"+row+",RCLoads73[#Data],\""+codes[j]+"\""+(cantilever?",TRUE":"")+")";
   }
-  if(beams.Length>0)results.Range["A5:L"+(4+beams.Length)].Formula=resultFormulas;
+  if(beams.Length>0){
+   results.Range["A5:L"+(4+beams.Length)].Formula=resultFormulas;
+   // Preserve each existing member-specific formula. A mixed CB/MB/SB/TB table
+   // must not inherit the first row's span source or support-condition argument.
+   object[,] actual=(object[,])results.Range["A5:J"+(4+beams.Length)].Formula;
+   for(int i=0;i<beams.Length;i++)for(int j=0;j<10;j++)
+    if(Convert.ToString(actual[i+1,j+1])!=Convert.ToString(resultFormulas[i,j]))results.Cells[i+5,j+1].Formula=resultFormulas[i,j];
+   actual=(object[,])results.Range["A5:J"+(4+beams.Length)].Formula;
+   for(int i=0;i<beams.Length;i++)for(int j=0;j<10;j++)
+    if(Convert.ToString(actual[i+1,j+1])!=Convert.ToString(resultFormulas[i,j]))throw new Exception("Excel 荷载表自动填充改变了原公式，未继续生成");
+  }
   if(job.ContainsKey("projectFloors")){
    var rows=Arr(job["projectFloors"]).Select(r=>Arr(r).ToArray()).ToArray();
    if(rows.Length>0){object[,] v=new object[rows.Length,8];for(int i=0;i<rows.Length;i++)for(int j=0;j<8;j++)v[i,j]=rows[i][j] is string?"'"+Convert.ToString(rows[i][j]):rows[i][j];floors.Range["A5:H"+(4+rows.Length)].Value2=v;}

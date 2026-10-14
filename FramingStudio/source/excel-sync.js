@@ -57,14 +57,20 @@ window.ExcelSync=(()=>{
   return {jobs:combineColumnJobs274(jobs),issues:problems};
  }
 
- async function start(kind,section=null,filter=null){if(busy)return;sizingChanges=[];const snapshot=current();lastSnapshot=snapshot;issues=[];records=[];runSection=kind==='Report'?section:null;runSections=kind==='Report'?(section==='AB'?['A','B']:[section]):[];pendingSections=new Set(runSections);finishes={};
+ async function start(kind,section=null,filter=null){if(busy)return;sizingChanges=[];let snapshot=current();lastSnapshot=snapshot;issues=[];records=[];runSection=kind==='Report'?section:null;runSections=kind==='Report'?(section==='AB'?['A','B']:[section]):[];pendingSections=new Set(runSections);finishes={};
   if(!available()){progress='请在桌面 App 中生成；此浏览器预览不能启动 Microsoft Excel。';for(const sec of runSections)reports[sec]={snapshot:reportSnapshot(sec,JSON.parse(snapshot)),issues:[],message:progress};pendingSections.clear();refresh();return;}
   busy=true;for(const sec of runSections){reports[sec]={snapshot:reportSnapshot(sec,JSON.parse(snapshot)),issues:[],message:'正在生成原 Excel 抄…',generatedAt:null,records:[]};WorkspacePages.clearPDF(sec);}progress='正在整理当前输入…';refresh();try{
+   if(kind==='Report'){
+    progress='正在確認全樓 SLAB／CS 最大彎矩及代表構件…';refresh();
+    if(typeof ExplorerUI.prepareReportSlabs276!=='function')throw Error('板代表構件檢查尚未就緒，請重新開啟項目。');
+    await ExplorerUI.prepareReportSlabs276();snapshot=current();lastSnapshot=snapshot;
+    for(const sec of runSections)reports[sec].snapshot=reportSnapshot(sec,JSON.parse(snapshot));
+   }
    const p=JSON.parse(snapshot),jobs=[];
    if(kind==='Report')for(const sec of runSections){const v=plan(JSON.parse(snapshot),kind,sec,filter);reports[sec].issues=[...v.issues];issues.push(...v.issues.map(x=>({...x,section:sec})));jobs.push(...v.jobs.map(j=>({...j,_reportSection:sec})));}
    else{const v=plan(p,kind,section,filter);issues=v.issues;jobs.push(...v.jobs);}
    if(!jobs.length){busy=false;pendingSections.clear();progress='没有可生成的完整输入。';for(const sec of runSections)reports[sec].message='请先完成输入并勾选本次要抄的构件。';refresh();return;}
-   const stamp=await fingerprint(snapshot);send({kind:'excel-run',parallelReports:section==='AB',openWhenReady:kind!=='Report',jobs:jobs.map(j=>({...j,fingerprint:stamp,preview:true}))});
+   const stamp=await fingerprint(snapshot);if(kind==='Report'&&current()!==snapshot)throw Error('生成準備期間模型已修改，請重新生成抄。');send({kind:'excel-run',parallelReports:section==='AB',openWhenReady:kind!=='Report',jobs:jobs.map(j=>({...j,fingerprint:stamp,preview:true}))});
   }catch(e){busy=false;pendingSections.clear();progress=e.message;for(const sec of runSections)reports[sec]={snapshot:reportSnapshot(sec,JSON.parse(snapshot)),issues:[...reports[sec].issues,{id:'生成失败',reason:e.message}],message:e.message};}refresh();
  }
  async function finishReport(section){const report=reports[section],pdfs=[];

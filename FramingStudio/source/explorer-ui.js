@@ -32,16 +32,16 @@ const BeamRepresentatives250=(()=>{
   for(const g of columnGroups)if(g.count)groups.set(g.id,g);
   return [...groups.values()].sort((a,b)=>String(a.framing).localeCompare(String(b.framing),'en',{numeric:true})||kinds.indexOf(a.kind)-kinds.indexOf(b.kind)||a.depth-b.depth);
  }
- function sync(ex,groups){
+ function sync(ex,groups,scope=()=>true){
   const before=JSON.stringify(ex),state=ex.representatives250??={owned:{},overrides:{}};state.owned??={};state.overrides??={};for(const name of maps)ex[name]??={};
   // Incomplete groups have no confirmed maximum and are not auto-selected.
   const winners=new Set(groups.filter(g=>g.winner&&!g.missing).map(g=>key(g.winner)));
-  for(const [k,owned]of Object.entries(state.owned)){for(const name of maps)if(owned[name]&&!winners.has(k)){delete ex[name][k];delete owned[name];}if(!Object.keys(owned).length)delete state.owned[k];}
+  for(const [k,owned]of Object.entries(state.owned)){if(!scope(k))continue;for(const name of maps)if(owned[name]&&!winners.has(k)){delete ex[name][k];delete owned[name];}if(!Object.keys(owned).length)delete state.owned[k];}
   for(const k of winners)for(const name of maps){if(Object.hasOwn(state.overrides[k]||{},name)||Object.hasOwn(ex[name],k))continue;ex[name][k]=true;(state.owned[k]??={})[name]=true;}
   return before!==JSON.stringify(ex);
  }
  function manual(ex,k,name,value){ex[name]??={};ex[name][k]=value;const state=ex.representatives250??={owned:{},overrides:{}};(state.overrides[k]??={})[name]=value;if(state.owned[k])delete state.owned[k][name];}
- return {select,sync,manual,key,moment};
+ return {select,sync,manual,key,moment,syncSlabs:(ex,groups)=>sync(ex,groups.filter(g=>['SLAB','CS'].includes(g.kind)),k=>k.split('|')[1]==='SLAB')};
 })();
 function ExplorerUI(host){
  let cache228=null;
@@ -520,6 +520,24 @@ return html;}
   if(action==='report-print'){const d=$('ex-report-dialog');d.close();const st=document.createElement('style');st.id='ex-print-style';st.textContent='@page{size:A4 portrait;margin:14mm}@media print{body>.print-page{width:auto!important;height:auto!important;overflow:visible!important} .print-page .check-report{font:10pt Arial;color:#233e3c}.print-page table{width:100%;table-layout:auto;font-size:9pt}.print-page th,.print-page td{white-space:normal;overflow-wrap:anywhere;padding:5px;border:1px solid #bbb}.print-page th{position:static}.print-page h2,.print-page h3{break-after:avoid}.member-report{break-inside:avoid}.report-heading{display:block!important;height:auto!important;background:white!important;color:#233e3c!important;padding:0!important}.print-page p{line-height:1.5}.print-page .assumption{padding:8px;background:#eef5f1}}';st.textContent+=ReportPaper.css;document.head.append(st);$('printpage').innerHTML=$('ex-report-content').innerHTML;const clean=()=>{st.remove();window.removeEventListener('afterprint',clean);};window.addEventListener('afterprint',clean);window.print();}
  }catch(err){host.toast(err.message);}});
  // The report planner is outside the UI instance; expose its freshness-checked snapshot.
+ // Report generation must not depend on first visiting Member Check.
+ ExplorerUI.prepareReportSlabs276=async()=>{
+  const p=Engine.clone(host.get().p),snapshot=JSON.stringify(p),model=Engine.generate(p);
+  const changed=()=>JSON.stringify(host.get().p)!==snapshot;
+  let lastCheck276=0,edited276=false;const cancelled=()=>{const now=performance.now();if(now-lastCheck276>100){lastCheck276=now;edited276=changed();}return edited276;};
+  const required=model.floors.flatMap(f=>Engine.floorModel(model,f.n).slabs.map(m=>f.n+'|'+Loading.token('SLAB',m)));
+  const complete=out=>{const keys=new Set((out?.rows||[]).filter(r=>r.kind==='SLAB').map(BeamRepresentatives250.key));return required.every(k=>keys.has(k));};
+  let checked=fresh(p)&&output.section==='B'&&complete(output)?output:null;
+  if(!checked){const answer=await AuditRunner132.run(p,model,{retainOutput226:true,cancelled});checked=answer?.output226;}
+  if(changed())throw Error('抽選板期間模型已修改，請重新生成抄。');
+  if(!checked||!complete(checked))throw Error('全樓板檢查未完成，未生成抄；請完成輸入後重試。');
+  const groups=BeamRepresentatives250.select(checked.rows).filter(g=>['SLAB','CS'].includes(g.kind));
+  const missing=groups.filter(g=>g.missing);
+  if(missing.length)throw Error('未能確認全樓最大板彎矩：'+missing.map(g=>g.kind+' 缺 '+g.missing+'/'+g.count+' 塊板的有效荷載／彎矩').join('；')+'。請在 Summary Check 完成輸入後重新生成。');
+  const next=Engine.clone(host.get().p.explorer||{});
+  if(BeamRepresentatives250.syncSlabs(next,groups)&&!host.transact(()=>{host.get().p.explorer=next;}))throw Error('板代表構件選取未能保存，未生成抄。');
+  output=checked;stamp=JSON.stringify(host.get().p);inputStamp231=checkStamp231(host.get().p);repRows250=null;
+ };
  ExplorerUI.getReportOutput254=p=>fresh(p)&&output.section==='B'?Engine.clone(output):null;
  return {parameters176:()=>common(state()).replace('<details>','<details open>'),clearSelection(){chosen='';chosenFloor=0;ColumnLoads101.clear();BeamLoadUI.clear();ColumnPanel123.clear();},resetProject(){repJob250++;repBusy250=false;repScheduled250=false;repError250='';repFailed250='';repRows250=null;repGroups250=[];repSynced250='';inputStamp231='';cache228=null;auditJob132++;auditBusy131=false;busy=false;calculation=null;auditProgress132='';auditNotice132='';ColumnLoads101.clear();BeamLoadUI.clear();ColumnPanel123.clear();groupEditing=false;groupContext=null;groupDraft=null;groupSource=null;groupDrag=null;groupPicking=false;audit131=null;auditStamp131='';auditBatchStamp157='';auditApplied157.clear();auditBatchStates157.clear();auditFilter131={floor:'all',kind:'all'};beamCombinations214=new Set(BeamLoadUI.defaultCombinations214());beamFilterOpen214=true;output=null;stamp='';chosen='';chosenFloor=0;activeArea='';areaPicking=false;activeFloor=0;groupFloors=false;rangeDraft={range:'',usage:'',dl:null,sdl:0,ll:null};$('ex-report-content').innerHTML='';if($('ex-report-dialog').open)$('ex-report-dialog').close();},beamInputs(hit){selectPlanMember(hit);const h=state(),overview=problemPanel131();if(h.selected?.kind==='WALL'){ColumnPanel123.clear();SlabPanel121.clear();return overview+ColumnLoads101.wallTable(h);}if(h.selected?.kind==='COL'){SlabPanel121.clear();return overview+ColumnPanel123.render(h,host);}ColumnPanel123.clear();if(h.selected?.kind==='SLAB')return overview+SlabPanel121.render(h,host,{settings:slabInputs(h,false),sectionA:sectionACard(h),steel:rr=>slabSteel121(h,rr)});SlabPanel121.clear();return overview+(h.selected&&["MB","SB","TB","CB"].includes(h.selected.kind)?"<h3>"+esc(h.selected.id)+" · 梁</h3><div class=\"row beam-section129\"><label class=\"field\">梁宽 B · mm<output>"+num(h.selected.member.b*1000)+"</output></label><label class=\"field\">梁深 D · mm<output>"+num(h.selected.member.d*1000)+"</output></label></div>"+beamInputs117(h):"<p class=muted>在左侧选择梁、板或柱，查看荷载、受力和计算。</p>");},render,calculate,highlights,canvasClick,beginArea,moveArea,finishArea,groupBox,selectPlanMember,openMember(hit){const h=host.get();if(h.key!==h.result.floors[h.floor-1].type){host.toast(h.key+' 尚未分配到楼层；请先在楼层表绑定后再做 Member Check');return;}if(hit.kind==='WALL'){host.toast('墙目前只传递荷载，不增加 Excel 以外的墙 Check');return;}const f=hit.f||h.floor,m=Loading.members(h.p,h.result,f).find(x=>x.member.id===hit.id&&x.kind===hit.kind||hit.kind==='SLAB'&&x.kind==='SLAB'&&x.id===hit.slabId);if(m){chosen=m.token;chosenFloor=f;host.focusMember(chosen,f);}},getReportOutput254:p=>fresh(p)&&output.section==='B'?Engine.clone(output):null,getMemberResult227:(p,floor,token)=>fresh(p)?output.rows.find(row=>row.floor===floor&&row.token===token):null,getOutput:()=>output};
 }

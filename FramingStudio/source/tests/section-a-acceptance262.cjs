@@ -23,7 +23,7 @@ const result=c.run(`(()=>{
   // Failed, absent and stale Check data cannot authorize a report.
   for(const mutate of [r=>r.result.autoFailed=true,r=>r.result.values.N44='NOT OKAY',r=>r.loadErrors=['missing load']]){
    const bad=Engine.clone(b);mutate(bad.rows.find(r=>r.token===m.token));api._seed262(p,bad);
-   if(RCPlan.build(p,'A').batches.length)throw Error('Failed Check released A');
+   for(const section of ['A','B'])if(RCPlan.build(p,section).batches.length)throw Error('Failed Check released '+section);
   }
   api._seed262(p,b);const changed=Engine.clone(p);LoadData.setFloor(changed,1,{usage:'Dormitory',dl:80,sdl:100,ll:2});
   calls=[];if(RCPlan.build(changed,'A').batches.length||calls.join()!=='A,B')throw Error('Stale Check reused');

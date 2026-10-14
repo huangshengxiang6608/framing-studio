@@ -55,12 +55,20 @@ const SectionB=(()=>{
     if(!pick)return false;s('C'+pick,num(g('C'+pick))+1);if(!m.geometry().groups){s('C'+pick,num(g('C'+pick))-1);if(!num(g('C'+pick)))s('D'+pick,'');return false;}return true;}
    for(let i=0;i<2000;i++){let changed=false;if(as(40)<g('K36'))changed=add(40);if(as(44)<g('K38'))changed=add(44)||changed;if(!changed&&ldRequired261())changed=add(44)||add(40);if(!changed)break;}}
   function policy(){let nt,nb,ti=0,bi=0;for(let i=0;i<8;i++){if(num(g('C'+row(40,i)))>0)ti=Math.max(ti,diameters.indexOf(g('D'+row(40,i))));if(num(g('C'+row(44,i)))>0)bi=Math.max(bi,diameters.indexOf(g('D'+row(44,i))));}ti=Math.max(ti,bi-2);nt=Math.max(2,Math.ceil(as(40)/area(1,diameters[ti])));nb=Math.max(2,Math.ceil(as(44)/area(1,diameters[bi])));
-   function put(f,n,d){let c=cap(d);if(c<2||n>8*c)return false;for(let i=0;i<8;i++){let take=Math.min(c,n),r=row(f,i);s('C'+r,take||'');s('D'+r,take?d:'');n-=take;}return true;}
+   function put(f,n,d){
+    // Automatic faces use the same count in every occupied layer. Manual
+    // reinforcement bypasses this candidate policy and remains independent.
+    const c=cap(d),count=Math.min(c,n),layers=Math.ceil(n/c);
+    if(c<2||layers>8)return false;
+    if(area(count*layers,d)>lim){stopped=(f===40?'受壓面':'受拉面')+'整層同支數配筋 '+count+'T'+d+' × '+layers+' 層，面積 '+round(area(count*layers,d),1)+' mm² 超過原有每面上限 '+round(lim,1)+' mm²（'+Math.min(4,g('T11'))+'%）；請調整截面或改用手動配筋並重新驗算';return false;}
+    for(let i=0;i<8;i++){const r=row(f,i),take=i<layers?count:0;s('C'+r,take||'');s('D'+r,take?d:'');}
+    return true;
+   }
    for(let i=0;i<80;i++){if(area(nt,diameters[ti])>lim||area(nb,diameters[bi])>lim)return false;if(!put(40,nt,diameters[ti])||!put(44,nb,diameters[bi]))return false;for(const f of [58,76]){let ok=false;for(const d of [10,12,16]){s('G'+f,d);for(const sp of [250,225,200,175,150,125,100]){s('H'+f,sp);if(g('N'+(f+1))==='OKAY'){ok=true;break;}}if(ok)break;}}if(!m.geometry().faces.every(f=>f.fit))return false;if(selectionChecks261.every(r=>g(r)==='OKAY'))return true;if(as(40)<g('K36'))nt++;else if(as(44)<g('K38')||g('N78')!=='OKAY'||ldRequired261())nb++;else return false;}return false;
   }
   if(o.steel){for(const [k,v]of Object.entries(o.steel))s(k,v);}else try{for(const f of [40,44]){s('C'+f,Math.floor(o.b/100));s('D'+f,10);}let c=0;
    while(!(g('N40')==='OKAY'&&g('N44')==='OKAY'&&g('N59')==='OKAY')&&g('D47')!==40&&g('D43')!==40&&c!==20){guard();for(const f of [44,40])while(g('N'+f)!=='OKAY'&&g('D'+(f+3))!==40){guard();bar(f);}for(const f of [58,76]){c=14;while(g('N'+(f+1))!=='OKAY'&&c!==20){guard();s('G'+f,[8,10,12,16,20,25,32][c-13]);s('H'+f,'');link(f);c++;}}while(g('N78')!=='OKAY'&&!(g('D43')===40&&g('D47')===40)){guard();bar(44);bar(40);}}
-   while(ldRequired261()&&!(g('D43')===40&&g('D47')===40)){guard();bar(40);if(g('D40')>=g('D44')&&ldRequired261())bar(44);}topup();if(!policy())stopped=rcOnly261?'RC 選筋限制內未找到通過的單一直徑組合':'Excel 选筋规则内未找到通过的单一直径组合';
+   while(ldRequired261()&&!(g('D43')===40&&g('D47')===40)){guard();bar(40);if(g('D40')>=g('D44')&&ldRequired261())bar(44);}topup();if(!policy()&&!stopped)stopped=rcOnly261?'RC 選筋限制內未找到通過的單一直徑、各層同支數組合':'Excel 選筋規則內未找到通過的單一直徑、各層同支數組合';
   }catch(e){stopped=e.message;}
   const vals=m.all(),fail=selectionChecks261.filter(r=>vals[r]!=='OKAY').map(r=>checkLabels[checks.indexOf(r)]);const faces=m.geometry().faces,di=faces.map(f=>[...new Set(f.bars.filter(b=>b.n>0).map(b=>b.d))]);if(di.some(d=>d.length!==1)||diameters.indexOf(di[1][0])>diameters.indexOf(di[0][0])+2)fail.push('每面单一直径及两级直径差');if(stopped)fail.unshift(stopped);fail.push(...linkErrors267(m.v));const desc=f=>f.bars.filter(b=>b.n>0).map(b=>b.n+'T'+b.d).join(' + ');
   const steel=Object.fromEntries(Object.entries(m.v).filter(([k])=>/^[CD](4[0-7]|11[0-7])$/.test(k)||['E58','G58','H58','E76','G76','H76'].includes(k)));steel.E58=g('E58');return {kind,...(rcOnly261?{acceptance261:'rc'}:{}),autoFailed:!o.steel&&!!stopped,status:fail.length?'NOT OK':'OK',fail,values:vals,inputs:m.v,steel,description:`${kind==='CB'?'下部受压':'上部'} ${desc(faces[0])}；${kind==='CB'?'上部受拉':'下部'} ${desc(faces[1])}；箍筋 ${g('E58')}肢 T${g('G58')}@${g('H58')}`,source:F[kind].sheet};

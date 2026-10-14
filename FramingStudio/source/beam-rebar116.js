@@ -27,7 +27,7 @@ const BeamRebar116=(()=>{
    rows237(f).forEach((row,i)=>{const n=counts[i]||0,d=Number(dias?.[i]??field.value);if(!diameters237.includes(d))throw Error('請選擇有效主筋直徑');steel['C'+row]=n||'';steel['D'+row]=n?d:'';});
   }
   for(const [k,id]of Object.entries({E58:'link-legs',G58:'link-dia',H58:'link-space',E76:'tor-legs',G76:'tor-dia',H76:'tor-space'})){const v=Number($('ex-'+id).value);if(!Number.isFinite(v)||v<=0)throw Error('請填寫有效箍筋數值');steel[k]=v;}
-  if(steel.H58<100||steel.H76<100)throw Error('抗剪及抗扭箍筋間距不得小於 100 mm');
+  const linkErrors=SectionB.linkErrors267(steel);if(linkErrors.length)throw Error(linkErrors.join('；'));
   if(!Number.isSafeInteger(steel.E58)||!Number.isSafeInteger(steel.E76))throw Error('箍筋肢数须为整数');
   return steel;
  }
@@ -39,7 +39,7 @@ const BeamRebar116=(()=>{
  function measures237(row,steel){
   const v=row?.result?.values||{},number=(x)=>typeof x==='number'&&Number.isFinite(x)?x:null,m=row?.result?.inputs?SectionB.machine(row.result.kind||row.kind,row.result.inputs):null,cell=k=>{if(number(v[k])!==null)return v[k];try{return number(m?.get(k));}catch{return null;}};
   const face=(f,req,provided,check)=>({req:cell(req),provided:steel?rows237(f).reduce((a,r)=>a+Number(steel['C'+r]||0)*Number(steel['D'+r]||0)**2*Math.PI/4,0):cell(provided),status:v[check],unit:'mm²',symbol:'As'});
-  const link=(f,req,check)=>({req:cell(req),provided:steel&&['E','G','H'].every(k=>typeof steel[k+f]==='number'&&Number.isFinite(steel[k+f]))&&steel['H'+f]>0?Number(steel['E'+f])*Number(steel['G'+f])**2*Math.PI/4/Number(steel['H'+f]):cell('K'+f),status:v[check],unit:'mm²/mm',symbol:'Asv/s'});
+  const link=(f,req,check)=>({req:cell(req),provided:steel&&['E','G','H'].every(k=>typeof steel[k+f]==='number'&&Number.isFinite(steel[k+f]))&&steel['H'+f]>0?Number(steel['E'+f])*Number(steel['G'+f])**2*Math.PI/4/Number(steel['H'+f]):cell('K'+f),status:(steel||row?.result?.steel)&&(Number((steel||row.result.steel)['G'+f])<10||Number((steel||row.result.steel)['H'+f])<100||Number((steel||row.result.steel)['H'+f])>250)?'NOT OKAY':v[check],unit:'mm²/mm',symbol:'Asv/s'});
   return {top:face(40,'K36','G40','N40'),bottom:face(44,'K38','G44','N44'),shear:link(58,'K56','N59'),torsion:link(76,'K72','N77')};
  }
  function metrics238(row,info={}){
@@ -55,7 +55,7 @@ const BeamRebar116=(()=>{
   const label=(x,y,text,attrs='')=>'<text x="'+x+'" y="'+y+'" '+attrs+'>'+esc(text)+'</text>';
   const editor=(key,value,x,y,width,title)=>{
    const dia=key.endsWith(':dia'),options=info.options?.[key.split(':')[0]]||diameters237,attrs=' data-inline-rebar234="'+key+'" aria-label="'+esc(title)+'" '+(info.errors?.[key]?'aria-invalid="true"':'');
-   const field=dia?'<select'+attrs+'>'+options.map(d=>'<option value="'+d+'"'+(Number(value)===Number(d)?' selected':'')+'>'+d+'</option>').join('')+'</select>':'<input type="text" inputmode="numeric"'+attrs+' value="'+esc(info.drafts?.[key]??value)+'" autocomplete="off" spellcheck="false"/>';
+   const field=dia?'<select'+attrs+'>'+options.map(d=>'<option value="'+d+'"'+(Number(value)===Number(d)?' selected':'')+(key.startsWith('shear:')||key.startsWith('torsion:')?Number(d)<10?' disabled':'':'')+'>'+d+(Number(d)<10?'（低於下限）':'')+'</option>').join('')+'</select>':'<input type="text" inputmode="numeric"'+attrs+' value="'+esc(info.drafts?.[key]??value)+'" autocomplete="off" spellcheck="false"/>';
    return '<foreignObject x="'+x+'" y="'+y+'" width="'+width+'" height="30"><div xmlns="http://www.w3.org/1999/xhtml" class="rebar-inline234">'+field+'</div></foreignObject>';
   };
   const measure=(part,y)=>{
@@ -70,8 +70,8 @@ const BeamRebar116=(()=>{
     return '<g data-rebar-layer232="'+(up?'upper':'lower')+'" data-layer="'+(i+1)+'" data-rebar-edit232="'+esc(part||'')+'"><title>'+esc(text)+'</title>'+field+'<path d="M164 '+y+' H193" stroke="'+tone+'"/>'+dots+'</g>';
    }).join('');
   };
-  const link=(part,y,title,value)=>info.editable?label(24,y+7,title)+editor(part+':legs',info[part+'Fields']?.legs??'',98,y-16,55,title+'肢數')+label(160,y+7,'T','data-fixed236="T"')+editor(part+':dia',info[part+'Fields']?.dia??'',182,y-16,65,title+'直徑')+label(258,y+7,'@','data-fixed236="@"')+editor(part+':space',info[part+'Fields']?.space??'',291,y-16,101,title+'間距 mm，最小 100 mm')+label(402,y+7,'mm'):label(24,y+7,title+' · '+value);
-  return '<svg role="group" viewBox="0 0 520 '+height+'" aria-label="梁截面配筋編輯，上筋在上、下筋在下；分別輸入根數及直徑；不按比例">'+label(302,22,'B = '+Math.round(b*1000)+' mm','text-anchor="middle"')+'<rect x="180" y="40" width="244" height="'+(base-40)+'" rx="2" fill="#f3f6f8" stroke="#5c7181"/><rect x="190" y="110" width="224" height="'+(base-122)+'" rx="9" fill="none" stroke="#18736b" stroke-width="2"/>'+label(158,58,'上筋 · '+(info.upperRole||''),'text-anchor="end" fill="#9c3d10"')+measure(info.upperPart,62)+label(158,bottom-(lowN-1)*step-66,'下筋 · '+(info.lowerRole||''),'text-anchor="end" fill="#185ba2"')+measure(info.lowerPart,bottom-(lowN-1)*step-66)+layers(upper,true)+layers(lower,false)+label(452,(40+base)/2,'D = '+Math.round(d*1000)+' mm','text-anchor="middle" transform="rotate(90 452 '+((40+base)/2)+')"')+link('shear',base+38,'抗剪',info.shear||'待確認')+measure('shear',base+65)+link('torsion',base+132,'抗扭',info.torsion||'待確認')+measure('torsion',base+159)+label(260,base+217,'逐層獨立選徑；0 表示該層無筋','text-anchor="middle" class="rebar-svg-note227"')+label(260,base+239,'截面不按比例；圓點不代表實際根數 · 箍筋最小間距 100 mm','text-anchor="middle" class="rebar-svg-note227"')+'</svg>';
+  const link=(part,y,title,value)=>info.editable?label(24,y+7,title)+editor(part+':legs',info[part+'Fields']?.legs??'',98,y-16,55,title+'肢數')+label(160,y+7,'T','data-fixed236="T"')+editor(part+':dia',info[part+'Fields']?.dia??'',182,y-16,65,title+'直徑')+label(258,y+7,'@','data-fixed236="@"')+editor(part+':space',info[part+'Fields']?.space??'',291,y-16,101,title+'間距 mm，100–250 mm')+label(402,y+7,'mm'):label(24,y+7,title+' · '+value);
+  return '<svg role="group" viewBox="0 0 520 '+height+'" aria-label="梁截面配筋編輯，上筋在上、下筋在下；分別輸入根數及直徑；不按比例">'+label(302,22,'B = '+Math.round(b*1000)+' mm','text-anchor="middle"')+'<rect x="180" y="40" width="244" height="'+(base-40)+'" rx="2" fill="#f3f6f8" stroke="#5c7181"/><rect x="190" y="110" width="224" height="'+(base-122)+'" rx="9" fill="none" stroke="#18736b" stroke-width="2"/>'+label(158,58,'上筋 · '+(info.upperRole||''),'text-anchor="end" fill="#9c3d10"')+measure(info.upperPart,62)+label(158,bottom-(lowN-1)*step-66,'下筋 · '+(info.lowerRole||''),'text-anchor="end" fill="#185ba2"')+measure(info.lowerPart,bottom-(lowN-1)*step-66)+layers(upper,true)+layers(lower,false)+label(452,(40+base)/2,'D = '+Math.round(d*1000)+' mm','text-anchor="middle" transform="rotate(90 452 '+((40+base)/2)+')"')+link('shear',base+38,'抗剪',info.shear||'待確認')+measure('shear',base+65)+link('torsion',base+132,'抗扭',info.torsion||'待確認')+measure('torsion',base+159)+label(260,base+217,'逐層獨立選徑；0 表示該層無筋','text-anchor="middle" class="rebar-svg-note227"')+label(260,base+239,'截面不按比例；圓點不代表實際根數 · 箍筋直徑最小 10 mm；間距 100–250 mm','text-anchor="middle" class="rebar-svg-note227"')+'</svg>';
  }
  function decorate(h){
   const top=$('ex-top-counts'),bottom=$('ex-bottom-counts');if(!top||!bottom||$('beam-rebar116'))return;
@@ -89,7 +89,7 @@ const BeamRebar116=(()=>{
   for(const part of [upper,lower,'shear','torsion']){
    const panel=document.createElement('section');panel.className='rebar-editor116';panel.id='rebar-editor116-'+part;
    const label=document.createElement('h4');label.textContent=titles[part];panel.append(label,fieldRows[part]);
-   if(part==='shear'||part==='torsion'){const hint=document.createElement('small');hint.textContent='項目最小間距 100 mm。';panel.append(hint);}
+   if(part==='shear'||part==='torsion'){const hint=document.createElement('small');hint.textContent='箍筋直徑最小 10 mm；間距 100–250 mm。';panel.append(hint);}
    if(part==='top'||part==='bottom'){
     const hint=document.createElement('small');hint.id='rebar-hint227-'+part;hint.textContent='每層根數用逗號分隔，例如 4, 3；由該面向內，最多 8 層。';panel.append(hint);panel.querySelector('#ex-'+part+'-counts').setAttribute('aria-describedby',hint.id);
    }
@@ -135,7 +135,8 @@ const BeamRebar116=(()=>{
    let error=valid?'':'請輸入有效'+(field==='space'?'間距數值。':'整數。');
    if(!error&&field==='dia'&&![...$('ex-'+prefix+'-dia').options].some(o=>Number(o.value)===value))error='請使用原有可選鋼筋直徑。';
    if(!error&&field==='legs'&&value<1)error='箍筋肢數須為正整數。';
-   if(!error&&field==='space'&&value<100)error='箍筋間距不得小於 100 mm。';
+   if(!error&&isLink&&field==='dia'&&value<10)error='箍筋直徑不得小於 10 mm。';
+   if(!error&&field==='space'&&(value<100||value>250))error='箍筋間距須為 100–250 mm。';
    if(!error){
     if(field==='count'){const ns=Array.from({length:8},(_,i)=>counts(prefix)[i]||0);ns[Number(parts[1])]=value;$('ex-'+prefix+'-counts').value=ns.join(', ');}
     else if(!isLink&&field==='dia'){const ds=dias(prefix);ds[Number(parts[1])]=value;$('ex-'+prefix+'-dia').dataset.layers237=JSON.stringify(ds);}

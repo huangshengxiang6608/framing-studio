@@ -21,6 +21,10 @@ async function click(s){$(s).dispatchEvent(new window.Event('click',{bubbles:tru
  await c.run('test227.ui.calculate()');render();assert(!$('.rebar-rc227').textContent.includes('待計算'));assert.equal($('[data-rc-context240=FRR]').textContent,c.run('Loading.settings(test227.p).fire')+' h');assert.equal($('[data-rc-context240=cover]').textContent,c.run('BeamLoads.display208(test227.ui.getOutput().rows.find(r=>r.id==="B1").result.inputs.G16)')+' mm');assert($('[data-rc-context240=cover]').parentElement.textContent.includes('按 FRR'));
  const actualLegs239=c.run('(()=>{const row=test227.ui.getOutput().rows.find(r=>r.id==="B1");return SectionB.machine(row.result.kind,row.result.inputs).get("E58");})()');
  assert(actualLegs239>2);assert.equal(Number($('#ex-link-legs').value),actualLegs239);assert.equal(Number($('[data-inline-rebar234="shear:legs"]').value),actualLegs239);
+ // Legacy T8 stays visible and is not silently replaced by the first T10 option.
+ c.run('globalThis.old267=structuredClone(test227.ui.getOutput().rows.find(r=>r.id==="B1").result);test227.ui.getOutput().rows.find(r=>r.id==="B1").result.steel.G58=8');render();
+ assert.equal($('#ex-link-dia').value,'8');assert($('#ex-link-dia option[value="8"]').hasAttribute('disabled'));assert.equal($('[data-inline-rebar234="shear:dia"]').value,'8');assert($('[data-inline-rebar234="shear:dia"] option[value="8"]').hasAttribute('disabled'));assert.equal($('[data-pass237=shear]').textContent,'未通過');assert.throws(()=>c.run('BeamRebar116.readSteel237()'),/10 mm/);
+ c.run('test227.ui.getOutput().rows.find(r=>r.id==="B1").result=old267');render();
  // Restore an older automatic result lacking serialized E58 and render it again.
  c.run('delete test227.ui.getOutput().rows.find(r=>r.id==="B1").result.steel.E58');render();assert.equal(Number($('#ex-link-legs').value),actualLegs239);
  input('ex-top-counts',$('#ex-top-counts').value);assert.equal(Number($('#ex-link-legs').value),actualLegs239,'Unrelated rebar edit retains computed legs');assert.equal(c.run('BeamRebar116.readSteel237().E58'),actualLegs239);
@@ -75,16 +79,16 @@ async function click(s){$(s).dispatchEvent(new window.Event('click',{bubbles:tru
  assert.equal(typeof req234.raw,'number');assert(req234.upper.includes('mm²'));
  for(const value of ['','1','18'])inline234('top:0:count',value);
  inline234('top:0:count','2');inline234('top:0:dia','20');inline234('bottom:0:count','4');inline234('bottom:0:dia','25');
- for(const [key,value]of [['shear:legs','2'],['shear:dia','10'],['shear:space','150'],['torsion:legs','2'],['torsion:dia','8'],['torsion:space','100']])inline234(key,value);
+ for(const [key,value]of [['shear:legs','2'],['shear:dia','10'],['shear:space','150'],['torsion:legs','2'],['torsion:dia','10'],['torsion:space','100']])inline234(key,value);
  assert.equal($('#ex-top-counts').value.split(',')[0],'2');assert.equal($('#ex-link-space').value,'150');assert.equal($('#ex-tor-space').value,'100');
  assert(!$('[data-required234=upper]').textContent.includes('上次'));assert(!$('[data-required234=upper]').textContent.includes('待更新'));
- for(const [key,bad,good] of [['top:0:count','','2'],['top:0:count','2T','2'],['shear:space','75','150'],['torsion:legs','0','2']]){const unchanged=c.run('JSON.stringify(test227.p)');inline234(key,bad);assert.equal($('[data-inline-rebar234="'+key+'"]').getAttribute('aria-invalid'),'true');await click('[data-ex=steel]');assert.equal(c.run('JSON.stringify(test227.p)'),unchanged,'Invalid inline edit cannot save the previous valid value');inline234(key,good);}
+ for(const [key,bad,good] of [['top:0:count','','2'],['top:0:count','2T','2'],['shear:space','75','150'],['shear:space','251','150'],['torsion:space','300','200'],['torsion:legs','0','2']]){const unchanged=c.run('JSON.stringify(test227.p)');inline234(key,bad);assert.equal($('[data-inline-rebar234="'+key+'"]').getAttribute('aria-invalid'),'true');await click('[data-ex=steel]');assert.equal(c.run('JSON.stringify(test227.p)'),unchanged,'Invalid inline edit cannot save the previous valid value');inline234(key,good);}
  inline234('top:4:dia','25');assert.equal($('[data-inline-rebar234="top:0:dia"]').value,'20','Diameter edit must only affect that layer');assert.equal($('[data-inline-rebar234="top:4:dia"]').value,'25');assert.equal($('[data-inline-rebar234="top:0:count"]').value,'2');
  const draft237=c.run('BeamRebar116.readSteel237()');assert.equal(draft237.D40,20);assert.equal(draft237.D110,25);
  const measures237=c.run('BeamRebar116.measures237(null,argument)',draft237);assert(Math.abs(measures237.top.provided-(2*20**2+25**2)*Math.PI/4)<1e-8);
  assert.equal(document.querySelectorAll('.rebar-inline234 select').length,18);assert.deepEqual([...$('[data-inline-rebar234="top:0:dia"]').querySelectorAll('option')].map(o=>o.getAttribute('value')),['10','12','16','20','25','32','40']);
- assert.deepEqual([...$('[data-inline-rebar234="shear:dia"]').querySelectorAll('option')].map(o=>o.getAttribute('value')),['8','10','12','16','20','25','32']);
- assert.deepEqual([...$('[data-inline-rebar234="torsion:dia"]').querySelectorAll('option')].map(o=>o.getAttribute('value')),['8','10','12','16','20','25']);
+ assert.deepEqual([...$('[data-inline-rebar234="shear:dia"]').querySelectorAll('option')].map(o=>o.getAttribute('value')),['10','12','16','20','25','32']);
+ assert.deepEqual([...$('[data-inline-rebar234="torsion:dia"]').querySelectorAll('option')].map(o=>o.getAttribute('value')),['10','12','16','20','25']);
  // T20/T25 are editable inputs, retained through live calculation and save/reload.
  for(const diameter of [20,25]){inline234('torsion:dia',String(diameter));assert.equal(c.run('BeamRebar116.readSteel237().G76'),diameter);assert($('[data-measure237=torsion]').textContent.includes('provided'));}
  // Exact existing engine parity, with no project mutation or all-floor calculation.

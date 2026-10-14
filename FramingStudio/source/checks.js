@@ -33,11 +33,21 @@ const SectionB=(()=>{
   const fail=slabDetail(m);if(autoFailed)fail.unshift('Excel 候选范围内未找到通过的配筋');return {kind,...(autoFailed?{autoFailed:true}:{}),status:fail.length?'NOT OK':'OK',fail,values:m.all(),inputs:m.v,steel:autoFailed?null:{F35:m.v.F35,H35:m.v.H35,C57:m.v.C57,D57:m.v.D57},description:autoFailed?'自動選筋失敗；未有可採用的自動配筋。':`主筋 T${m.v.F35}@${m.v.H35}；分布筋 T${m.v.C57}@${m.v.D57}`,source:F[kind].sheet};
  }
  const checks=['N40','N44','N52','N59','N69','N77','N78','N87'],checkLabels=['受压面钢筋','受拉面钢筋','最大剪应力','抗剪箍筋','剪扭组合','抗扭箍筋','抗扭纵筋','挠度'];
- function beam(o){positive(o,['L','b','h','fcu']);nonnegative(o,['M','V','T']);const kind=o.kind||'MB',m=machine(kind,{G12:o.L,G13:0,G14:o.b,G15:o.h,G16:o.cover??cover(kind,o.fire),G17:o.fcu,G18:500,G19:500,G23:o.M,G24:o.V,K25:o.T,G85:kind==='CB'?7:20,T8:40,T9:250,T10:150,T11:4,E76:2,G58:10,H58:200,G76:'',H76:''});
+ function linkErrors267(steel){
+  const errors=[];
+  for(const [f,label]of [[58,'抗剪'],[76,'抗扭']]){
+   const dia=Number(steel['G'+f]),space=Number(steel['H'+f]);
+   if(!Number.isFinite(dia)||dia<10)errors.push(label+'箍筋直徑不得小於 10 mm');
+   if(!Number.isFinite(space)||space<100)errors.push(label+'箍筋間距小於項目下限 100 mm');
+   if(space>250)errors.push(label+'箍筋間距不得大於 250 mm');
+  }
+  return errors;
+ }
+ function beam(o){positive(o,['L','b','h','fcu']);nonnegative(o,['M','V','T']);const kind=o.kind||'MB',m=machine(kind,{G12:o.L,G13:0,G14:o.b,G15:o.h,G16:o.cover??cover(kind,o.fire),G17:o.fcu,G18:500,G19:500,G23:o.M,G24:o.V,K25:o.T,G85:kind==='CB'?7:20,T8:40,T9:250,T10:150,T11:4,E76:2,G58:10,H58:200,G76:10,H76:250});
   const g=m.get,s=m.set,rcOnly261=o.acceptance261==='rc',ldRequired261=()=>!rcOnly261&&g('N87')!=='OKAY',selectionChecks261=rcOnly261?checks.filter(k=>k!=='N87'):checks;const initialCover=o.cover??cover(kind,o.fire);if(!Number.isFinite(initialCover)||initialCover<0)throw Error('梁保护层须为有效非负数');if(o.steel){for(const [k,v]of Object.entries(o.steel))s(k,v);}else for(const f of [40,44]){s('C'+f,Math.floor(o.b/100));s('D'+f,10);}const initial=m.geometry();if(!initial.groups||initial.faces.some(f=>!(f.depth>0&&f.depth<o.h)||!f.fit))throw Error('梁截面／配筋无法形成有效截面：梁宽 '+o.b+' mm、梁深 '+o.h+' mm、保护层 '+initialCover+' mm；请检查钢筋排布、净距及有效高度');for(const f of [40,44])for(let i=0;i<8;i++){s('C'+row(f,i),'');s('D'+row(f,i),'');}
   const as=f=>m.geometry().faces[f===40?0:1].area,cap=d=>Math.max(0,Math.min(Math.floor(o.b/100),Math.floor((o.b-2*(g('G16')+g('G58'))+Math.max(25,d))/(d+Math.max(25,d))))),lim=o.b*o.h*Math.min(4,g('T11'))/100;let stopped='';
   function bar(f){let r=f;while(r<f+3&&g('D'+(r+1))!=='')r++;const d=g('D'+r);if(d===40){if(r<f+3){s('C'+(r+1),Math.floor(o.b/100));s('D'+(r+1),10);}}else s('D'+r,diameters[Math.min(6,diameters.indexOf(d)+1)]);}
-  function link(f){for(const sp of [300,275,250,225,200,175,150,125,100]){if(g('N'+(f+1))==='OKAY')break;s('H'+f,Math.min(sp,g('T9')));}}
+  function link(f){for(const sp of [250,225,200,175,150,125,100]){if(g('N'+(f+1))==='OKAY')break;s('H'+f,Math.min(sp,g('T9')));}}
   let loops=0;function guard(){if(++loops>2000)throw Error('选筋未收敛');}
   function topup(){for(const f of [40,44])for(let i=7;i>=0;i--){let r=row(f,i);if(num(g('C'+r))>cap(num(g('D'+r))))s('C'+r,cap(num(g('D'+r))));while(as(f)>lim&&num(g('C'+r))>0)s('C'+r,num(g('C'+r))-1);if(num(g('C'+r))===0)s('D'+r,'');}
    function add(f){let pick=0,least=1e10;for(let i=0;i<8;i++){let r=row(f,i),n=num(g('C'+r)),d=num(g('D'+r));if(n>0&&n<cap(d)&&as(f)+area(1,d)<=lim&&n<least){least=n;pick=r;}}
@@ -46,13 +56,13 @@ const SectionB=(()=>{
    for(let i=0;i<2000;i++){let changed=false;if(as(40)<g('K36'))changed=add(40);if(as(44)<g('K38'))changed=add(44)||changed;if(!changed&&ldRequired261())changed=add(44)||add(40);if(!changed)break;}}
   function policy(){let nt,nb,ti=0,bi=0;for(let i=0;i<8;i++){if(num(g('C'+row(40,i)))>0)ti=Math.max(ti,diameters.indexOf(g('D'+row(40,i))));if(num(g('C'+row(44,i)))>0)bi=Math.max(bi,diameters.indexOf(g('D'+row(44,i))));}ti=Math.max(ti,bi-2);nt=Math.max(2,Math.ceil(as(40)/area(1,diameters[ti])));nb=Math.max(2,Math.ceil(as(44)/area(1,diameters[bi])));
    function put(f,n,d){let c=cap(d);if(c<2||n>8*c)return false;for(let i=0;i<8;i++){let take=Math.min(c,n),r=row(f,i);s('C'+r,take||'');s('D'+r,take?d:'');n-=take;}return true;}
-   for(let i=0;i<80;i++){if(area(nt,diameters[ti])>lim||area(nb,diameters[bi])>lim)return false;if(!put(40,nt,diameters[ti])||!put(44,nb,diameters[bi]))return false;for(const f of [58,76]){let ok=false;for(const d of [8,10,12,16]){s('G'+f,d);for(const sp of [250,225,200,175,150,125,100]){s('H'+f,sp);if(g('N'+(f+1))==='OKAY'){ok=true;break;}}if(ok)break;}}if(!m.geometry().faces.every(f=>f.fit))return false;if(selectionChecks261.every(r=>g(r)==='OKAY'))return true;if(as(40)<g('K36'))nt++;else if(as(44)<g('K38')||g('N78')!=='OKAY'||ldRequired261())nb++;else return false;}return false;
+   for(let i=0;i<80;i++){if(area(nt,diameters[ti])>lim||area(nb,diameters[bi])>lim)return false;if(!put(40,nt,diameters[ti])||!put(44,nb,diameters[bi]))return false;for(const f of [58,76]){let ok=false;for(const d of [10,12,16]){s('G'+f,d);for(const sp of [250,225,200,175,150,125,100]){s('H'+f,sp);if(g('N'+(f+1))==='OKAY'){ok=true;break;}}if(ok)break;}}if(!m.geometry().faces.every(f=>f.fit))return false;if(selectionChecks261.every(r=>g(r)==='OKAY'))return true;if(as(40)<g('K36'))nt++;else if(as(44)<g('K38')||g('N78')!=='OKAY'||ldRequired261())nb++;else return false;}return false;
   }
   if(o.steel){for(const [k,v]of Object.entries(o.steel))s(k,v);}else try{for(const f of [40,44]){s('C'+f,Math.floor(o.b/100));s('D'+f,10);}let c=0;
-   while(!(g('N40')==='OKAY'&&g('N44')==='OKAY'&&g('N59')==='OKAY')&&g('D47')!==40&&g('D43')!==40&&c!==20){guard();for(const f of [44,40])while(g('N'+f)!=='OKAY'&&g('D'+(f+3))!==40){guard();bar(f);}for(const f of [58,76]){c=13;while(g('N'+(f+1))!=='OKAY'&&c!==20){guard();s('G'+f,[8,10,12,16,20,25,32][c-13]);s('H'+f,'');link(f);c++;}}while(g('N78')!=='OKAY'&&!(g('D43')===40&&g('D47')===40)){guard();bar(44);bar(40);}}
+   while(!(g('N40')==='OKAY'&&g('N44')==='OKAY'&&g('N59')==='OKAY')&&g('D47')!==40&&g('D43')!==40&&c!==20){guard();for(const f of [44,40])while(g('N'+f)!=='OKAY'&&g('D'+(f+3))!==40){guard();bar(f);}for(const f of [58,76]){c=14;while(g('N'+(f+1))!=='OKAY'&&c!==20){guard();s('G'+f,[8,10,12,16,20,25,32][c-13]);s('H'+f,'');link(f);c++;}}while(g('N78')!=='OKAY'&&!(g('D43')===40&&g('D47')===40)){guard();bar(44);bar(40);}}
    while(ldRequired261()&&!(g('D43')===40&&g('D47')===40)){guard();bar(40);if(g('D40')>=g('D44')&&ldRequired261())bar(44);}topup();if(!policy())stopped=rcOnly261?'RC 選筋限制內未找到通過的單一直徑組合':'Excel 选筋规则内未找到通过的单一直径组合';
   }catch(e){stopped=e.message;}
-  const vals=m.all(),fail=selectionChecks261.filter(r=>vals[r]!=='OKAY').map(r=>checkLabels[checks.indexOf(r)]);const faces=m.geometry().faces,di=faces.map(f=>[...new Set(f.bars.filter(b=>b.n>0).map(b=>b.d))]);if(di.some(d=>d.length!==1)||diameters.indexOf(di[1][0])>diameters.indexOf(di[0][0])+2)fail.push('每面单一直径及两级直径差');if(stopped)fail.unshift(stopped);for(const [f,label]of [[58,'抗剪'],[76,'抗扭']])if(num(g('G'+f))>0&&num(g('H'+f))<100)fail.push(label+'箍筋間距小於項目下限 100 mm');const desc=f=>f.bars.filter(b=>b.n>0).map(b=>b.n+'T'+b.d).join(' + ');
+  const vals=m.all(),fail=selectionChecks261.filter(r=>vals[r]!=='OKAY').map(r=>checkLabels[checks.indexOf(r)]);const faces=m.geometry().faces,di=faces.map(f=>[...new Set(f.bars.filter(b=>b.n>0).map(b=>b.d))]);if(di.some(d=>d.length!==1)||diameters.indexOf(di[1][0])>diameters.indexOf(di[0][0])+2)fail.push('每面单一直径及两级直径差');if(stopped)fail.unshift(stopped);fail.push(...linkErrors267(m.v));const desc=f=>f.bars.filter(b=>b.n>0).map(b=>b.n+'T'+b.d).join(' + ');
   const steel=Object.fromEntries(Object.entries(m.v).filter(([k])=>/^[CD](4[0-7]|11[0-7])$/.test(k)||['E58','G58','H58','E76','G76','H76'].includes(k)));steel.E58=g('E58');return {kind,...(rcOnly261?{acceptance261:'rc'}:{}),autoFailed:!o.steel&&!!stopped,status:fail.length?'NOT OK':'OK',fail,values:vals,inputs:m.v,steel,description:`${kind==='CB'?'下部受压':'上部'} ${desc(faces[0])}；${kind==='CB'?'上部受拉':'下部'} ${desc(faces[1])}；箍筋 ${g('E58')}肢 T${g('G58')}@${g('H58')}`,source:F[kind].sheet};
  }
  function column(o){positive(o,['b','h','height','factor','fcu','ratio','projectFactor']);nonnegative(o,['dead','live']);const values={C3:o.height*1000,C4:o.system||'Braced',C6:o.factor,C13:o.id||'C',C14:o.b,C15:o.h,C16:o.height*1000,C20:o.fcu,C21:500,C22:o.ratio,C23:1.4,C24:1.6,C25:o.projectFactor,C26:o.dead,C27:o.live,C28:(1.4*o.dead+1.6*o.live)*o.projectFactor,C39:'OK',C42:'OK'},m=machine('COL',values);if(o.steel){m.set('C5',o.steel.C5);m.set('C32',o.steel.C32);}const v=m.all(),fail=[];if(v.C40!=='OKAY (AREA ONLY)')fail.push(v.C40);if(v.C38!=='SHORT / BRACED')fail.push(v.C38);if(v.C41!=='OKAY (AXIAL ONLY)')fail.push(v.C41);return {kind:'COL',status:fail.length?'NOT OK':'OK (AXIAL ONLY)',fail,values:v,inputs:m.v,steel:{C5:v.C31,C32:v.C32},description:`${v.C32}T${v.C31}；As ${round(v.C33,0)} mm²；${round(v.C34,2)}%`,source:F.COL.sheet};}
@@ -77,6 +87,6 @@ const SectionB=(()=>{
   }
   return fallback('500 mm 遞增搜尋未找到符合目標鋼筋率的尺寸，須另行覆核');
  }
- return {slab,beam,column,columnAdvice,machine,round,cover};
+ return {slab,beam,column,columnAdvice,machine,round,cover,linkErrors267};
 })();
 if(typeof module!=='undefined')module.exports=SectionB;

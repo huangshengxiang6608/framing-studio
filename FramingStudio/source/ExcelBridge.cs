@@ -137,12 +137,20 @@ static class ExcelBridge {
   }
   x.CalculateFull();
  }
+ static void VerifyLinks267(Dictionary<string,object> steel,string id){
+  foreach(string f in new[]{"58","76"}){
+   double dia=D(steel,"G"+f),space=D(steel,"H"+f);
+   if(double.IsNaN(dia)||double.IsInfinity(dia)||dia<10||double.IsNaN(space)||double.IsInfinity(space)||space<100||space>250)
+    throw new Exception(id+"：箍筋直徑須至少 10 mm，間距須為 100–250 mm；請更新 Summary／Member Check 配筋後生成抄");
+  }
+ }
  static void AdoptInputs254(dynamic x,dynamic b,Dictionary<string,object> member,bool store){
   var data=Obj(member["adopt254"]);string kind=Convert.ToString(member["kind"]),sheetName=Convert.ToString(data["sheet"]);int row=Convert.ToInt32(member["row"]);
   var names=new Dictionary<string,string>{{"MB","Section B Main Beam Design"},{"SB","Section B Secondary Beam Design"},{"TB","Section B Transfer Beam Check"},{"CB","Section B Cantilever Beam Check"},{"SLAB","Section B Slab Check"},{"CS","Section B Cantilever Slab Check"}};
   if(!names.ContainsKey(kind)||names[kind]!=sheetName)throw new Exception("App 配筋工作表不符");
   var inputs=Obj(data["inputs"]);var steel=Obj(data["steel"]);var expected=Obj(data["expected"]);
   bool slab=kind=="SLAB"||kind=="CS";
+  if(!slab)VerifyLinks267(steel,Convert.ToString(member["id"]));
   string[] required=slab?new[]{"C2","C4","C5","C6","C7","C9","F35","H35","C57","D57"}:new[]{"G12","G14","G15","G16","G17","G23","G24","C40","D40","C44","D44","G58","H58","E76","G76","H76"};
   string[] results=slab?new[]{"F34","I35","I46"}:new[]{"G29","K36","K38","K58","N40","N44","N59","N77","N87"};
   var steelCells=slab?new List<string>{"F35","H35","C57","D57"}:new List<string>{"E58","G58","H58","E76","G76","H76"};
@@ -424,6 +432,7 @@ static class ExcelBridge {
      if(member.ContainsKey("cover")&&member["cover"]!=null){if(mk=="CB")throw new Exception("原 Excel 悬臂梁采用 FRR 保护层，手动保护层尚未核对");Set(design,"G16",member["cover"]);changed.Add("G16");}
      if(changed.Count>0&&mk=="COL"){x.CalculateFull();}
      else if(changed.Count>0){string macro=mk=="TB"?"TransferChanged79":mk=="CB"?"CBChanged99":mk=="CS"?"CSChanged101":"SectionBChanged78";x.Run("'"+b.Name+"'!"+macro,design,design.Range[string.Join(",",changed)]);if(mk=="TB")Run(x,b,"UpdateTransfer79");else if(mk=="CB"||mk=="CS")x.Run("'"+b.Name+"'!CheckOne"+mk+(mk=="CB"?"99":"101"),Convert.ToInt32(member["row"]),false);else Run(x,b,"Check99");}
+     if(new[]{"MB","SB","TB","CB"}.Contains(mk))VerifyLinks267(new Dictionary<string,object>{{"G58",Val(design.Range["G58"])},{"H58",Val(design.Range["H58"])},{"G76",Val(design.Range["G76"])},{"H76",Val(design.Range["H76"])}},id);
      if(member.ContainsKey("selected")&&!Convert.ToBoolean(member["selected"]))continue;
      // Same source inputs and same source result cells; no derived replacement formulas.
      Compare(id+" · input",b,new Dictionary<string,object>{{sheet,member["inputs"]}});

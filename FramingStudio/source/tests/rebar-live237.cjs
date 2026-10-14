@@ -3,7 +3,7 @@ const c=context(path.resolve(__dirname,'../..'));
 const result=c.run(`(()=>{
  const cases=[];
  for(const kind of ['MB','SB','TB','CB']){
-  const options={kind,L:6,b:400,h:750,fcu:45,cover:40,M:400,V:100,T:80},original=SectionB.beam(options),row={kind,result:original},snapshot=JSON.stringify(row);
+  const options={acceptance261:'rc',kind,L:6,b:400,h:750,fcu:45,cover:40,M:400,V:100,T:80},original=SectionB.beam(options),row={kind,result:original},snapshot=JSON.stringify(row);
   const good=BeamRebar116.preview237(row,original.steel),weakSteel={...original.steel,G58:8,H58:250,G76:8,H76:250},weak=BeamRebar116.preview237(row,weakSteel);
   const mixed={...original.steel,C110:1,D110:20},mixedResult=BeamRebar116.preview237(row,mixed);
   cases.push({kind,original,good,weak,mixedResult,providedTorsion:SectionB.machine(kind,good.result.inputs).get("K76"),direct:SectionB.beam({...options,steel:mixed}),measures:BeamRebar116.measures237(good,original.steel),metrics:BeamRebar116.metrics238(good),unchanged:snapshot===JSON.stringify(row),goodRC:Loading.auditChecks205({},good).b,weakRC:Loading.auditChecks205({},weak).b});

@@ -16,8 +16,8 @@ const result=c.run(`(()=>{
   const plan=RCPlan.build(p,'A'),job=plan.batches[0],member=job?.members.find(m=>m.id==='B1');
   if(plan.issues.length||!member)throw Error('Passed Check did not release A');
   if(calls.join()!=='A')throw Error('Fresh B Check unnecessarily recalculated');
-  if(member.adopt254!==null)throw Error('Failed A reinforcement was adopted');
-  if(job.fullLoads.find(m=>m.id==='B1').expected.M!==ar.actions.M||ar.actions.M===br.actions.M)throw Error('A loads replaced with B loads');
+  if(!member.adopt254||JSON.stringify(member.adopt254.steel)!==JSON.stringify(br.result.steel))throw Error('Successful shared beam steel not adopted');
+  if(job.fullLoads.find(m=>m.id==='B1').expected.M!==br.actions.M||ar.actions.M===br.actions.M)throw Error('A beam loads not aligned with shared Check');
   if(job.cells.C9!==80||job.cells.D9!==0||job.cells.E9!==2)throw Error('A floor input changed');
   if(JSON.stringify(p)!==before)throw Error('Project mutated');
   // Failed, absent and stale Check data cannot authorize a report.
@@ -30,7 +30,7 @@ const result=c.run(`(()=>{
   const missing=Engine.clone(b);missing.rows=missing.rows.filter(r=>r.token!==m.token);api._seed262(p,missing);
   calls=[];if(RCPlan.build(p,'A').issues.length||calls.join()!=='A,B')throw Error('Incomplete cache not recalculated');
   api._seed262(p,b);calls=[];RCPlan.build(p,'B');if(calls.length)throw Error('B fresh reuse changed');
-  return {differentLoads:true,failedAReinforcementNotAdopted:true,freshReuse:true,staleRejected:true,missingRecomputed:true,failedCheckRejected:true,unchangedAInputs:true,unchangedProject:true};
+  return {differentLoads:true,sharedBeamReinforcementAdopted:true,freshReuse:true,staleRejected:true,missingRecomputed:true,failedCheckRejected:true,unchangedFloorInputs:true,unchangedProject:true};
  }finally{Loading.run=original}
 })()`);
-assert(result);console.log('PASS Section A eligibility uses current Summary/Member Check; preserves A loads and rejects failed/stale Check',JSON.stringify(result));
+assert(result);console.log('PASS Section A eligibility uses current Summary/Member Check; uses shared beam loads and rejects failed/stale Check',JSON.stringify(result));

@@ -4,14 +4,16 @@ const RCPlan=(()=>{
   const p=Engine.clone(project),e=Loading.init(p),settings=Loading.settings(p),map=section==='Check'?e.selected:e['report'+section]||{};
   const wanted=selection||Object.keys(map).filter(k=>map[k]);for(const k of wanted)e.selected[k]=true;
   const model=Engine.generate(p);for(let f=1;f<=p.total;f++)for(const m of Loading.members(p,model,f))e.selected[f+'|'+m.token]=m.kind!=='COL'||wanted.includes(f+'|'+m.token);
-  // A keeps its own report loads. Beam eligibility comes from the current B
-  // check used by Summary/Member Check, never from A's separate design result.
+  // A beam reports use the same unfactored loads and actions as the shared
+  // Summary/Member Check (B). Keep A slab/column inputs and native report formulas.
   const cached=typeof ExplorerUI!=='undefined'?ExplorerUI.getReportOutput254?.(project):null;
   const reusable=cached&&wanted.every(key=>cached.rows.some(r=>r.floor+'|'+r.token===key&&r.result?.inputs));
-  const out=section==='A'?Loading.run(p,model,'A'):reusable?Engine.clone(cached):Loading.run(p,model,'B'),roots=out.rows.filter(r=>r.kind!=='TT'&&wanted.includes(r.floor+'|'+r.token)),issues=[],batches=[];
+  const out=section==='A'?Loading.run(p,model,'A'):reusable?Engine.clone(cached):Loading.run(p,model,'B'),issues=[],batches=[];
   const beamKinds262=['MB','SB','TB','CB'];
-  const checked262=section==='A'&&roots.some(r=>beamKinds262.includes(r.kind))?(reusable?cached:Loading.run(p,model,'B')):out;
+  const checked262=section==='A'&&out.rows.some(r=>wanted.includes(r.floor+'|'+r.token)&&beamKinds262.includes(r.kind))?(reusable?cached:Loading.run(p,model,'B')):out;
   const checkedRows262=new Map(checked262.rows.map(r=>[r.floor+'|'+r.token,r]));
+  if(section==='A')out.rows=out.rows.map(r=>{if(!beamKinds262.includes(r.kind)||!wanted.includes(r.floor+'|'+r.token))return r;const checked=checkedRows262.get(r.floor+'|'+r.token);if(!checked)throw Error(r.id+'：Summary／Member Check 梁荷載未完整，請更新 Check');return Engine.clone(checked);});
+  const roots=out.rows.filter(r=>r.kind!=='TT'&&wanted.includes(r.floor+'|'+r.token));
   const lookup=(r,id)=>out.rows.find(x=>x.floor===r.floor&&x.id===id),kind=r=>r.result.kind||r.displayType||r.kind;
   function dependencies(r,seen=new Map()){
    if(r.result.widthViolation)throw Error(r.result.fail.join('；'));if(seen.has(r.token))return seen;const k=kind(r),l=r.loading||{};
@@ -44,7 +46,7 @@ const RCPlan=(()=>{
     else if(k==='MB'){row=mb++;add(row,[id(r),l.L,c.b*1000,c.d*1000,support]);}
     else if(k==='CB'){row=manual++;add(row,[id(r),'Cantilever Beam',l.L,c.d*1000,'Cantilever',c.b*1000,0,0,0,0,0,0,0]);}
     else if(k==='TB'){row=tb++;const a=sheetCells['Section A Transfer Beam'];for(const [col,value]of Object.entries({A:id(r),B:l.L,C:c.d*1000,T:c.b,U:support}))a[col+row]=value;const u=row+23;for(const [col,value]of Object.entries({C:l.L,D:1,E:0,F:0,G:0}))a[col+u]=value;}
-    if(['SB','MB','TB'].includes(k)||k==='CB'&&section!=='A'){
+    if(beamKinds262.includes(k)){
      fullLoads.push({id:id(r),kind:k,L:l.L,loads:[{type:'LINE',start:0,end:l.L,g:l.udlDead,q:l.udlLive,label:'Full-span DL / LL (incl. assigned self-weight)'},...(l.lines||[]).map(x=>({...x,type:'LINE'})),...(l.points||[]).map(x=>({type:'POINT',start:x.x,end:x.x,g:x.g,q:x.q,label:x.label||'集中荷载'}))],expected:{M:r.actions.M,V:r.actions.V,RA:r.actions.left,RB:r.actions.right,dead:r.actions.totalDead,live:r.actions.totalLive}});
     }
     if(k==='COL'){
@@ -60,9 +62,9 @@ const RCPlan=(()=>{
      }continue;
     }
     const inputs={...r.result.inputs},expected={...r.result.values};if(['SLAB','CS'].includes(k)){inputs.C1=id(r);if(Object.hasOwn(expected,'C1'))expected.C1=id(r);}
-    // A's failed search is not a successful reinforcement result to adopt.
-    // The native A report still uses its original loads and sizing formulas.
-    const adopt254=!r.result.autoFailed&&(section!=='A'||['MB','SB','TB'].includes(k))&&(k!=='CS'||r.input?.steel)&&r.result.inputs&&r.result.steel?{sheet:r.result.source,inputs,expected,steel:{...r.result.steel}}:null;
+    // Adopt only successful shared beam steel. Native report/sizing formulas
+    // remain unchanged; fullLoads supplies the common characteristic G and Q.
+    const adopt254=!r.result.autoFailed&&(section!=='A'||beamKinds262.includes(k))&&(k!=='CS'||r.input?.steel)&&r.result.inputs&&r.result.steel?{sheet:r.result.source,inputs,expected,steel:{...r.result.steel}}:null;
     if(section==='A'){
      const sup=['CS','CB'].includes(k)?'Cantilever':support,h=['CS','SLAB'].includes(k)?c.thickness:c.d*1000,ratio=l.L*1000/h*(sup!=='Cantilever'&&l.L>10.001?l.L/10:1),limit={'Cantilever':7,'Simply-supported':20,'Continuous':26,'End span':23}[sup],status=sup==='Cantilever'&&l.L>10.001?'CALC. REQUIRED':ratio<=limit?'OK':'NOT OK',cols={SLAB:['J','K','L'],SB:['H','I','J'],MB:['F','G','H'],CB:['N','O','P'],CS:['N','O','P'],TB:['V','W','X']}[k],sheet=k==='TB'?'Section A Transfer Beam':'Input';
      members.push({id:id(r),kind:k,row,sectionA:true,sheet,expected:Object.fromEntries(cols.map((c,i)=>[c+row,[ratio,limit,k==='TB'?status.replace('NOT OK','NOT OKAY').replace(/^OK$/,'OKAY'):status][i]])),inputs:{},actions:k==='TB'?{G23:r.actions.M,G24:r.actions.V}:null,selected:true,adopt254});

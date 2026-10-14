@@ -71,3 +71,13 @@ Accumulate upper floors and confirmed area overrides once along this route.
 Shared boundaries or missing ownership require an explicit unresolved result,
 not an arbitrary fraction or duplicate assignment. Preserve the separate beam
 analysis and the original Section A/B report formulas and formatting.
+
+## Section A beam loads share the Check model
+
+User authorization on 2026-10-14 (E2.264): Section A beam loads must match
+Summary/Member Check and Section B, including full beam self-weight, slab
+reactions, point loads and resulting M/V. Use the fresh matching Check/B row
+for MB, SB, TB and CB; recalculate stale or absent Check data. This supersedes
+the historical separate Section A beam-load basis. Keep Section A slab and
+column schedules, all original A/B formulas, report layout and native rendering
+routines unchanged. Do not overwrite formula cells to force agreement.

@@ -85,6 +85,11 @@ static class ExcelBridge {
  static string RunDirectory79,CacheDirectory79,CacheVersion79,CacheSource277;
  static readonly System.Diagnostics.Stopwatch Timer79=System.Diagnostics.Stopwatch.StartNew();
  static void Stage79(string message){if(RunDirectory79==null)return;try{Write(Path.Combine(RunDirectory79,"progress.json"),new {message=message,seconds=Timer79.Elapsed.TotalSeconds});File.AppendAllText(Path.Combine(RunDirectory79,"timing.jsonl"),J.Serialize(new {message=message,seconds=Timer79.Elapsed.TotalSeconds})+"\n");}catch{}}
+ sealed class Timing281:IDisposable {
+  readonly string name,directory;readonly double start;readonly System.Diagnostics.Stopwatch watch=System.Diagnostics.Stopwatch.StartNew();
+  public Timing281(string value){name=value;directory=RunDirectory79;start=Timer79.Elapsed.TotalSeconds;}
+  public void Dispose(){if(directory!=null)try{File.AppendAllText(Path.Combine(directory,"profile281.jsonl"),J.Serialize(new{name=name,start=start,seconds=watch.Elapsed.TotalSeconds})+"\n");}catch{}}
+ }
  static string TextHash79(string text){using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(Encoding.UTF8.GetBytes(text))).Replace("-","").ToLowerInvariant();}
  static string Canon79(object value){var map=value as Dictionary<string,object>;if(map!=null)return "{"+string.Join(",",map.OrderBy(v=>v.Key,StringComparer.Ordinal).Select(v=>J.Serialize(v.Key)+":"+Canon79(v.Value)))+"}";if(value is IEnumerable&&!(value is string))return "["+string.Join(",",((IEnumerable)value).Cast<object>().Select(Canon79))+"]";return J.Serialize(value);}
  static string CacheKey79(object value){return TextHash79(CacheVersion79+"|"+Canon79(value));}
@@ -221,7 +226,7 @@ static class ExcelBridge {
  static bool Number(object v){return v is double||v is int||v is decimal||v is long;}
  static bool Same(object a,object b){if(Number(a)&&Number(b)){double x=Convert.ToDouble(a),y=Convert.ToDouble(b);return Math.Abs(x-y)<=1e-7*Math.Max(1,Math.Max(Math.Abs(x),Math.Abs(y)));}return Convert.ToString(a)==Convert.ToString(b);}
  static void Write(string p,object v){File.WriteAllText(p,J.Serialize(v),new UTF8Encoding(false));}
- static object Run(dynamic x,dynamic b,string macro){Stage79(macro.StartsWith("Generate")?"生成原 Excel 抄":"计算与核对："+macro);return x.Run("'"+b.Name+"'!"+macro);}
+ static object Run(dynamic x,dynamic b,string macro){Stage79(macro.StartsWith("Generate")?"生成原 Excel 抄":"计算与核对："+macro);using(new Timing281("macro:"+macro))return x.Run("'"+b.Name+"'!"+macro);}
  static void Set(dynamic sheet,string cell,object v){try{dynamic c=sheet.Range[cell];if(v==null)c.MergeArea.ClearContents();else if(v is string)c.Value2="'"+(string)v;else c.Value2=v;}catch(Exception e){throw new Exception(Convert.ToString(sheet.Name)+"!"+cell+": "+e.Message);}}
  static Dictionary<string,object> ActiveJob75;
  // Adopt the App's checked reinforcement through native editable input cells.
@@ -348,7 +353,39 @@ static class ExcelBridge {
   var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(dynamic s in b.Worksheets)names.Add(Convert.ToString(s.Name));string name=text;int i=2;
   while(names.Contains(name)){string suffix=" ("+(i++)+")";name=text.Substring(0,Math.Min(text.Length,31-suffix.Length))+suffix;}return name;
  }
- static void CaptureDesign265(dynamic x,dynamic b,Dictionary<string,object> job,Dictionary<string,object> member){
+ sealed class FormulaCell281 { public int Row,Column; public string Formula; }
+ static int Column281(string letters){int column=0;foreach(char c in letters)column=column*26+c-'A'+1;return column;}
+ static IEnumerable<FormulaCell281> FormulaCells281(dynamic sheet){
+  // Excel identifies actual formula cells. Read the contents once, then walk
+  // the SAME SpecialCells areas/order in managed memory; text beginning with
+  // '=' is not selected. Never rewrite a rectangular range of mixed inputs.
+  dynamic areas=sheet.UsedRange.SpecialCells(-4123).Areas;
+  dynamic used=sheet.UsedRange;int firstRow=Convert.ToInt32(used.Row),firstColumn=Convert.ToInt32(used.Column);
+  object raw=used.Formula;object[,] matrix=raw as object[,];
+  var cells=new List<FormulaCell281>();
+  foreach(dynamic range in areas){
+   // A multi-area Address can truncate at 255 characters in native Excel.
+   // Read each area address so the last formula cells cannot be omitted.
+   string area=Convert.ToString(range.Address);
+   var match=System.Text.RegularExpressions.Regex.Match(area,@"^\$([A-Z]+)\$([1-9][0-9]*)(?::\$([A-Z]+)\$([1-9][0-9]*))?$");
+   if(!match.Success)throw new Exception("無法識別原 Excel 公式範圍："+area);
+   int row=int.Parse(match.Groups[2].Value),column=Column281(match.Groups[1].Value);
+   int lastRow=match.Groups[4].Success?int.Parse(match.Groups[4].Value):row,lastColumn=match.Groups[3].Success?Column281(match.Groups[3].Value):column;
+   for(int r=row;r<=lastRow;r++)for(int c=column;c<=lastColumn;c++){
+    object value=matrix==null?raw:matrix[r-firstRow+matrix.GetLowerBound(0),c-firstColumn+matrix.GetLowerBound(1)];
+    string formula=value as string;if(formula!=null&&formula.StartsWith("="))cells.Add(new FormulaCell281{Row=r,Column=c,Formula=formula});
+   }
+  }
+  return cells;
+ }
+ static void RequireValueReport281(dynamic sheet){
+  // Range.HasFormula is false only if EVERY cell is formula-free. True (all
+  // formulas), null/DBNull (mixed), or an unknown result must stop the merge.
+  object flag=sheet.UsedRange.HasFormula;
+  if(!(flag is bool)||Convert.ToBoolean(flag))throw new Exception("原抄含未隔離的公式，停止合併");
+ }
+ static void CaptureDesign265(dynamic x,dynamic b,Dictionary<string,object> job,Dictionary<string,object> member){using(new Timing281("capture:"+Convert.ToString(member["id"])))CaptureDesign265Core281(x,b,job,member);}
+ static void CaptureDesign265Core281(dynamic x,dynamic b,Dictionary<string,object> job,Dictionary<string,object> member){
   if(Convert.ToString(job["section"])=="A"||(member.ContainsKey("selected")&&!Convert.ToBoolean(member["selected"])))return;
   if(differences.Count>0)throw new Exception("构件核对未通过，不能生成独立计算页");
   string source=Convert.ToString(member["sheet"]),id=Convert.ToString(member["id"]);if(!source.StartsWith("Section B ")&&!(job.ContainsKey("columnCopies274")&&source=="Section A Column Loading"))throw new Exception("未知构件 design sheet："+source);
@@ -366,14 +403,14 @@ static class ExcelBridge {
     hidden.Range[area].Value2=data;copy.Activate();hidden.Visible=0;captures.Add(key,hiddenName);return hiddenName;
    };
    string loadRange=null;
-   foreach(dynamic cell in copy.UsedRange.SpecialCells(-4123).Cells){
-    if(!Convert.ToBoolean(cell.HasFormula))continue;string formula=Convert.ToString(cell.Formula);
+   foreach(var cell in FormulaCells281(copy)){
+    string formula=cell.Formula;
     string changed=DesignRefs265.Replace(formula,match=>{
      if(match.Groups["sheet"].Success){string key=match.Groups["sheet"].Value;if(key.StartsWith("'"))key=key.Substring(1,key.Length-2).Replace("''","'");if(key==name||key==source)return "'"+name.Replace("'","''")+"'!";return "'"+capture(key)+"'!";}
      if(match.Groups["loads"].Success){if(loadRange==null)loadRange="'"+capture("RC Loads")+"'!"+Convert.ToString(b.Worksheets["RC Loads"].ListObjects["RCLoads73"].DataBodyRange.Address);return loadRange;}
      return match.Value;
     });
-    if(changed!=formula)try{cell.Formula=changed;}catch(Exception ex){throw new Exception("Independent design formula: "+name+"!"+Convert.ToString(cell.Address)+": "+ex.Message,ex);}
+    if(changed!=formula)try{copy.Cells[cell.Row,cell.Column].Formula=changed;}catch(Exception ex){throw new Exception("Independent design formula: "+name+"!R"+cell.Row+"C"+cell.Column+": "+ex.Message,ex);}
    }
    // HasFullLoads73's existing lookup must also remain private to this member.
    if(Convert.ToString(member["kind"])=="CB"){
@@ -387,7 +424,8 @@ static class ExcelBridge {
   }finally{x.EnableEvents=events;x.Calculation=mode;}
  }
  // Export editing permissions only: no values, formulas, dimensions or print settings change.
- static void EditableWorkbook270(dynamic b){
+ static void EditableWorkbook270(dynamic b){using(new Timing281("editing-permissions"))EditableWorkbook270Core281(b);}
+ static void EditableWorkbook270Core281(dynamic b){
   b.Unprotect();
   foreach(dynamic sheet in b.Worksheets){
    sheet.Unprotect();sheet.EnableSelection=0;sheet.ScrollArea="";
@@ -409,7 +447,8 @@ static class ExcelBridge {
   }
   if(Convert.ToBoolean(b.ProtectStructure)||Convert.ToBoolean(b.ProtectWindows))throw new Exception("工作簿未能解除保護");
  }
- static void VerifyDesign265(dynamic b,DesignCopy265 item){
+ static void VerifyDesign265(dynamic b,DesignCopy265 item){using(new Timing281("verify-design:"+item.Name))VerifyDesign265Core281(b,item);}
+ static void VerifyDesign265Core281(dynamic b,DesignCopy265 item){
   dynamic sheet=b.Worksheets[item.Name];sheet.Calculate();object[,] values=(object[,])sheet.Range[item.Address].Value2;
   for(int r=item.Values.GetLowerBound(0);r<=item.Values.GetUpperBound(0);r++)for(int c=item.Values.GetLowerBound(1);c<=item.Values.GetUpperBound(1);c++)if(!Same(item.Values[r,c],values[r,c]))throw new Exception("独立计算页数值改变："+item.Name+" · relative R"+r+"C"+c+" ("+Convert.ToString(item.Values[r,c])+" / "+Convert.ToString(values[r,c])+")");
  }
@@ -584,7 +623,8 @@ static class ExcelBridge {
   string address=Convert.ToString(sheet.UsedRange.Address);
   return new SheetSnapshot274{Name=Convert.ToString(sheet.Name),Address=address,Values=(object[,])sheet.Range[address].Value2,Formulas=(object[,])sheet.Range[address].Formula};
  }
- static void VerifySheet274(dynamic book,SheetSnapshot274 snapshot,bool calculate){
+ static void VerifySheet274(dynamic book,SheetSnapshot274 snapshot,bool calculate){using(new Timing281("verify-sheet:"+snapshot.Name))VerifySheet274Core281(book,snapshot,calculate);}
+ static void VerifySheet274Core281(dynamic book,SheetSnapshot274 snapshot,bool calculate){
   dynamic sheet=book.Worksheets[snapshot.Name];if(calculate)sheet.Calculate();
   object[,] values=(object[,])sheet.Range[snapshot.Address].Value2,formulas=(object[,])sheet.Range[snapshot.Address].Formula;
   for(int r=1;r<=values.GetLength(0);r++)for(int c=1;c<=values.GetLength(1);c++){
@@ -676,13 +716,13 @@ static class ExcelBridge {
     if(design==null)throw new Exception("缺少柱獨立計算頁");
     dynamic reportSheet=other.Worksheets[report];
     // Native report cells are rendered values; do not flatten any equations.
-    foreach(dynamic cell in reportSheet.UsedRange.Cells)if(Convert.ToBoolean(cell.HasFormula))throw new Exception("原抄含未隔離的公式，停止合併");
+    using(new Timing281("merge:formula-guard")){RequireValueReport281(reportSheet);}
     reportSheet.Name=UniqueDesignName265(b,report+" - "+Convert.ToString(member["id"]));names.Add(Convert.ToString(reportSheet.Name));
     var existing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(dynamic s in b.Worksheets)existing.Add(Convert.ToString(s.Name));
     if(names.Any(existing.Contains))throw new Exception("合併工作表名稱重複");
     var captured=names.Select(n=>Snapshot274(other.Worksheets[n])).ToList();
     // Copy the dependency closure as a group so Excel keeps references local.
-    other.Worksheets[names.Cast<object>().ToArray()].Copy(Type.Missing,b.Worksheets[b.Worksheets.Count]);
+    using(new Timing281("merge:copy-sheets")){other.Worksheets[names.Cast<object>().ToArray()].Copy(Type.Missing,b.Worksheets[b.Worksheets.Count]);}
     foreach(var snapshot in captured){VerifySheet274(b,snapshot,false);snapshots.Add(snapshot);}
     string after=section=="B"?"Section B Column Check":"Section A Column Loading";
     foreach(dynamic s in b.Worksheets)if(Convert.ToString(s.Name)!=design&&IsDesign274(s)&&Convert.ToString(s.Range[section=="B"?"C13":"B4"].Value2)==Convert.ToString(Arr(parts[0]["members"]).Select(Obj).First(m=>Convert.ToString(m["kind"])=="COL")["id"]))after=Convert.ToString(s.Name);
@@ -693,9 +733,9 @@ static class ExcelBridge {
    }
    object links=b.LinkSources(1);if(links!=null)throw new Exception("合併產生外部 Excel 連結，停止輸出");
    foreach(var snapshot in snapshots)VerifySheet274(b,snapshot,IsDesign274(b.Worksheets[snapshot.Name]));
-   EditableWorkbook270(b);b.Worksheets["Input"].Activate();b.Save();b.Close(false);b=null;
+   EditableWorkbook270(b);b.Worksheets["Input"].Activate();using(new Timing281("merge:save-close")){b.Save();b.Close(false);b=null;}
    // Reopen the saved artifact and recheck both columns' private equations.
-   b=x.Workbooks.Open(output,0,true);x.Calculation=-4135;
+   using(new Timing281("merge:reopen")){b=x.Workbooks.Open(output,0,true);x.Calculation=-4135;}
    foreach(var snapshot in snapshots)VerifySheet274(b,snapshot,IsDesign274(b.Worksheets[snapshot.Name]));
    if(b.LinkSources(1)!=null)throw new Exception("重開後發現外部連結");
    b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;
@@ -943,14 +983,14 @@ static class ExcelBridge {
     Stage79("原抄生成完成，整理版式");int formatCalc82=Convert.ToInt32(x.Calculation);bool formatScreen82=Convert.ToBoolean(x.ScreenUpdating),formatEvents82=Convert.ToBoolean(x.EnableEvents);
     try{x.Calculation=-4135;x.ScreenUpdating=false;x.EnableEvents=false;
     Intro111(b.Worksheets["Section A 抄"],job);ReportNumbers79(b.Worksheets["Section A 抄"]);ReportNumbers79(b.Worksheets["Section B 抄"]);ReportHeader75(b.Worksheets["Section A 抄"],job);ReportHeader75(b.Worksheets["Section B 抄"],job);
-    if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"])) { if(section=="A"||section=="Check")ExportRC76(b.Worksheets["Section A 抄"],job,files,dir,"A");if(section=="B"||section=="Check")ExportRC76(b.Worksheets["Section B 抄"],job,files,dir,"B"); }
+    using(new Timing281("report:pdf"))if(job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"])) { if(section=="A"||section=="Check")ExportRC76(b.Worksheets["Section A 抄"],job,files,dir,"A");if(section=="B"||section=="Check")ExportRC76(b.Worksheets["Section B 抄"],job,files,dir,"B"); }
     }finally{x.Calculation=formatCalc82;x.ScreenUpdating=formatScreen82;x.EnableEvents=formatEvents82;}
     Run(x,b,"PersistManualSteel78");Run(x,b,"PersistTransfer79");input.Activate();ReportPages75(b,job,files,dir);ReportInks84(b);
     // Transfer actions and report macros can leave RC marked pending. Complete
     // the native check once at export time, so opening need not regenerate it.
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("导出前 RC Check 未完成");
-    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);foreach(var saved279 in resumedSheets279)VerifySheet274(b,saved279,true);x.EnableEvents=false;EditableWorkbook270(b);if(Continued280)b.SaveAs(copy,52);else b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,reusedCheck279=resumed279,continuedLive280=Continued280,continuedWorker280=Continued280?System.Diagnostics.Process.GetCurrentProcess().Id:0,checkVerifiedAt279=resumed279?(checkpoint279.ContainsKey("verifiedAt")?checkpoint279["verifiedAt"]:checkpoint279["at"]):null,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);foreach(var saved279 in resumedSheets279)VerifySheet274(b,saved279,true);x.EnableEvents=false;EditableWorkbook270(b);using(new Timing281("report:save")){if(Continued280)b.SaveAs(copy,52);else b.Save();}Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,reusedCheck279=resumed279,continuedLive280=Continued280,continuedWorker280=Continued280?System.Diagnostics.Process.GetCurrentProcess().Id:0,checkVerifiedAt279=resumed279?(checkpoint279.ContainsKey("verifiedAt")?checkpoint279["verifiedAt"]:checkpoint279["at"]):null,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
    Stage79("保存已核对结果");CommitPageCaches82(copy);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;StoreJob79(job,dir);CompleteLive280(0);GC.Collect();return 0;
   }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if((object)b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});CompleteLive280(1);return 1;}

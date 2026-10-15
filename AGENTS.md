@@ -91,3 +91,16 @@ Preserve the original design layout and calculation equations; capture member
 inputs privately so later shared-sheet selection cannot overwrite them. Copied
 UPDATE/auto-design buttons must not operate the original design. Original A/B
 report-copy content and formatting remain unchanged.
+
+
+## Manual beam horizontal spacing (E2.283)
+
+User clarified 2026-10-15: in the App Member Check, manual beam reinforcement
+may exceed floor(beam width in mm / 100), but same-layer horizontal clear spacing
+must be at least 40 mm. Show the physical face, layer and calculated gap on failure,
+and reject saving invalid spacing. This does not change vertical layer spacing,
+effective-depth calculation, or automatic reinforcement candidate/count rules.
+The user subsequently explicitly required Excel to retain its existing rule:
+do not change the original workbook, VBA, formulas or A/B report format to relax
+that restriction. App acceptance does not imply native Excel verification;
+retain native mismatch reporting/blocking rather than forcing Excel agreement.

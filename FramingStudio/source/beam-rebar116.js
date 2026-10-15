@@ -37,7 +37,7 @@ const BeamRebar116=(()=>{
   catch(e){return {...row,result:{status:'INPUT REQUIRED',fail:[e.message]}};}
  }
  function measures237(row,steel){
-  const v=row?.result?.values||{},number=(x)=>typeof x==='number'&&Number.isFinite(x)?x:null,m=row?.result?.inputs?SectionB.machine(row.result.kind||row.kind,row.result.inputs):null,cell=k=>{if(number(v[k])!==null)return v[k];try{return number(m?.get(k));}catch{return null;}};
+  const v=row?.result?.values||{},number=(x)=>typeof x==='number'&&Number.isFinite(x)?x:null,m=row?.result?.inputs?SectionB.machine(row.result.kind||row.kind,row.result.inputs,!!row.result.manualSpacing283):null,cell=k=>{if(number(v[k])!==null)return v[k];try{return number(m?.get(k));}catch{return null;}};
   const face=(f,req,provided,check)=>{const bars=steel||row?.result?.steel,area=bars?rows237(f).reduce((a,r)=>a+Number(bars['C'+r]||0)*Number(bars['D'+r]||0)**2*Math.PI/4,0):cell(provided),b=cell('G14'),h=cell('G15');return {req:cell(req),provided:area,ratio:area!=null&&b>0&&h>0?100*area/(b*h):null,status:v[check],unit:'mm²',symbol:'As'};};
   const link=(f,req,check)=>({req:cell(req),provided:steel&&['E','G','H'].every(k=>typeof steel[k+f]==='number'&&Number.isFinite(steel[k+f]))&&steel['H'+f]>0?Number(steel['E'+f])*Number(steel['G'+f])**2*Math.PI/4/Number(steel['H'+f]):cell('K'+f),status:(steel||row?.result?.steel)&&(Number((steel||row.result.steel)['G'+f])<10||Number((steel||row.result.steel)['H'+f])<100||Number((steel||row.result.steel)['H'+f])>250)?'NOT OKAY':v[check],unit:'mm²/mm',symbol:'Asv/s'});
   return {top:face(40,'K36','G40','N40'),bottom:face(44,'K38','G44','N44'),shear:link(58,'K56','N59'),torsion:link(76,'K72','N77')};
@@ -108,7 +108,7 @@ const BeamRebar116=(()=>{
 
    const automatic=$('ex-steel-mode').value==='AUTO',awaitAuto=automatic&&(dirty||!row),current=h.memberResult?.(h.floor,token),invalid=Object.keys(errors234).length>0;
    let steel=null,live=current,status;
-   if(dirty&&!invalid&&!automatic){try{steel=readSteel237();live=preview237(current,steel);}catch(e){live=null;status={tone:'pending',text:'RC 輸入待修正',reasons:[e.message]};}}
+   if(dirty&&!invalid&&!automatic){try{steel=readSteel237();const errs=SectionB.horizontalErrors283(beam.kind,beam.b*1000,Loading.input(h.p,h.floor,token).cover??SectionB.cover(beam.kind,Engine.beamFire241(h.p,h.floor,beam.kind)),steel);if(errs.length)throw Error(errs.join('；'));live=preview237(current,steel);}catch(e){live=null;status={tone:'pending',text:'RC 輸入待修正',reasons:[e.message]};}}
    if(invalid){live=null;status={tone:'pending',text:'RC 輸入待修正',reasons:Object.values(errors234)};}
    status=status||status227(h.p,live,false);const measures=measures237(live,steel);
    if($('rebar-mode235'))$('rebar-mode235').textContent=automatic?'配筋：自動選筋':'配筋：手動'+(dirty?'（已修改，待保存）':'');
@@ -124,7 +124,7 @@ const BeamRebar116=(()=>{
    card.querySelector('[data-rebar-torsion]').textContent='抗扭 · '+(awaitAuto?'待自動選筋':$('ex-tor-legs').value+' 肢 T'+$('ex-tor-dia').value+' @ '+$('ex-tor-space').value+' mm');
    const input=Loading.input(h.p,h.floor,token),L=Math.hypot(beam.rawZ[0]-beam.rawA[0],beam.rawZ[1]-beam.rawA[1]);
    try{const size=Reports.sizing(h.p,{kind:beam.kind,member:beam,floor:h.floor,input,loading:{L}});card.querySelector('.rebar-ratio227').textContent='Span/Depth · L/h = '+Number(size.ratio.toFixed(3))+' / '+size.limit+' · '+size.status+'（獨立判定）';}catch{card.querySelector('.rebar-ratio227').textContent='';}
-   card.querySelector('.rebar-status116').textContent=automatic?(awaitAuto?'待自動選筋；圖中修改格為輸入預設值，修改即轉為手動。':'自動選筋結果；可直接修改，修改後轉為手動。'):(dirty?'即時 RC 試算 · 尚未保存；按「保存配筋并检查」保存至項目。':'手動配筋；修改即時試算目前構件。');
+   card.querySelector('.rebar-status116').textContent=automatic?(awaitAuto?'待自動選筋；圖中修改格為輸入預設值，修改即轉為手動。':'自動選筋結果；可直接修改，修改後轉為手動。'):(dirty?'即時 RC 試算 · 尚未保存；按「保存配筋并检查」保存至項目。':'手動配筋；修改即時試算目前構件。水平淨距至少 40 mm；不受梁寬 ÷ 100 支數上限限制。');
    if(key){const replacement=card.querySelector('[data-inline-rebar234="'+key+'"]');replacement?.focus();if(selection&&replacement?.tagName?.toLowerCase()==='input'&&replacement?.setSelectionRange)replacement.setSelectionRange(...selection);}
   }
   for(const fields of Object.values(fieldRows))for(const field of fields.querySelectorAll('input,select'))field.addEventListener('input',()=>{if(['ex-top-dia','ex-bottom-dia'].includes(field.id))field.dataset.layers237=JSON.stringify(Array(8).fill(Number(field.value)));$('ex-steel-mode').value='MANUAL';dirty=changed231();draw();});

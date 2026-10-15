@@ -517,7 +517,7 @@ return html;}
   if(action==='reset'){BeamLoadUI.clear();store((ex,h)=>{Loading.saveFramingSupports(h.p,h.floor,chosen,{});delete ex.members[h.floor+'|'+chosen];});}
   if(action==='steel'||action==='auto-steel'){const h=state();let steel=null;if(action==='steel'&&$('ex-steel-mode').value==='MANUAL'){steel={};if(h.selected.kind==='SLAB'){for(const [k,id]of Object.entries({F35:'slab-dia',H35:'slab-space',C57:'trans-dia',D57:'trans-space'}))steel[k]=positive(read('ex-'+id,true),id);}
     else if(h.selected.kind==='COL'){steel.C5=read('ex-col-dia',true);steel.C32=positive(read('ex-col-count',true),'根数');if(!Number.isInteger(steel.C32))throw Error('钢筋根数须为整数');}
-    else steel=BeamRebar116.readSteel237();
+    else {steel=BeamRebar116.readSteel237();const errors=SectionB.horizontalErrors283(h.selected.kind,h.selected.member.b*1000,h.data.cover??SectionB.cover(h.selected.kind,Engine.beamFire241(h.p,h.floor,h.selected.kind)),steel);if(errors.length)throw Error(errors.join('；'));}
    }memberSave(o=>o.steel=steel);if(document.querySelector('.slab-panel121')){host.refresh();return;}await calculate();return;}
   if(action==='report-a'||action==='report-b'){host.tab(action==='report-a'?'reportA':'reportB');return;}
   if(action==='report-close')$('ex-report-dialog').close();

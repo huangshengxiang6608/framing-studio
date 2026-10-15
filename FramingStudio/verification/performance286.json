@@ -1,0 +1,112 @@
+{
+  "order": [
+    "8-E2.285",
+    "9-E2.286",
+    "10-E2.286",
+    "11-E2.285"
+  ],
+  "modelSha256": "a12b6babee854c7115d6c908f4b624f3cab5c3ccb8bb0502afe468c4fc96cd6f",
+  "selectedMembers": 13,
+  "sharedBeamMembers": 10,
+  "protocol": "Two isolated fresh caches per version; 285/286/286/285 order; identical captured current model, selected automatic/manual RC, machine, Excel and printer driver. Each cold run explicitly verifies RC then continues the same open workbooks into A/B generation, followed by two unchanged cached generations. Includes App planning and native host time; excludes browser PDF painting. Native benchmark phases do not overlap.",
+  "originalCheckInputsIdentical": true,
+  "summary": {
+    "285": {
+      "nativeCheckSeconds": [
+        120.57748,
+        85.8486869
+      ],
+      "nativeGenerationSeconds": [
+        69.3151173,
+        68.8057456
+      ],
+      "firstTotalSeconds": [
+        219.41390710000002,
+        181.62457270000002
+      ],
+      "firstTotalMeanSeconds": 200.5192399,
+      "nativeCheckMeanSeconds": 103.21308345,
+      "nativeGenerationMeanSeconds": 69.06043145,
+      "warmTotalSeconds": [
+        6.3109543999999875,
+        6.062667999999976,
+        6.094705000000016,
+        6.042019300000015
+      ],
+      "warmTotalMeanSeconds": 6.127586674999999
+    },
+    "286": {
+      "nativeCheckSeconds": [
+        68.2984021,
+        64.2154669
+      ],
+      "nativeGenerationSeconds": [
+        69.2949487,
+        79.6058007
+      ],
+      "firstTotalSeconds": [
+        167.6050175,
+        171.419506
+      ],
+      "firstTotalMeanSeconds": 169.51226175,
+      "nativeCheckMeanSeconds": 66.2569345,
+      "nativeGenerationMeanSeconds": 74.4503747,
+      "warmTotalSeconds": [
+        6.384664500000014,
+        6.043501499999984,
+        6.245093900000007,
+        6.734008000000002
+      ],
+      "warmTotalMeanSeconds": 6.351816975000002
+    }
+  },
+  "improvementPercent": 15.463343151242427,
+  "preservation": {
+    "9-E2.286": {
+      "A": {
+        "formulaCells": 15709,
+        "reportAndMemberSheets": 5,
+        "pdfFiles": 23,
+        "pdfPages": 25,
+        "timestampMaskedPages": 0,
+        "otherPixelDifferences": 0,
+        "formulaValueLayoutDifferences": 0
+      },
+      "B": {
+        "formulaCells": 18918,
+        "reportAndMemberSheets": 16,
+        "pdfFiles": 14,
+        "pdfPages": 15,
+        "timestampMaskedPages": 0,
+        "otherPixelDifferences": 0,
+        "formulaValueLayoutDifferences": 0
+      }
+    },
+    "10-E2.286": {
+      "A": {
+        "formulaCells": 15709,
+        "reportAndMemberSheets": 5,
+        "pdfFiles": 23,
+        "pdfPages": 25,
+        "timestampMaskedPages": 0,
+        "otherPixelDifferences": 0,
+        "formulaValueLayoutDifferences": 0
+      },
+      "B": {
+        "formulaCells": 18918,
+        "reportAndMemberSheets": 16,
+        "pdfFiles": 14,
+        "pdfPages": 15,
+        "timestampMaskedPages": 0,
+        "otherPixelDifferences": 0,
+        "formulaValueLayoutDifferences": 0
+      }
+    }
+  },
+  "printInterruptionTest": {
+    "blockedNativeComSeconds": 1.595,
+    "injectedServiceStatusOnly": true,
+    "preExistingExcelPreserved": true,
+    "windowsServiceUnchanged": true
+  }
+}

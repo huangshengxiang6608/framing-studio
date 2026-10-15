@@ -94,7 +94,18 @@ window.ExcelSync=(()=>{
   if(snapshot!==planSnapshot277){reportPlans277.clear();planSnapshot277=snapshot;}
   const key=JSON.stringify([section,filter]);
   if(!reportPlans277.has(key))reportPlans277.set(key,plan(JSON.parse(snapshot),'Report',section,filter));
-  return Engine.clone(reportPlans277.get(key));
+  const result=Engine.clone(reportPlans277.get(key));
+  // A retains its original loading inputs. B may reuse A's already-verified
+  // beam preparation, but still applies and checks its own slab/column inputs.
+  if(section==='A')for(const j of result.jobs.filter(j=>j.type==='RC'))for(const part of j.columnParts274||[j])part.shareRC286=true;
+  if(section==='B'&&reportPlans277.has(JSON.stringify(['A',filter]))){
+   const a=reportPlan277(snapshot,'A',filter).jobs.filter(j=>j.type==='RC').flatMap(j=>j.columnParts274||[j]);
+   for(const j of result.jobs.filter(j=>j.type==='RC'))for(const part of j.columnParts274||[j]){
+    const peer=a.find(x=>JSON.stringify(x.members.map(m=>[m.kind,m.id,m.row]))===JSON.stringify(part.members.map(m=>[m.kind,m.id,m.row])));
+    if(peer){const {reportPages,...data}=peer;part.sharedFrom286=data;}
+   }
+  }
+  return result;
  }
  async function start(kind,section=null,filter=null){if(busy)return;sizingChanges=[];let snapshot=current();lastSnapshot=snapshot;issues=[];records=[];runSection=kind==='Report'?section:null;runSections=kind==='Report'?(section==='AB'?['A','B']:[section]):[];pendingSections=new Set(runSections);finishes={};
   if(!available()){progress='请在桌面 App 中生成；此浏览器预览不能启动 Microsoft Excel。';for(const sec of runSections)reports[sec]={snapshot:reportSnapshot(sec,JSON.parse(snapshot)),issues:[],message:progress};pendingSections.clear();refresh();return;}

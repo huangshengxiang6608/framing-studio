@@ -32,6 +32,18 @@ static class VerifiedCache277 {
   Write(Path.Combine(source,"result.json"),result);Call("StoreJob79",job,source);Assert(File.Exists(Reference(job)),"successful combined output cached");
   string target=Fresh();Assert((bool)Call("RestoreJob79",job,target),"identical input hits");Assert(Hash(Path.Combine(source,"RC-filled.xlsm"))==Hash(Path.Combine(target,"RC-filled.xlsm")),"byte identical workbook");Assert((bool)Read(Path.Combine(target,"result.json"))["cached"],"cache status");
   File.AppendAllText(Path.Combine(target,"RC-filled.xlsm"),"user manual edits");Assert(Restore(job),"delivered edits cannot change private cache");
+  var prepare=new Dictionary<string,object>(job);prepare["prepareRC279"]=true;
+  var checkpoint=(Dictionary<string,object>)Call("CheckKey279",prepare);
+  Assert(Call("JobKey79",checkpoint).Equals(Call("JobKey79",Call("CheckKey279",job))),"Check and report share checkpoint identity");
+  Assert(!Call("JobKey79",checkpoint).Equals(Call("JobKey79",job)),"checkpoint cannot impersonate a completed report");
+  Assert(!Restore(checkpoint),"completed report does not masquerade as checkpoint");
+  string completedCheck=Fresh();Assert((bool)Call("CompletedCheck279",prepare,completedCheck),"Check can adopt already verified report without Excel");
+  Assert((bool)Read(Path.Combine(completedCheck,"result.json"))["preparedRC279"],"explicit Check state for completed verification");
+  result["preparedRC279"]=true;result["files"]=new object[0];Write(Path.Combine(source,"result.json"),result);
+  Call("StoreJob79",checkpoint,source);Assert((bool)Call("RestoreCheck279",job,Fresh()),"report restores Check snapshot");
+  foreach(string key in new[]{"fingerprint","section","cells","members"}){var altered=new Dictionary<string,object>(job);altered[key]="edited";Assert(!(bool)Call("RestoreCheck279",altered,Fresh()),"changed Check rejects "+key);}
+  string preparedEntry=Entry(checkpoint);File.AppendAllText(Path.Combine(preparedEntry,"RC-filled.xlsm"),"corrupt");Assert(!(bool)Call("RestoreCheck279",job,Fresh()),"damaged checkpoint rejects");
+  result.Remove("preparedRC279");result["files"]=new object[]{new Dictionary<string,object>{{"file","page.pdf"}}};Write(Path.Combine(source,"result.json"),result);
   var changed=Read(Path.Combine(source,"result.json"));
   foreach(string key in new[]{"fingerprint","section","cells","members","columnParts274"}){var j=new Dictionary<string,object>(job);j[key]="changed";Assert(!Restore(j),"invalidate "+key);}
   File.WriteAllText(Path.Combine(app,"assets/index.html"),"version2");Call("Start79",Fresh(),template);Assert(!Restore(job),"app version invalidates");File.WriteAllText(Path.Combine(app,"assets/index.html"),"version1");Call("Start79",Fresh(),template);

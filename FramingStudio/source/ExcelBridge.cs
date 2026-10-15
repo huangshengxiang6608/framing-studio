@@ -94,6 +94,23 @@ static class ExcelBridge {
  // Cache completed native outputs, including combined column workbooks. Each
  // publication is immutable; a small atomic reference selects a complete entry.
  static string JobKey79(Dictionary<string,object> job){return CacheKey79(job);}
+ // A verified RC checkpoint is a separate immutable artifact, never a completed
+ // report. Keep the full job/model/template identity; remove only the operation.
+ static Dictionary<string,object> CheckKey279(Dictionary<string,object> job){
+  var key=new Dictionary<string,object>(job);key.Remove("prepareRC279");key["verifiedRC279"]=true;return key;
+ }
+ static bool RestoreCheck279(Dictionary<string,object> job,string dir){
+  if(!RestoreJob79(CheckKey279(job),dir))return false;
+  Stage79("重用 Summary／Member Check 已核對工作簿；不重新選筋或逐項核對 RC");return true;
+ }
+ static bool CompletedCheck279(Dictionary<string,object> job,string dir){
+  var completed=new Dictionary<string,object>(job);completed.Remove("prepareRC279");
+  if(!RestoreJob79(completed,dir))return false;
+  var result=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(dir,"result.json"))));
+  result["preparedRC279"]=true;result["files"]=new object[0];
+  Write(Path.Combine(dir,"result.json"),result);StoreJob79(CheckKey279(job),dir);
+  Stage79("沿用本模型已生成報表的原生 Excel 核對；未重新計算");return true;
+ }
  static bool VerifiedJob277(Dictionary<string,object> job,string dir,out Dictionary<string,object> result){
   result=null;
   try{
@@ -664,7 +681,7 @@ static class ExcelBridge {
    foreach(var snapshot in snapshots)VerifySheet274(b,snapshot,IsDesign274(b.Worksheets[snapshot.Name]));
    if(b.LinkSources(1)!=null)throw new Exception("重開後發現外部連結");
    b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;
-   Write(Path.Combine(dir,"result.json"),new{ok=true,type="RC",workbook="RC-filled.xlsm",files=files,compared=total,differences=new object[0],sourceHash=results[0]["sourceHash"],fingerprint=job["fingerprint"],workbookHash=Hash(output),at=DateTime.Now.ToString("s"),mergedColumns274=imported,privateSheetsVerified274=snapshots.Count});
+   Write(Path.Combine(dir,"result.json"),new{ok=true,type="RC",workbook="RC-filled.xlsm",files=files,compared=total,differences=new object[0],sourceHash=results[0]["sourceHash"],fingerprint=job["fingerprint"],workbookHash=Hash(output),at=DateTime.Now.ToString("s"),mergedColumns274=imported,privateSheetsVerified274=snapshots.Count,reusedCheck279=results.All(r=>r.ContainsKey("reusedCheck279")&&Convert.ToBoolean(r["reusedCheck279"]))});
    Stage79("柱計算頁及原抄合併完成，儲存後重開核對通過");return 0;
   }catch(Exception e){File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());Write(Path.Combine(dir,"result.json"),new{ok=false,error=e.Message,compared=0,differences=new object[0]});return 1;}
   finally{if((object)other!=null)try{other.Close(false);}catch{}if((object)b!=null)try{b.Close(false);}catch{}if((object)x!=null)try{x.Quit();}catch{}}
@@ -679,16 +696,21 @@ static class ExcelBridge {
    if(kind=="Truss")return TrussJob109(job,dir);
    if(kind!="Overall"&&kind!="RC"&&kind!="Steel"&&kind!="Deflection"&&kind!="Foundation")throw new Exception("未知 Excel 类型");var template=Obj(config[kind]);string source=Path.Combine(root,Path.GetFileName(Convert.ToString(template["file"])));
    if(Hash(source)!=Convert.ToString(template["sha256"]))throw new Exception("Excel 模板已改变，请先更新 App；没有使用旧公式继续核对。");
-   Start79(dir,source);if(RestoreJob79(job,dir))return 0;
+   bool prepare279=job.ContainsKey("prepareRC279")&&Convert.ToBoolean(job["prepareRC279"]);
+   if(prepare279&&(kind!="RC"||job.ContainsKey("columnParts274")))throw new Exception("RC 核對須使用獨立原表工作");
+   Start79(dir,source);if(!prepare279&&RestoreJob79(job,dir))return 0;
    if(job.ContainsKey("columnParts274")){int code=CombineColumns274(root,dir,job);if(code==0)StoreJob79(job,dir);return code;}
+   if(prepare279&&CompletedCheck279(job,dir))return 0;
+   bool resumed279=kind=="RC"&&RestoreCheck279(job,dir);
+   Dictionary<string,object> checkpoint279=resumed279?Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(dir,"result.json")))):null;
+   if(resumed279&&prepare279)return 0;
    Stage79("打开原 Excel 模板");
    bool axis92=kind=="Deflection"&&job.ContainsKey("method")&&Convert.ToString(job["method"])=="BUILDING_AXIS";
-   RequireSpooler278();
-   RequirePrinterResponse278();
-   string copy=Path.Combine(dir,kind+(axis92?"-filled.xlsx":"-filled.xlsm"));if(File.Exists(copy))throw new Exception("输出已经存在，请重新生成一个核对任务。");if(!axis92)File.Copy(source,copy);if(kind=="RC")PrepareLoadTable273(copy,job);
+   if(!prepare279){RequireSpooler278();RequirePrinterResponse278();}
+   string copy=Path.Combine(dir,kind+(axis92?"-filled.xlsx":"-filled.xlsm"));if(!resumed279){if(File.Exists(copy))throw new Exception("输出已经存在，请重新生成一个核对任务。");if(!axis92)File.Copy(source,copy);if(kind=="RC")PrepareLoadTable273(copy,job);}
    x=Activator.CreateInstance(Type.GetTypeFromProgID("Excel.Application",true));x.Visible=false;x.DisplayAlerts=false;x.ScreenUpdating=false;x.EnableEvents=false;
    // Only the packaged, hash-verified user templates run macros, in this isolated instance.
-   x.AutomationSecurity=1;PreparePrinter278(x);Stage79("Excel A4 列印環境已通過");if(axis92){b=x.Workbooks.Add();b.SaveAs(copy,51);}else b=x.Workbooks.Open(copy,0,false);x.EnableEvents=false;Stage79("模板已打开");
+   x.AutomationSecurity=1;if(!prepare279){PreparePrinter278(x);Stage79("Excel A4 列印環境已通過");}if(axis92){b=x.Workbooks.Add();b.SaveAs(copy,51);}else b=x.Workbooks.Open(copy,0,false);x.EnableEvents=false;Stage79("模板已打开");
    var files=new List<object>();
    if(kind=="Overall"){
     dynamic input=b.Worksheets["图形输入"];input.Unprotect();var faces=Obj(job["faces"]);
@@ -715,6 +737,12 @@ static class ExcelBridge {
     SteelJob(x,b,job,files,dir);ReportPages75(b,job,files,dir);ReportInks84(b);EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }else{
     dynamic input=b.Worksheets["Input"],engine=b.Worksheets["_Input Engine"];Stage79("准备输入");int inputCalculation80=Convert.ToInt32(x.Calculation);
+    var resumedSheets279=new List<SheetSnapshot274>();
+    if(resumed279){
+     compared=Convert.ToInt32(checkpoint279["compared"]);
+     foreach(dynamic sheet in b.Worksheets)if(IsDesign274(sheet))resumedSheets279.Add(Snapshot274(sheet));
+     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("已核對工作簿狀態已失效，請更新 Check");
+    }else{
     string reset="A9:H28,J9:K28,M9:M28,A34:H43,A49:G68,A74:E93,A99:D118,A124:M143";
     x.Calculation=-4135;try{input.Unprotect();
     foreach(string range in reset.Split(','))input.Range[range].ClearContents();
@@ -755,6 +783,18 @@ static class ExcelBridge {
      Compare(id+" · check",b,new Dictionary<string,object>{{sheet,member["expected"]}});
      CaptureDesign265(x,b,job,member);
     }
+    if(prepare279){
+     if(differences.Count>0||compared<=0)throw new Exception("RC 未通過原 Excel 核對，沒有保存可重用結果");
+     Run(x,b,"PersistManualSteel78");Run(x,b,"PersistTransfer79");
+     RestoreFixedLoads252();foreach(var design in DesignCopies265)VerifyDesign265(b,design);
+     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
+     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("RC 核對狀態未完成");
+     input.Activate();EditableWorkbook270(b);x.EnableEvents=false;b.Save();
+     Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,preparedRC279=true,workbook=Path.GetFileName(copy),files=new object[0],compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+     b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;
+     StoreJob79(CheckKey279(job),dir);Stage79("原生 Excel RC 核對完成；已保存計算工作簿供 A／B 抄重用");return 0;
+    }
+    }
     string section=Convert.ToString(job["section"]);
     if(section=="A"||section=="Check"){Run(x,b,"GenerateCopy");}
     if(section=="B"||section=="Check"){
@@ -778,7 +818,7 @@ static class ExcelBridge {
     // the native check once at export time, so opening need not regenerate it.
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("导出前 RC Check 未完成");
-    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);x.EnableEvents=false;EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);foreach(var saved279 in resumedSheets279)VerifySheet274(b,saved279,true);x.EnableEvents=false;EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,reusedCheck279=resumed279,checkVerifiedAt279=resumed279?(checkpoint279.ContainsKey("verifiedAt")?checkpoint279["verifiedAt"]:checkpoint279["at"]):null,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
    Stage79("保存已核对结果");CommitPageCaches82(copy);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;StoreJob79(job,dir);GC.Collect();return 0;
   }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if((object)b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}

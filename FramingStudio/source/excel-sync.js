@@ -40,6 +40,37 @@ window.ExcelSync=(()=>{
  // Report versions ignore the transient Member Check selection and the other report's selection.
  const reportSnapshot=(section,p=window.ExcelProject().project)=>{const v=Engine.clone(p);if(v.explorer){delete v.explorer.selected;delete v.explorer[section==='A'?'reportB':'reportA'];if(section==='B')delete v.explorer.reportANotes;}for(const t of v.transferTrusses||[])delete t[section==='A'?'reportB':'reportA'];return JSON.stringify(v);};
  const send=o=>window.chrome?.webview?.postMessage?window.chrome.webview.postMessage(o):LocalExcel251.send(o),refresh=()=>WorkspacePages.refresh();
+ let native279={snapshot:null,running:false,records:[],issues:[],status:'尚未進行原生 Excel RC 核對',members:0},resolve279=null;
+ function nativeState279(){return {...native279,stale:native279.snapshot!==null&&native279.snapshot!==current()};}
+ function nativeRefresh279(){refresh();ExplorerUI.refreshNative279?.();}
+ async function verifyCheck279(){
+  if(busy)throw Error('已有 Excel 工作正在進行，請完成後更新 Check');
+  native279={snapshot:current(),running:false,records:[],issues:[],status:'正在準備原生 Excel RC 核對…',members:0};
+  if(!available()){native279.status='App 已計算；原生 Excel 未核對，請使用 Windows App 或本機網頁版';nativeRefresh279();return false;}
+  busy=true;native279.running=true;nativeRefresh279();
+  try{
+   await ExplorerUI.prepareNative279();
+   const snapshot=current(),p=JSON.parse(snapshot),jobs=[],covered=new Set();native279.snapshot=snapshot;
+   for(const section of ['A','B']){
+    const v=reportPlan277(snapshot,section,null),rc=v.jobs.filter(j=>j.type==='RC');
+    // Only RC issues belong to this check; wind/foundation prerequisites remain on their pages.
+    native279.issues.push(...v.issues.filter(x=>x.floor!=null||String(x.id).startsWith('Scheme 1 · Section ')));
+    for(const job of rc)for(const part of job.columnParts274||[job]){
+     const {reportPages,...data}=part;jobs.push({...data,_reportSection:section,prepareRC279:true});
+     if(section==='B')for(const m of data.members)covered.add(m.designName265);
+    }
+   }
+   const checked=Object.entries(p.explorer?.selected||{}).filter(([,v])=>v).map(([k])=>k);
+   const extra=checked.filter(k=>!p.explorer?.reportB?.[k]);
+   if(extra.length){const v=plan(p,'RC','B',extra);native279.issues.push(...v.issues);for(const job of v.jobs)for(const part of job.columnParts274||[job]){const {reportPages,...data}=part;jobs.push({...data,_reportSection:'B',prepareRC279:true});for(const m of data.members)covered.add(m.designName265);}}
+   native279.members=covered.size;native279.expected=jobs.length;
+   if(!jobs.length)throw Error('沒有可核對的已選 RC 構件；請完成輸入並勾選 Check');
+   const stamp=await fingerprint(snapshot);if(current()!==snapshot)throw Error('核對準備期間模型已修改，請更新 Check');
+   native279.fingerprint=stamp;native279.started=performance.now();native279.status='原生 Excel 正在核對已選 RC；完成後供 A／B 抄重用';
+   const done=new Promise(resolve=>resolve279=resolve);nativeRefresh279();
+   send({kind:'excel-run',parallelReports:true,openWhenReady:false,jobs:jobs.map(j=>({...j,fingerprint:stamp,preview:true}))});return await done;
+  }catch(error){native279.status='Excel RC 核對未完成：'+error.message;native279.running=false;busy=false;nativeRefresh279();return false;}
+ }
  async function fingerprint(text){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');}
  function overallJob(p){const faces={},states={};for(const face of ['B','D']){const input=OverallGeometry.input(p,face),state=OverallGeometry.calculate(input,face);if(state.state!=='CALCULATED')throw Error(face+' 面：'+state.state);states[face]=state;const m=Overall.machine(input,face),expected={};for(const role of [1,2,3,4]){const sheet=Overall.roles[role];expected[sheet]={};for(const [cell,def] of Object.entries(Overall.source.sheets[sheet].cells)){if(!def.formula)continue;const value=m.safe(sheet,cell);if(typeof value==='string'&&(/^(#|Unsupported|Circular)/.test(value)))continue;expected[sheet][cell]=value;}}faces[face]={input:Overall.normalize(input,face),expected};}const comparison={};for(const [row,value] of Object.entries(Overall.compareFaces(states.B,states.D)))comparison['G'+row]=value;for(const face of ['B','D'])for(const [row,value] of Object.entries(states[face].results))comparison[(face==='B'?'C':'E')+row]=value;return {type:'Overall',faces,comparison,label:'Overall · B / D'};}
  function plan(p,kind,section,filter){const jobs=[],problems=[];
@@ -89,7 +120,21 @@ window.ExcelSync=(()=>{
   await WorkspacePages.setPDF(section,result.bytes);report.layout=result.stats;report.generatedAt=new Date().toISOString();report.message='';
  }
  function finishOnce(section){return finishes[section]??=(async()=>{try{await finishReport(section);}catch(e){reports[section].message='预览未完成：'+e.message;progress=e.message;}finally{pendingSections.delete(section);refresh();}})();}
- async function receive(message){if(message.record){records.push(message.record);const report=reports[message.record.reportSection];if(report)(report.records??=[]).push(message.record);}if(message.progress)progress=message.progress;
+ async function receive(message){
+  if(native279.running){
+   if(message.record)native279.records.push(message.record);
+   if(message.progress)native279.status=message.progress;
+   if(message.error)native279.issues.push({id:'Excel',reason:message.error});
+   if(message.done){
+    const rs=native279.records,valid=rs.length===native279.expected&&rs.every(r=>r.ok&&r.preparedRC279&&r.compared>0&&!r.differences?.length&&r.fingerprint===native279.fingerprint);
+    native279.seconds=(performance.now()-native279.started)/1000;native279.running=false;busy=false;
+    native279.verified=valid&&!native279.issues.length&&current()===native279.snapshot;
+    native279.status=current()!==native279.snapshot?'模型已改動；本次 Excel 核對屬舊版本，請更新 Check':native279.verified?'Excel RC 已核對 · '+native279.members+' 個已選構件 · '+rs.reduce((n,r)=>n+r.compared,0)+' 項一致'+(rs.every(r=>r.cached)?' · 重用已核對結果':''):'Excel RC 核對未完整；請查看未核對原因';
+    const resolve=resolve279;resolve279=null;resolve?.(native279.verified);
+   }
+   nativeRefresh279();return;
+  }
+  if(message.record){records.push(message.record);const report=reports[message.record.reportSection];if(report)(report.records??=[]).push(message.record);}if(message.progress)progress=message.progress;
   if(message.error)for(const sec of runSections)reports[sec].issues.push({id:'生成中断',reason:message.error});
   if(message.sectionDone&&runSections.includes(message.sectionDone))await finishOnce(message.sectionDone);
   if(message.done){await Promise.all(runSections.map(finishOnce));busy=false;runSection=null;pendingSections.clear();}refresh();
@@ -100,5 +145,5 @@ window.ExcelSync=(()=>{
  function open(type='Overall',section,filter){window.StudioHost?.navigate(section==='B'?'reportB':'reportA');if(filter?.member)start(type,section||'Check',[filter.member]);}
  function openWorkbook(id,file){if(available())send({kind:'excel-open',id,file});}
  document.addEventListener('click',e=>{const b=e.target.closest('[data-excel-open],[data-ex]');if(!b)return;if(b.dataset.excelOpen){e.preventDefault();e.stopImmediatePropagation();open(b.dataset.excelOpen);}else if(['preview-report','excel-row'].includes(b.dataset.ex)){e.preventDefault();e.stopImmediatePropagation();open('RC',b.dataset.section||'Check',b.dataset.ex==='excel-row'?{member:b.dataset.floor+'|'+b.dataset.token}:null);}},true);
- return {available,open,receive,overallJob,plan,state,reportState,ensureReport,generateReport:section=>start('Report',section),generate:type=>start(type),openWorkbook};
+ return {available,open,receive,overallJob,plan,state,reportState,ensureReport,verifyCheck279,nativeState279,generateReport:section=>start('Report',section),generate:type=>start(type),openWorkbook};
 })();

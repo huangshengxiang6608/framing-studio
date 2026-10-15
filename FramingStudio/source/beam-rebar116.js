@@ -34,7 +34,7 @@ const BeamRebar116=(()=>{
  function preview237(row,steel){
   const v=row?.result?.inputs;if(!v)return null;
   try{return {...row,result:SectionB.beam({acceptance261:'rc',kind:row.result.kind||row.kind,L:v.G12,b:v.G14,h:v.G15,cover:v.G16,fcu:v.G17,M:v.G23,V:v.G24,T:v.K25,steel})};}
-  catch(e){return {...row,result:{status:'INPUT REQUIRED',fail:[e.message]}};}
+  catch(e){return {...row,result:{status:'INPUT REQUIRED',fail:[e.message],description:'—'}};}
  }
  function measures237(row,steel){
   const v=row?.result?.values||{},number=(x)=>typeof x==='number'&&Number.isFinite(x)?x:null,m=row?.result?.inputs?SectionB.machine(row.result.kind||row.kind,row.result.inputs,!!row.result.manualSpacing283):null,cell=k=>{if(number(v[k])!==null)return v[k];try{return number(m?.get(k));}catch{return null;}};
@@ -125,7 +125,7 @@ const BeamRebar116=(()=>{
    card.querySelector('[data-rebar-torsion]').textContent='抗扭 · '+(awaitAuto?'待自動選筋':$('ex-tor-legs').value+' 肢 T'+$('ex-tor-dia').value+' @ '+$('ex-tor-space').value+' mm');
    const input=Loading.input(h.p,h.floor,token),L=Math.hypot(beam.rawZ[0]-beam.rawA[0],beam.rawZ[1]-beam.rawA[1]);
    try{const size=Reports.sizing(h.p,{kind:beam.kind,member:beam,floor:h.floor,input,loading:{L}});card.querySelector('.rebar-ratio227').textContent='Span/Depth · L/h = '+Number(size.ratio.toFixed(3))+' / '+size.limit+' · '+size.status+'（獨立判定）';}catch{card.querySelector('.rebar-ratio227').textContent='';}
-   card.querySelector('.rebar-status116').textContent=automatic?(awaitAuto?'待自動選筋；圖中修改格為輸入預設值，修改即轉為手動。':'自動選筋結果；修改後轉為手動，按 Enter／離開輸入格自動保存；選擇直徑後自動保存。'):(dirty?'尚未保存 · 按 Enter 或離開輸入格後自動保存；輸入錯誤時不會保存。':(saved284?'配筋已自動保存；':'手動配筋；')+(current?'App Check 已更新。':'App Check 更新中／待更新。')+' 水平淨距至少 40 mm。');
+   card.querySelector('.rebar-status116').textContent=automatic?(awaitAuto?'待自動選筋；圖中修改格為輸入預設值，修改即轉為手動。':'自動選筋結果；修改後轉為手動，按 Enter／離開輸入格自動保存；選擇直徑後自動保存。'):(dirty?'尚未保存 · 按 Enter 或離開輸入格後自動保存；輸入錯誤時不會保存。':(saved284?'配筋已自動保存；':'手動配筋；')+(current?.localRebar285?'目前梁 App RC 已更新；全樓 Check 背景更新中。':current?'App Check 已更新。':'App Check 更新中／待更新。')+' 水平淨距至少 40 mm。');
    if(key){const replacement=card.querySelector('[data-inline-rebar234="'+key+'"]');replacement?.focus();if(selection&&replacement?.tagName?.toLowerCase()==='input'&&replacement?.setSelectionRange)replacement.setSelectionRange(...selection);}
    drawing284=false;
   }
@@ -159,7 +159,7 @@ const BeamRebar116=(()=>{
     card.dispatchEvent(new CustomEvent('framing-rebar-save284',{bubbles:true,detail}));
     if(!detail.saved)throw Error(detail.error||'構件已切換，配筋未保存。');
     fields231.forEach((field,i)=>initial231[i]=field.value);for(const part of ['top','bottom'])initialDias237[part]=dias(part);
-    mode231='MANUAL';dirty=false;saved284=true;card.querySelector('.rebar-status116').textContent='配筋已自動保存；App Check 更新中。';
+    mode231='MANUAL';dirty=false;saved284=true;card.querySelector('.rebar-status116').textContent=h.memberResult?.(h.floor,token)?'配筋已自動保存；目前梁 App RC 已更新，未更新 Excel。':'配筋已自動保存；App Check 更新中，未更新 Excel。';
    }catch(err){card.querySelector('.rebar-status116').textContent='未保存：'+err.message;}
    finally{saving284=false;}
   }

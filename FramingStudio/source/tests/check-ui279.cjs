@@ -3,7 +3,7 @@ const c=context(),{document,window}=parseHTML('<html><head></head><body><aside i
 c.run(`globalThis.h279={p:Engine.clone(loading115Tests().projects.slab),floor:1,key:'F1'};h279.result=Engine.generate(h279.p);globalThis.ui279=ExplorerUI({get:()=>h279,refresh(){},toast(){},transact(fn){fn();h279.result=Engine.generate(h279.p);return true;}});window.ExcelProject=()=>({project:Engine.clone(h279.p)});WorkspacePages.refresh=()=>{};WorkspacePages.clearPDF=()=>{};window.chrome={webview:{postMessage:x=>sent279.push(x)}};`);
 (async()=>{
  document.getElementById('side').innerHTML=c.run("ui279.render('checks')");
- const button=document.querySelector('[data-native-check279] button');assert(button);assert(button.textContent.includes('更新 Check'));
+ const button=document.querySelector('[data-native-check279] button');assert(button);assert(button.textContent.includes('更新至EXCEL並核對'));
  button.dispatchEvent(new window.Event('click',{bubbles:true}));
  const deadline=Date.now()+45000;while(!c.ctx.sent279.length&&Date.now()<deadline)await new Promise(r=>setTimeout(r,20));
  assert.equal(c.ctx.sent279.length,1,'Member Check button invokes native verification after the App audit');

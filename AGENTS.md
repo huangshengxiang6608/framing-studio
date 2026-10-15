@@ -113,3 +113,9 @@ reject invalid inputs without overwriting the stored arrangement, retain undo
 and local backup, and update App checks without launching native Excel. The
 project file still uses Save Project. Calculation/selection rules and original
 Excel formulas, VBA and A/B report formatting remain unchanged.
+
+E2.285 clarification: daily Member Check reinforcement editing is App-only.
+Show local beam RC promptly when the load basis is unchanged, without marking
+the whole-building/report output fresh. The user-confirmed native verification
+scope remains selected Check/A/B members; label its explicit command
+"更新至EXCEL並核對" and the restore command "恢復 App 自動選筋".

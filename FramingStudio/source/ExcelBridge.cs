@@ -601,21 +601,39 @@ static class ExcelBridge {
     throw new Exception("無效的柱合併工作");
    var results=new List<Dictionary<string,object>>();var folders=new List<string>();var files=new List<object>();
    int total=0;
+   // At most two independent, already-verified column contexts per section.
+   // Their native workers own different Excel instances and output directories.
+   // Validate and stage every part before dispatch; preserve ordered merging.
    for(int i=0;i<parts.Count;i++){
     var part=parts[i];if(i==0&&job.ContainsKey("reportPages"))part["reportPages"]=job["reportPages"];
     if(part.ContainsKey("columnParts274")||Convert.ToString(part["type"])!="RC"||Convert.ToString(part["section"])!=section
       ||(i>0&&(Arr(part["members"]).Count()!=1||Convert.ToString(Obj(Arr(part["members"]).First())["kind"])!="COL")))
      throw new Exception("合併部分必須是同一 Section 的獨立柱工作");
     part["fingerprint"]=job["fingerprint"];part["preview"]=job.ContainsKey("preview")&&Convert.ToBoolean(job["preview"]);
-    string folder=Path.Combine(dir,"column-part-"+(i+1));Directory.CreateDirectory(folder);folders.Add(folder);
-    string path=Path.Combine(folder,"job.json");Write(path,part);
+    string folder=Path.Combine(dir,"column-part-"+(i+1));Directory.CreateDirectory(folder);Write(Path.Combine(folder,"job.json"),part);
+   }
+   System.Threading.Thread second280=null;int secondCode280=1;Exception secondError280=null;
+   if(parts.Count==2&&parts.All(p=>LiveAvailable280(p))){
+    string secondPath280=Path.Combine(dir,"column-part-2","job.json");
+    second280=new System.Threading.Thread(delegate(){
+     var domain280=AppDomain.CreateDomain("LiveColumnPart280-2");
+     try{secondCode280=domain280.ExecuteAssembly(typeof(ExcelBridge).Assembly.Location,new[]{"--recover272",root,secondPath280});}
+     catch(Exception error){secondError280=error;}
+     finally{AppDomain.Unload(domain280);}
+    });second280.SetApartmentState(System.Threading.ApartmentState.STA);second280.IsBackground=true;second280.Start();
+   }
+   for(int i=0;i<parts.Count;i++){
+    var part=parts[i];string folder=Path.Combine(dir,"column-part-"+(i+1));folders.Add(folder);
+    string path=Path.Combine(folder,"job.json");
     AppDomain domain=AppDomain.CreateDomain("ColumnPart274-"+i);int code;
     using(var relay=new System.Threading.Timer(delegate(object unused){try{
      var progress=Obj(new JavaScriptSerializer().DeserializeObject(File.ReadAllText(Path.Combine(folder,"progress.json"))));
      progress["message"]="柱資料獨立核對 · "+Convert.ToString(progress["message"]);Write(Path.Combine(dir,"progress.json"),progress);
     }catch{}},null,400,400)){
-     try{code=domain.ExecuteAssembly(typeof(ExcelBridge).Assembly.Location,new[]{"--recover272",root,path});}
-     finally{AppDomain.Unload(domain);}
+     try{
+      if(i==1&&second280!=null){second280.Join();if(secondError280!=null)throw secondError280;code=secondCode280;}
+      else code=domain.ExecuteAssembly(typeof(ExcelBridge).Assembly.Location,new[]{"--recover272",root,path});
+     }finally{AppDomain.Unload(domain);}
     }
     var result=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(folder,"result.json"))));
     if(code!=0||!Convert.ToBoolean(result["ok"])||Arr(result["differences"]).Any())
@@ -681,12 +699,109 @@ static class ExcelBridge {
    foreach(var snapshot in snapshots)VerifySheet274(b,snapshot,IsDesign274(b.Worksheets[snapshot.Name]));
    if(b.LinkSources(1)!=null)throw new Exception("重開後發現外部連結");
    b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;
-   Write(Path.Combine(dir,"result.json"),new{ok=true,type="RC",workbook="RC-filled.xlsm",files=files,compared=total,differences=new object[0],sourceHash=results[0]["sourceHash"],fingerprint=job["fingerprint"],workbookHash=Hash(output),at=DateTime.Now.ToString("s"),mergedColumns274=imported,privateSheetsVerified274=snapshots.Count,reusedCheck279=results.All(r=>r.ContainsKey("reusedCheck279")&&Convert.ToBoolean(r["reusedCheck279"]))});
+   Write(Path.Combine(dir,"result.json"),new{ok=true,type="RC",workbook="RC-filled.xlsm",files=files,compared=total,differences=new object[0],sourceHash=results[0]["sourceHash"],fingerprint=job["fingerprint"],workbookHash=Hash(output),at=DateTime.Now.ToString("s"),mergedColumns274=imported,privateSheetsVerified274=snapshots.Count,reusedCheck279=results.All(r=>r.ContainsKey("reusedCheck279")&&Convert.ToBoolean(r["reusedCheck279"])),continuedLive280=results.All(r=>r.ContainsKey("continuedLive280")&&Convert.ToBoolean(r["continuedLive280"]))});
    Stage79("柱計算頁及原抄合併完成，儲存後重開核對通過");return 0;
   }catch(Exception e){File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());Write(Path.Combine(dir,"result.json"),new{ok=false,error=e.Message,compared=0,differences=new object[0]});return 1;}
   finally{if((object)other!=null)try{other.Close(false);}catch{}if((object)b!=null)try{b.Close(false);}catch{}if((object)x!=null)try{x.Quit();}catch{}}
  }
  static bool IsDesign274(dynamic sheet){try{object name=sheet.Names.Item("_RCDesign265");return name!=null;}catch{return false;}}
+
+ // A bounded, private STA worker retains its verified workbook for five minutes.
+ // Check completion is published independently of process exit. Only an exact
+ // job/template/software key can claim the continuation; no user Excel is attached.
+ static System.IO.Pipes.NamedPipeServerStream LivePipe280;
+ static StreamWriter LiveReply280;
+ static FileStream LiveSlot280;
+ static string LiveIndex280,LiveToken280;
+ static bool Continued280;
+ static bool IsPrepare280(Dictionary<string,object> job){return job.ContainsKey("prepareRC279")&&Convert.ToBoolean(job["prepareRC279"]);}
+ static bool Ready280(string directory,int pid){try{
+  var r=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(directory,"result.json"))));
+  return r.ContainsKey("liveReady280")&&Convert.ToBoolean(r["liveReady280"])&&Convert.ToInt32(r["workerPid280"])==pid&&Convert.ToBoolean(r["ok"]);
+ }catch{return false;}}
+ static string LiveKey280(Dictionary<string,object> job){return CacheKey79(CheckKey279(job));}
+ static string LiveFile280(string key){return Path.Combine(CacheDirectory79,"live280",key+".json");}
+ static bool LiveAvailable280(Dictionary<string,object> job){try{
+  var entry=Obj(J.DeserializeObject(File.ReadAllText(LiveFile280(LiveKey280(job)))));
+  using(var worker=System.Diagnostics.Process.GetProcessById(Convert.ToInt32(entry["pid"])))
+   return !worker.HasExited&&worker.StartTime.ToUniversalTime().Ticks==Convert.ToInt64(entry["started"])&&DateTime.UtcNow.Ticks<Convert.ToInt64(entry["expires"]);
+ }catch{return false;}}
+ static int? UseLive280(Dictionary<string,object> job,string directory){
+  if(Convert.ToString(job["type"])!="RC"||job.ContainsKey("columnParts274"))return null;
+  string key=LiveKey280(job),index=LiveFile280(key);
+  try{
+   var entry=Obj(J.DeserializeObject(File.ReadAllText(index)));
+   if(DateTime.UtcNow.Ticks>=Convert.ToInt64(entry["expires"]))return null;
+   using(var worker=System.Diagnostics.Process.GetProcessById(Convert.ToInt32(entry["pid"])))
+    if(worker.HasExited||worker.StartTime.ToUniversalTime().Ticks!=Convert.ToInt64(entry["started"]))return null;
+   using(var pipe=new System.IO.Pipes.NamedPipeClientStream(".",Convert.ToString(entry["pipe"]),System.IO.Pipes.PipeDirection.InOut,System.IO.Pipes.PipeOptions.Asynchronous)){
+    pipe.Connect(800);
+    var writer=new StreamWriter(pipe,new UTF8Encoding(false),1024,true){AutoFlush=true};
+    var reader=new StreamReader(pipe,Encoding.UTF8,false,1024,true);
+    writer.WriteLine(J.Serialize(new{key=key,path=Path.Combine(directory,"job.json")}));
+    var response=reader.ReadLineAsync();
+    if(!response.Wait(1800000))throw new TimeoutException("已核對 Excel 接續生成逾時");
+    string line=response.Result;if(line=="MISS")return null;
+    int code;if(!Int32.TryParse(line,out code))throw new IOException("已核對 Excel 工作階段已中斷；請更新 Check 後再生成");
+    return code;
+   }
+  }catch(System.TimeoutException){return null;}catch(System.ArgumentException){return null;}
+  catch(FileNotFoundException){return null;}catch(DirectoryNotFoundException){return null;}
+  catch(IOException){
+   // A dead worker is safe to recompute in a new job directory; never certify
+   // its partial report. Remove no files: completed outputs are still immutable.
+   if(File.Exists(Path.Combine(directory,"result.json"))){var r=Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(directory,"result.json"))));if(r.ContainsKey("ok")&&Convert.ToBoolean(r["ok"])&&!r.ContainsKey("liveReady280"))return 0;}
+   return null;
+  }
+ }
+ static bool WaitLive280(string source,string origin,Dictionary<string,object> job,Dictionary<string,object> verified,out string nextPath){
+  nextPath=null;if(Environment.GetEnvironmentVariable("FRAMING_DISABLE_LIVE280")=="1")return false;
+  string key=LiveKey280(job),folder=Path.Combine(CacheDirectory79,"live280");Directory.CreateDirectory(folder);
+  // Keep at most four idle native workbooks per cache/user. Larger batches use
+  // durable checkpoints, without an unbounded collection of Excel processes.
+  for(int i=0;i<4&&LiveSlot280==null;i++)try{LiveSlot280=new FileStream(Path.Combine(folder,"slot"+i),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);}catch(IOException){}
+  if(LiveSlot280==null)return false;
+  LiveToken280="FramingRC280-"+Guid.NewGuid().ToString("N");LiveIndex280=LiveFile280(key);
+  DateTime deadline=DateTime.UtcNow.AddMinutes(5);int ttl;
+  if(Int32.TryParse(Environment.GetEnvironmentVariable("FRAMING_LIVE_SECONDS280"),out ttl)&&ttl>=1&&ttl<=300)deadline=DateTime.UtcNow.AddSeconds(ttl);
+  LivePipe280=new System.IO.Pipes.NamedPipeServerStream(LiveToken280,System.IO.Pipes.PipeDirection.InOut,1,System.IO.Pipes.PipeTransmissionMode.Byte,System.IO.Pipes.PipeOptions.Asynchronous);
+  using(var process=System.Diagnostics.Process.GetCurrentProcess()){
+   Write(LiveIndex280,new{pipe=LiveToken280,pid=process.Id,started=process.StartTime.ToUniversalTime().Ticks,expires=deadline.Ticks});
+   verified["liveReady280"]=true;verified["workerPid280"]=process.Id;verified["liveUntil280"]=deadline.ToString("o");
+  }
+  Write(Path.Combine(origin,"result.json"),verified);Stage79("原生 Excel 已核對；保持同一工作簿供生成抄接續（最多 5 分鐘）");
+  while(DateTime.UtcNow<deadline){
+   var connected=LivePipe280.BeginWaitForConnection(null,null);
+   if(!connected.AsyncWaitHandle.WaitOne(Math.Max(1,(int)(deadline-DateTime.UtcNow).TotalMilliseconds)))break;
+   LivePipe280.EndWaitForConnection(connected);connected.AsyncWaitHandle.Close();
+   var reader=new StreamReader(LivePipe280,Encoding.UTF8,false,1024,true);
+   LiveReply280=new StreamWriter(LivePipe280,new UTF8Encoding(false),1024,true){AutoFlush=true};
+   try{
+    var read=reader.ReadLineAsync();if(!read.Wait(5000))throw new IOException("Incomplete continuation request");
+    var request=Obj(J.DeserializeObject(read.Result));string path=Path.GetFullPath(Convert.ToString(request["path"]));
+    if(Path.GetFileName(path)!="job.json")throw new IOException("Invalid continuation path");
+    var candidate=Obj(J.DeserializeObject(File.ReadAllText(path)));
+    // Recheck binaries, template and exact submitted inputs when consuming the
+    // live session, including changes made while the worker was idle.
+    Start79(origin,source);
+    if(Convert.ToString(request["key"])!=key||LiveKey280(job)!=key||LiveKey280(candidate)!=key){LiveReply280.WriteLine("MISS");}
+    else if(IsPrepare280(candidate)){
+     var repeat=new Dictionary<string,object>(verified);repeat.Remove("liveReady280");repeat["cached"]=true;repeat["liveVerified280"]=true;
+     Write(Path.Combine(Path.GetDirectoryName(path),"result.json"),repeat);LiveReply280.WriteLine("0");
+    }else{
+     nextPath=path;Continued280=true;RemoveLiveIndex280();return true;
+    }
+   }catch(Exception){try{LiveReply280.WriteLine("MISS");}catch{}}
+   LiveReply280=null;LivePipe280.Disconnect();
+  }
+  CloseLive280();Start79(origin,source);return false;
+ }
+ static void RemoveLiveIndex280(){try{if(LiveIndex280!=null&&Convert.ToString(Obj(J.DeserializeObject(File.ReadAllText(LiveIndex280)))["pipe"])==LiveToken280)File.Delete(LiveIndex280);}catch{}}
+ static void CloseLive280(){
+  RemoveLiveIndex280();if(LivePipe280!=null)try{LivePipe280.Dispose();}catch{}LivePipe280=null;LiveReply280=null;
+  if(LiveSlot280!=null)LiveSlot280.Dispose();LiveSlot280=null;
+ }
+ static void CompleteLive280(int code){if(LiveReply280!=null)try{LiveReply280.WriteLine(code.ToString());}catch{}CloseLive280();}
 
  static int RunJob272(string[] args){
   if(args.Length==3&&(args[0]=="--open"||args[0]=="--verify-open"))return OpenWorkbook(args[1],args[2],args[0]=="--open");
@@ -700,6 +815,7 @@ static class ExcelBridge {
    if(prepare279&&(kind!="RC"||job.ContainsKey("columnParts274")))throw new Exception("RC 核對須使用獨立原表工作");
    Start79(dir,source);if(!prepare279&&RestoreJob79(job,dir))return 0;
    if(job.ContainsKey("columnParts274")){int code=CombineColumns274(root,dir,job);if(code==0)StoreJob79(job,dir);return code;}
+   int? liveCode280=UseLive280(job,dir);if(liveCode280.HasValue)return liveCode280.Value;
    if(prepare279&&CompletedCheck279(job,dir))return 0;
    bool resumed279=kind=="RC"&&RestoreCheck279(job,dir);
    Dictionary<string,object> checkpoint279=resumed279?Obj(J.DeserializeObject(File.ReadAllText(Path.Combine(dir,"result.json")))):null;
@@ -789,10 +905,26 @@ static class ExcelBridge {
      RestoreFixedLoads252();foreach(var design in DesignCopies265)VerifyDesign265(b,design);
      if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
      if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("RC 核對狀態未完成");
-     input.Activate();EditableWorkbook270(b);x.EnableEvents=false;b.Save();
-     Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,preparedRC279=true,workbook=Path.GetFileName(copy),files=new object[0],compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
-     b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;
-     StoreJob79(CheckKey279(job),dir);Stage79("原生 Excel RC 核對完成；已保存計算工作簿供 A／B 抄重用");return 0;
+     string preparedVersion280=CacheVersion79,nextPath280;
+     var verified280=new Dictionary<string,object>{{"ok",true},{"type",kind},{"preparedRC279",true},{"workbook",null},{"files",new object[0]},{"compared",compared},{"differences",differences},{"sourceHash",Hash(source)},{"fingerprint",job["fingerprint"]},{"at",DateTime.Now.ToString("s")}};
+     if(WaitLive280(source,dir,job,verified280,out nextPath280)){
+      // Continue with the SAME COM workbook. No intermediate Save/Close/Open.
+      checkpoint279=verified280;resumed279=true;prepare279=false;
+      job=Obj(J.DeserializeObject(File.ReadAllText(nextPath280)));ActiveJob75=job;
+      dir=Path.GetDirectoryName(nextPath280);copy=Path.Combine(dir,"RC-filled.xlsm");Start79(dir,source);
+      if(File.Exists(copy))throw new Exception("接續輸出已存在，未覆蓋任何工作簿");
+      RequireSpooler278();RequirePrinterResponse278();PreparePrinter278(x);
+      Stage79("接續同一份已核對 Excel；沒有中途儲存、關閉或重開");
+     }else{
+      // Idle expiry / slot limit: make the same durable E279 checkpoint. A
+      // software/template change while idle cannot bless this old workbook.
+      input.Activate();EditableWorkbook270(b);x.EnableEvents=false;b.Save();
+      verified280.Remove("liveReady280");verified280["workbook"]=Path.GetFileName(copy);verified280["workbookHash"]=Hash(copy);
+      Write(Path.Combine(dir,"result.json"),verified280);
+      b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;
+      if(CacheVersion79==preparedVersion280)StoreJob79(CheckKey279(job),dir);
+      Stage79("已保存核對工作簿，釋放閒置 Excel");return 0;
+     }
     }
     }
     string section=Convert.ToString(job["section"]);
@@ -818,11 +950,11 @@ static class ExcelBridge {
     // the native check once at export time, so opening need not regenerate it.
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")Run(x,b,"Check99");
     if(Convert.ToString(Val(engine.Range["AS1"]))!="CURRENT")throw new Exception("导出前 RC Check 未完成");
-    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);foreach(var saved279 in resumedSheets279)VerifySheet274(b,saved279,true);x.EnableEvents=false;EditableWorkbook270(b);b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,reusedCheck279=resumed279,checkVerifiedAt279=resumed279?(checkpoint279.ContainsKey("verifiedAt")?checkpoint279["verifiedAt"]:checkpoint279["at"]):null,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
+    RestoreFixedLoads252();foreach(var design265 in DesignCopies265)VerifyDesign265(b,design265);foreach(var saved279 in resumedSheets279)VerifySheet274(b,saved279,true);x.EnableEvents=false;EditableWorkbook270(b);if(Continued280)b.SaveAs(copy,52);else b.Save();Write(Path.Combine(dir,"result.json"),new {ok=true,type=kind,reusedCheck279=resumed279,continuedLive280=Continued280,continuedWorker280=Continued280?System.Diagnostics.Process.GetCurrentProcess().Id:0,checkVerifiedAt279=resumed279?(checkpoint279.ContainsKey("verifiedAt")?checkpoint279["verifiedAt"]:checkpoint279["at"]):null,workbook=Path.GetFileName(copy),files=files,compared=compared,differences=differences,sourceHash=Hash(source),fingerprint=job["fingerprint"],workbookHash=Hash(copy),at=DateTime.Now.ToString("s")});
    }
-   Stage79("保存已核对结果");CommitPageCaches82(copy);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;StoreJob79(job,dir);GC.Collect();return 0;
-  }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if((object)b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});return 1;}
-  finally{if((object)b!=null)try{b.Close(false);}catch{}if((object)x!=null)try{x.Quit();}catch{}}
+   Stage79("保存已核对结果");CommitPageCaches82(copy);b.Close(false);b=null;x.Quit();Marshal.FinalReleaseComObject(x);x=null;StoreJob79(job,dir);CompleteLive280(0);GC.Collect();return 0;
+  }catch(Exception e){try{RestoreFixedLoads252();}catch(Exception restoreError){e=new Exception(e.Message+"; "+restoreError.Message,e);}File.WriteAllText(Path.Combine(dir,"error-details.txt"),e.ToString());string partial=null;if((object)b!=null)try{b.Save();partial=Path.GetFileName(Convert.ToString(b.FullName));}catch{}Write(Path.Combine(dir,"result.json"),new {ok=false,error=e.Message,workbook=partial,compared=compared,differences=differences});CompleteLive280(1);return 1;}
+  finally{CloseLive280();if((object)b!=null)try{b.Close(false);}catch{}if((object)x!=null)try{x.Quit();}catch{}}
  }
   static double D(Dictionary<string,object> a,string k,double fallback=0){return a.ContainsKey(k)&&a[k]!=null?Convert.ToDouble(a[k]):fallback;}
  static void FoundationJob76(dynamic x,dynamic b,Dictionary<string,object> job,List<object> files,string dir){

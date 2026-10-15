@@ -95,15 +95,16 @@ const BeamRebar116=(()=>{
    }
    card.querySelector('.rebar-fields227').append(panel);
   }
-  if(saveRow?.querySelector('[data-ex="steel"]'))card.append(saveRow);
+  if(saveRow?.querySelector('[data-ex="steel"]')){saveRow.querySelector('[data-ex="steel"]').remove();card.append(saveRow);}
   const counts=part=>$('ex-'+part+'-counts').value.split(/[,，]/).map(x=>Number(x.trim()));
   const dias=part=>JSON.parse($('ex-'+part+'-dia').dataset.layers237);
   const countText=part=>{const ns=counts(part); return ns.some(x=>!Number.isInteger(x)||x<0)||ns.length>8?'請輸入有效根數':ns.some(x=>x>0)?ns.map((n,i)=>n>0?'第 '+(i+1)+' 層 '+n+'T'+dias(part)[i]:'').filter(Boolean).join(' + '):'未配筋';};
-  const fields231=[...Object.values(fieldRows)].flatMap(fields=>[...fields.querySelectorAll('input,select')]),initial231=fields231.map(field=>field.value),mode231=$('ex-steel-mode').value;
+  const fields231=[...Object.values(fieldRows)].flatMap(fields=>[...fields.querySelectorAll('input,select')]),initial231=fields231.map(field=>field.value);let mode231=$('ex-steel-mode').value;
   const initialDias237={top:dias('top'),bottom:dias('bottom')};
   const changed231=()=>$('ex-steel-mode').value!==mode231||fields231.some((field,i)=>field.value!==initial231[i])||['top','bottom'].some(part=>JSON.stringify(dias(part))!==JSON.stringify(initialDias237[part]));
-  let dirty=false;const drafts234={},errors234={};
+  let dirty=false,drawing284=false,saving284=false,saved284=false;const drafts234={},errors234={};
   function draw(){
+   drawing284=true;
    const active=document.activeElement,key=active?.dataset?.inlineRebar234,selection=key?[active.selectionStart,active.selectionEnd]:null;
 
    const automatic=$('ex-steel-mode').value==='AUTO',awaitAuto=automatic&&(dirty||!row),current=h.memberResult?.(h.floor,token),invalid=Object.keys(errors234).length>0;
@@ -124,8 +125,9 @@ const BeamRebar116=(()=>{
    card.querySelector('[data-rebar-torsion]').textContent='抗扭 · '+(awaitAuto?'待自動選筋':$('ex-tor-legs').value+' 肢 T'+$('ex-tor-dia').value+' @ '+$('ex-tor-space').value+' mm');
    const input=Loading.input(h.p,h.floor,token),L=Math.hypot(beam.rawZ[0]-beam.rawA[0],beam.rawZ[1]-beam.rawA[1]);
    try{const size=Reports.sizing(h.p,{kind:beam.kind,member:beam,floor:h.floor,input,loading:{L}});card.querySelector('.rebar-ratio227').textContent='Span/Depth · L/h = '+Number(size.ratio.toFixed(3))+' / '+size.limit+' · '+size.status+'（獨立判定）';}catch{card.querySelector('.rebar-ratio227').textContent='';}
-   card.querySelector('.rebar-status116').textContent=automatic?(awaitAuto?'待自動選筋；圖中修改格為輸入預設值，修改即轉為手動。':'自動選筋結果；可直接修改，修改後轉為手動。'):(dirty?'即時 RC 試算 · 尚未保存；按「保存配筋并检查」保存至項目。':'手動配筋；修改即時試算目前構件。水平淨距至少 40 mm；不受梁寬 ÷ 100 支數上限限制。');
+   card.querySelector('.rebar-status116').textContent=automatic?(awaitAuto?'待自動選筋；圖中修改格為輸入預設值，修改即轉為手動。':'自動選筋結果；修改後轉為手動，按 Enter／離開輸入格自動保存；選擇直徑後自動保存。'):(dirty?'尚未保存 · 按 Enter 或離開輸入格後自動保存；輸入錯誤時不會保存。':(saved284?'配筋已自動保存；':'手動配筋；')+(current?'App Check 已更新。':'App Check 更新中／待更新。')+' 水平淨距至少 40 mm。');
    if(key){const replacement=card.querySelector('[data-inline-rebar234="'+key+'"]');replacement?.focus();if(selection&&replacement?.tagName?.toLowerCase()==='input'&&replacement?.setSelectionRange)replacement.setSelectionRange(...selection);}
+   drawing284=false;
   }
   for(const fields of Object.values(fieldRows))for(const field of fields.querySelectorAll('input,select'))field.addEventListener('input',()=>{if(['ex-top-dia','ex-bottom-dia'].includes(field.id))field.dataset.layers237=JSON.stringify(Array(8).fill(Number(field.value)));$('ex-steel-mode').value='MANUAL';dirty=changed231();draw();});
   const edit237=e=>{
@@ -145,9 +147,26 @@ const BeamRebar116=(()=>{
    if(error)errors234[key]=error;else delete errors234[key];dirty=changed231()||Object.keys(errors234).length>0;draw();
   };
   card.addEventListener('input',e=>{if(e.target.tagName?.toLowerCase()!=='select')edit237(e);});
-  card.addEventListener('change',e=>{if(e.target.tagName?.toLowerCase()==='select')edit237(e);});
-  card.addEventListener('click',e=>{if(e.target.closest('[data-ex="steel"]')&&Object.keys(errors234).length){e.preventDefault();e.stopPropagation();card.querySelector('[aria-invalid="true"]')?.focus();}});
-  $('ex-steel-mode').addEventListener('change',()=>{if($('ex-steel-mode').value==='AUTO'){for(const key of Object.keys(drafts234))delete drafts234[key];for(const key of Object.keys(errors234))delete errors234[key];}if(mode231==='AUTO'&&$('ex-steel-mode').value==='AUTO'){fields231.forEach((field,i)=>field.value=initial231[i]);for(const part of ['top','bottom'])$('ex-'+part+'-dia').dataset.layers237=JSON.stringify(initialDias237[part]);}dirty=changed231();draw();});draw();
+  card.addEventListener('change',e=>{if(e.target.tagName?.toLowerCase()==='select'){edit237(e);save284();}});
+  function save284(){
+   if(drawing284||saving284||!dirty||!card.isConnected||$('ex-steel-mode').value!=='MANUAL')return;
+   saving284=true;
+   try{
+    if(Object.keys(errors234).length)throw Error(Object.values(errors234).join('；'));
+    const steel=readSteel237(),errors=SectionB.horizontalErrors283(beam.kind,beam.b*1000,Loading.input(h.p,h.floor,token).cover??SectionB.cover(beam.kind,Engine.beamFire241(h.p,h.floor,beam.kind)),steel);
+    if(errors.length)throw Error(errors.join('；'));
+    const detail={project:h.p,floor:h.floor,token,steel,saved:false};
+    card.dispatchEvent(new CustomEvent('framing-rebar-save284',{bubbles:true,detail}));
+    if(!detail.saved)throw Error(detail.error||'構件已切換，配筋未保存。');
+    fields231.forEach((field,i)=>initial231[i]=field.value);for(const part of ['top','bottom'])initialDias237[part]=dias(part);
+    mode231='MANUAL';dirty=false;saved284=true;card.querySelector('.rebar-status116').textContent='配筋已自動保存；App Check 更新中。';
+   }catch(err){card.querySelector('.rebar-status116').textContent='未保存：'+err.message;}
+   finally{saving284=false;}
+  }
+  card.refresh284=draw;
+  card.addEventListener('focusout',e=>{if(e.target.dataset?.inlineRebar234)save284();});
+  card.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.target.dataset?.inlineRebar234){e.preventDefault();save284();}});
+  $('ex-steel-mode').addEventListener('change',()=>{if($('ex-steel-mode').value==='AUTO'){for(const key of Object.keys(drafts234))delete drafts234[key];for(const key of Object.keys(errors234))delete errors234[key];}if(mode231==='AUTO'&&$('ex-steel-mode').value==='AUTO'){fields231.forEach((field,i)=>field.value=initial231[i]);for(const part of ['top','bottom'])$('ex-'+part+'-dia').dataset.layers237=JSON.stringify(initialDias237[part]);}dirty=changed231();draw();if($('ex-steel-mode').value==='AUTO')card.querySelector('[data-ex="auto-steel"]')?.click();else save284();});draw();
  }
  return {decorate,faces227,status227,diagram227,required234,readSteel237,preview237,measures237,metrics238,steel239};
 })();

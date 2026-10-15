@@ -104,3 +104,12 @@ The user subsequently explicitly required Excel to retain its existing rule:
 do not change the original workbook, VBA, formulas or A/B report format to relax
 that restriction. App acceptance does not imply native Excel verification;
 retain native mismatch reporting/blocking rather than forcing Excel agreement.
+
+## Beam reinforcement automatic save (E2.284)
+
+Completed beam reinforcement edits in Member Check save automatically on Enter,
+leaving a numeric field, or selecting a diameter. Preserve intermediate drafts,
+reject invalid inputs without overwriting the stored arrangement, retain undo
+and local backup, and update App checks without launching native Excel. The
+project file still uses Save Project. Calculation/selection rules and original
+Excel formulas, VBA and A/B report formatting remain unchanged.

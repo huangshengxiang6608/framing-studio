@@ -6,13 +6,14 @@ Object.defineProperty(window.HTMLElement.prototype,'open',{configurable:true,get
 // linkedom's select has a getter only; supply the browser-standard value setter.
 const descriptor=Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype,'value');
 if(!descriptor.set)Object.defineProperty(window.HTMLSelectElement.prototype,'value',{...descriptor,set(value){const options=[...this.querySelectorAll('option')];for(const o of options)o.removeAttribute('selected');const selected=options.find(o=>o.value===String(value));if(selected)selected.setAttribute('selected','');}});
-c.ctx.document=document;c.ctx.setTimeout=setTimeout;c.ctx.clearTimeout=clearTimeout;
+c.ctx.document=document;c.ctx.CustomEvent=window.CustomEvent;c.ctx.setTimeout=setTimeout;c.ctx.clearTimeout=clearTimeout;
 // linkedom does not switch to HTMLInputElement inside SVG foreignObject.
 Object.defineProperty(window.SVGElement.prototype,'value',{configurable:true,get(){return this.localName==='select'?this.querySelector('option[selected]')?.getAttribute('value')||'':this.getAttribute('value')||'';},set(v){if(this.localName==='select'){for(const o of this.querySelectorAll('option')){o.removeAttribute('selected');if(o.getAttribute('value')===String(v))o.setAttribute('selected','');}}else this.setAttribute('value',String(v));}});
 let active234=null;Object.defineProperty(document,'activeElement',{get(){return active234?.isConnected?active234:document.body;}});
 window.SVGElement.prototype.focus=function(){active234=this;};window.SVGElement.prototype.setSelectionRange=function(a,b){this.selectionStart=a;this.selectionEnd=b;};
 const pending=[],listen=document.addEventListener.bind(document);document.addEventListener=(type,fn,...args)=>listen(type,e=>{const p=fn(e);if(p?.then)pending.push(p);},...args);
 const $=s=>document.querySelector(s),input=(id,value)=>{const el=$('#'+id);el.value=value;el.dispatchEvent(new window.Event('input',{bubbles:true}));};
+async function commit284(){const el=$('[data-inline-rebar234="bottom:0:count"]');const e=new window.Event('keydown',{bubbles:true});e.key='Enter';el.dispatchEvent(e);await new Promise(r=>setTimeout(r,0));await c.run('test227.ui.calculate()');}
 async function click(s){$(s).dispatchEvent(new window.Event('click',{bubbles:true}));await Promise.all(pending.splice(0));}
 (async()=>{
  c.run(`globalThis.test227={p:Engine.clone(argument),floor:1,key:'F1',messages:[]};
@@ -24,14 +25,14 @@ async function click(s){$(s).dispatchEvent(new window.Event('click',{bubbles:tru
  edit('bottom:0:dia','40');edit('bottom:0:count','20');
  assert(!$('.rebar-reasons227').textContent.includes('水平淨距'),$('.rebar-reasons227').textContent);
  assert(!$('[data-provided237=bottom]').textContent.includes('待計算'));
- await click('[data-ex=steel]');assert(!c.run('test227.messages.at(-1)').includes('水平淨距'));render();
+ await commit284();assert(!c.run('test227.messages.at(-1)').includes('水平淨距'));render();
  assert.equal($('[data-inline-rebar234="bottom:0:count"]').value,'20','20 bars saved and reloaded');
  const before=c.run('JSON.stringify(test227.p)');edit('bottom:0:count','22');
  assert($('.rebar-reasons227').textContent.includes('下筋第 1 層 22T40'),$('.rebar-reasons227').textContent);
  assert($('.rebar-reasons227').textContent.includes('小於 40 mm'));
  assert.equal($('.rebar-rc227').textContent,'RC 輸入待修正');
- await click('[data-ex=steel]');assert.equal(c.run('JSON.stringify(test227.p)'),before,'Invalid spacing cannot be saved');
- assert(c.run('test227.messages.at(-1)').includes('小於 40 mm'));
+ await commit284();assert.equal(c.run('JSON.stringify(test227.p)'),before,'Invalid spacing cannot be saved');
+ assert($('.rebar-status116').textContent.includes('未保存：'));assert($('.rebar-status116').textContent.includes('小於 40 mm'));
  edit('bottom:0:count','20');assert(!$('.rebar-reasons227').textContent.includes('水平淨距'));
  console.log('PASS live Member edit above width/100, save/reload, immediate layer-specific spacing error, invalid-save blocked and recovery');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -64,7 +64,7 @@ const RCPlan=(()=>{
     const inputs={...r.result.inputs},expected={...r.result.values};if(['SLAB','CS'].includes(k)){inputs.C1=id(r);if(Object.hasOwn(expected,'C1'))expected.C1=id(r);}
     // Adopt only successful shared beam steel. Native report/sizing formulas
     // remain unchanged; fullLoads supplies the common characteristic G and Q.
-    const adopt254=!r.result.autoFailed&&(section!=='A'||beamKinds262.includes(k))&&(k!=='CS'||r.input?.steel)&&r.result.inputs&&r.result.steel?{sheet:r.result.source,inputs,expected,steel:{...r.result.steel}}:null;
+    const adopt254=!r.result.autoFailed&&(section!=='A'||beamKinds262.includes(k))&&r.result.inputs&&r.result.steel?{sheet:r.result.source,inputs,expected,steel:{...r.result.steel}}:null;
     if(section==='A'){
      const sup=['CS','CB'].includes(k)?'Cantilever':support,h=['CS','SLAB'].includes(k)?c.thickness:c.d*1000,ratio=l.L*1000/h*(sup!=='Cantilever'&&l.L>10.001?l.L/10:1),limit={'Cantilever':7,'Simply-supported':20,'Continuous':26,'End span':23}[sup],status=sup==='Cantilever'&&l.L>10.001?'CALC. REQUIRED':ratio<=limit?'OK':'NOT OK',cols={SLAB:['J','K','L'],SB:['H','I','J'],MB:['F','G','H'],CB:['N','O','P'],CS:['N','O','P'],TB:['V','W','X']}[k],sheet=k==='TB'?'Section A Transfer Beam':'Input';
      members.push({id:id(r),kind:k,row,sectionA:true,sheet,expected:Object.fromEntries(cols.map((c,i)=>[c+row,[ratio,limit,k==='TB'?status.replace('NOT OK','NOT OKAY').replace(/^OK$/,'OKAY'):status][i]])),inputs:{},actions:k==='TB'?{G23:r.actions.M,G24:r.actions.V}:null,selected:true,adopt254});

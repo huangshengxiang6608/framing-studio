@@ -14,6 +14,51 @@ static class ExcelBridge {
  static Dictionary<string,object> Obj(object o){return (Dictionary<string,object>)o;}
  static IEnumerable<object> Arr(object o){return ((IEnumerable)o).Cast<object>();}
 
+ [DllImport("winspool.drv",CharSet=CharSet.Unicode,SetLastError=true)]
+ static extern bool EnumPrinters(uint flags,string name,uint level,IntPtr data,uint size,out uint needed,out uint count);
+ static int PrinterProbe278(){
+  uint needed,count;EnumPrinters(6,null,2,IntPtr.Zero,0,out needed,out count);
+  if(needed==0)return 1;
+  IntPtr data=Marshal.AllocHGlobal(checked((int)needed));
+  try{return EnumPrinters(6,null,2,data,needed,out needed,out count)&&count>0?0:1;}
+  finally{Marshal.FreeHGlobal(data);}
+ }
+ static void RequirePrinterResponse278(){
+  // A running Spooler can still hang on disconnected network printers. Isolate
+  // this OS query in a disposable child, before starting Excel or opening files.
+  Stage79("檢查 Windows 印表機回應");
+  var start=new System.Diagnostics.ProcessStartInfo(typeof(ExcelBridge).Assembly.Location,"--printer-probe278"){UseShellExecute=false,CreateNoWindow=true};
+  using(var probe=System.Diagnostics.Process.Start(start)){
+   if(!probe.WaitForExit(15000)){
+    try{probe.Kill();probe.WaitForExit(1000);}catch{}
+    throw new Exception("Windows 印表機查詢逾時，Excel 尚未啟動。請恢復公司網絡／VPN，或在 Windows 移除失聯的網絡印表機連線後再生成；原 A4 及抄格式未更改。");
+   }
+   if(probe.ExitCode!=0)throw new Exception("Windows 沒有可回應的印表機；請確認 Microsoft Print to PDF 已安裝並可用。Excel 尚未啟動。");
+  }
+ }
+
+ // Native reports retain their A4 PageSetup. Check the print environment before
+ // entering VBA: DisplayAlerts=false does not suppress an unhandled VBA 1004.
+ static void RequireSpooler278(){
+  try{using(var service=new System.ServiceProcess.ServiceController("Spooler")){
+   if(service.Status!=System.ServiceProcess.ServiceControllerStatus.Running)
+    throw new InvalidOperationException("Print Spooler 列印服務未啟動；請在 Windows 服務啟動 Print Spooler 後重新生成。原 Excel A4 紙張及抄格式未更改。");
+  }}catch(InvalidOperationException){throw;}catch(Exception e){throw new Exception("無法檢查 Windows 列印服務；尚未執行 Excel 抄生成。"+e.Message,e);}
+ }
+ static bool SupportsA4278(dynamic app){
+  dynamic probe=null;
+  try{Stage79("建立空白 A4 列印測試頁");probe=app.Workbooks.Add();Stage79("測試原 A4 PaperSize 設定");probe.Worksheets[1].PageSetup.PaperSize=9;return Convert.ToInt32(probe.Worksheets[1].PageSetup.PaperSize)==9;}
+  catch{return false;}
+  finally{if((object)probe!=null)try{probe.Close(false);}catch{}}
+ }
+ static void PreparePrinter278(dynamic app){
+  Stage79("檢查 Excel A4 列印環境");
+  if(SupportsA4278(app))return;
+  // Changing drivers can change Excel's computed fit-to-page scale, even for
+  // ExportAsFixedFormat. Preserve the existing driver and native pagination.
+  throw new Exception("Excel 無法使用原有 A4 紙張（PaperSize）；請恢復 Excel 原本印表機驅動的連線後重新生成 PDF。未更換驅動或修改原抄版面。");
+ }
+
  // FullAction73 depends on fixed source IDs/spans and the submitted load table,
  // not on trial reinforcement. Keep its formulas intact, suspend only this
  // worksheet during native design, then recalculate and verify every held cell.
@@ -166,6 +211,20 @@ static class ExcelBridge {
  // Formula cells are never replaced: their recalculated values must agree.
  static HashSet<string> Adopted254=new HashSet<string>();
  static string MemberKey254(Dictionary<string,object> m){return Convert.ToString(m["kind"])+"|"+Convert.ToString(m["id"]);}
+ static int BeamCacheRow278(dynamic x,dynamic b,string kind,string id){
+  dynamic cache=b.Worksheets["_"+kind+" Analysis"];
+  int row=Convert.ToInt32(x.Run("'"+b.Name+"'!CacheRow66",cache,id));
+  if(row<6||row>25||!String.Equals(Convert.ToString(Val(cache.Cells[row,200])),id,StringComparison.OrdinalIgnoreCase))throw new Exception("梁配筋快取未對應構件："+id);
+  return row;
+ }
+ static void VerifyReportErrors278(dynamic sheet){
+  object[,] values=(object[,])sheet.UsedRange.Value2;
+  for(int r=1;r<=values.GetLength(0);r++)for(int c=1;c<=values.GetLength(1);c++){
+   string text=values[r,c] as string;
+   if(text!=null&&System.Text.RegularExpressions.Regex.IsMatch(text,@"#(?:VALUE!|REF!|DIV/0!|NUM!|NAME\?|N/A|SPILL!)"))
+    throw new Exception("原 Excel 抄包含計算錯誤，未輸出 PDF："+Convert.ToString(sheet.Name)+" · "+text);
+  }
+ }
  static string[] CalculationSheets254={"_Input Engine","Section B Slab Check","Section B Main Beam Design","Section B Secondary Beam Design","_MB Analysis","_SB Analysis","_SB Helpers","Section B Transfer Beam Check","_TB Analysis","Section B Cantilever Beam Check","_CB Analysis","_CB Helpers","Section B Cantilever Slab Check","_CS Analysis"};
  static void InputOnly254(dynamic sheet,string address,object value){
   if(Convert.ToBoolean(sheet.Range[address].HasFormula))return;
@@ -177,7 +236,7 @@ static class ExcelBridge {
   dynamic engine=b.Worksheets["_Input Engine"];
   if(kind=="MB"||kind=="SB"){
    InputOnly254(engine,kind=="MB"?"F3":"I3",id);x.CalculateFull();
-   x.Run("'"+b.Name+"'!"+kind+"LoadAuto81",row-(kind=="MB"?68:43));
+   x.Run("'"+b.Name+"'!"+kind+"LoadAuto81",BeamCacheRow278(x,b,kind,id));
   }else if(kind=="SLAB"){
    InputOnly254(engine,"C3",id);
    if(!seed){string[] a={"F35","H35","C9","C57","D57"};for(int i=0;i<5;i++)InputOnly254(b.Worksheets["Section B Slab Check"],a[i],Val(engine.Cells[row-23,39+i]));}
@@ -225,7 +284,7 @@ static class ExcelBridge {
   }
   x.CalculateFull();
   if(store){
-   if(kind=="MB"||kind=="SB")x.Run("'"+b.Name+"'!"+kind+"SaveAuto81",row-(kind=="MB"?68:43));
+   if(kind=="MB"||kind=="SB")x.Run("'"+b.Name+"'!"+kind+"SaveAuto81",BeamCacheRow278(x,b,kind,Convert.ToString(member["id"])));
    else if(kind=="TB")x.Run("'"+b.Name+"'!TBStorePending79",true);
    else if(kind=="CB"){
     InputOnly254(b.Worksheets["_CB Analysis"],"A"+(row-118),member["id"]);x.Run("'"+b.Name+"'!CBSaveAuto81",row-118);
@@ -462,6 +521,7 @@ static class ExcelBridge {
   File.Copy(Path.Combine(source,"result.json"),Path.Combine(target,"result.json"),true);
  }
  [STAThread] static int Main(string[] args){
+  if(args.Length==1&&args[0]=="--printer-probe278")try{return PrinterProbe278();}catch{return 1;}
   if(args.Length==3&&args[0]=="--recover272")return RunJob272(new[]{args[1],args[2]});
   int code=RunJob272(args);if(args.Length!=2)return code;
   string directory=Path.GetDirectoryName(Path.GetFullPath(args[1]));
@@ -553,7 +613,7 @@ static class ExcelBridge {
    string output=Path.Combine(dir,"RC-filled.xlsm");File.Copy(Path.Combine(folders[0],Convert.ToString(results[0]["workbook"])),output);
    Stage79("合併已核對的柱計算頁及原抄，保留原公式與格式");
    x=Activator.CreateInstance(Type.GetTypeFromProgID("Excel.Application",true));x.Visible=false;x.DisplayAlerts=false;x.EnableEvents=false;x.ScreenUpdating=false;x.AutomationSecurity=1;
-   b=x.Workbooks.Open(output,0,false);x.Calculation=-4135;x.CalculateBeforeSave=false;
+   PreparePrinter278(x);b=x.Workbooks.Open(output,0,false);x.Calculation=-4135;x.CalculateBeforeSave=false;
    var snapshots=new List<SheetSnapshot274>();var imported=new List<object>();
    // Section A gets its own independent native column-loading calculation page.
    if(section=="A")foreach(var member in Arr(parts[0]["members"]).Select(Obj).Where(m=>Convert.ToString(m["kind"])=="COL")){
@@ -623,10 +683,12 @@ static class ExcelBridge {
    if(job.ContainsKey("columnParts274")){int code=CombineColumns274(root,dir,job);if(code==0)StoreJob79(job,dir);return code;}
    Stage79("打开原 Excel 模板");
    bool axis92=kind=="Deflection"&&job.ContainsKey("method")&&Convert.ToString(job["method"])=="BUILDING_AXIS";
+   RequireSpooler278();
+   RequirePrinterResponse278();
    string copy=Path.Combine(dir,kind+(axis92?"-filled.xlsx":"-filled.xlsm"));if(File.Exists(copy))throw new Exception("输出已经存在，请重新生成一个核对任务。");if(!axis92)File.Copy(source,copy);if(kind=="RC")PrepareLoadTable273(copy,job);
    x=Activator.CreateInstance(Type.GetTypeFromProgID("Excel.Application",true));x.Visible=false;x.DisplayAlerts=false;x.ScreenUpdating=false;x.EnableEvents=false;
    // Only the packaged, hash-verified user templates run macros, in this isolated instance.
-   x.AutomationSecurity=1;if(axis92){b=x.Workbooks.Add();b.SaveAs(copy,51);}else b=x.Workbooks.Open(copy,0,false);x.EnableEvents=false;Stage79("模板已打开");
+   x.AutomationSecurity=1;PreparePrinter278(x);Stage79("Excel A4 列印環境已通過");if(axis92){b=x.Workbooks.Add();b.SaveAs(copy,51);}else b=x.Workbooks.Open(copy,0,false);x.EnableEvents=false;Stage79("模板已打开");
    var files=new List<object>();
    if(kind=="Overall"){
     dynamic input=b.Worksheets["图形输入"];input.Unprotect();var faces=Obj(job["faces"]);
@@ -703,6 +765,8 @@ static class ExcelBridge {
      Run(x,b,"GenerateSectionBCopy");
     }
     CompareFullLoads(b,job);
+    if(section=="A"||section=="Check")VerifyReportErrors278(b.Worksheets["Section A 抄"]);
+    if(section=="B"||section=="Check")VerifyReportErrors278(b.Worksheets["Section B 抄"]);
     if(differences.Count>0)throw new Exception("App 与 Excel 结果有差异，未生成已核对抄；请查看差异。");
     Stage79("原抄生成完成，整理版式");int formatCalc82=Convert.ToInt32(x.Calculation);bool formatScreen82=Convert.ToBoolean(x.ScreenUpdating),formatEvents82=Convert.ToBoolean(x.EnableEvents);
     try{x.Calculation=-4135;x.ScreenUpdating=false;x.EnableEvents=false;

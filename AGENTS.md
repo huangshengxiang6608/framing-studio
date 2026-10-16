@@ -59,3 +59,63 @@ space SBs across intervening MB/CB/TB boundaries. Preserve walls as valid bay
 boundaries. CB defaults to support-column width. Existing CBs were explicitly
 authorized to migrate to column-dependent width in E2.171; later explicit manual
 width overrides must remain intact.
+
+## Column loads use tributary ownership
+
+User clarification on 2026-10-14: column design loads use tributary areas,
+independently of slab -> SB -> primary beam reactions. An offset upper column
+is assigned 100% to the lower column whose actual tributary area contains its
+physical centre. Do not split this column load using TB end-reaction ratios.
+For the current model, 4/F C1 contributes 100% to 3/F AC10 and 0% to AC16.
+Accumulate upper floors and confirmed area overrides once along this route.
+Shared boundaries or missing ownership require an explicit unresolved result,
+not an arbitrary fraction or duplicate assignment. Preserve the separate beam
+analysis and the original Section A/B report formulas and formatting.
+
+## Section A beam loads share the Check model
+
+User authorization on 2026-10-14 (E2.264): Section A beam loads must match
+Summary/Member Check and Section B, including full beam self-weight, slab
+reactions, point loads and resulting M/V. Use the fresh matching Check/B row
+for MB, SB, TB and CB; recalculate stale or absent Check data. This supersedes
+the historical separate Section A beam-load basis. Keep Section A slab and
+column schedules, all original A/B formulas, report layout and native rendering
+routines unchanged. Do not overwrite formula cells to force agreement.
+
+
+## Independent Section B member design sheets
+
+E2.265 user request: generated B/combined workbooks retain a read-only calculation
+sheet for each selected member, grouped after its original Section B design sheet.
+Preserve the original design layout and calculation equations; capture member
+inputs privately so later shared-sheet selection cannot overwrite them. Copied
+UPDATE/auto-design buttons must not operate the original design. Original A/B
+report-copy content and formatting remain unchanged.
+
+
+## Manual beam horizontal spacing (E2.283)
+
+User clarified 2026-10-15: in the App Member Check, manual beam reinforcement
+may exceed floor(beam width in mm / 100), but same-layer horizontal clear spacing
+must be at least 40 mm. Show the physical face, layer and calculated gap on failure,
+and reject saving invalid spacing. This does not change vertical layer spacing,
+effective-depth calculation, or automatic reinforcement candidate/count rules.
+The user subsequently explicitly required Excel to retain its existing rule:
+do not change the original workbook, VBA, formulas or A/B report format to relax
+that restriction. App acceptance does not imply native Excel verification;
+retain native mismatch reporting/blocking rather than forcing Excel agreement.
+
+## Beam reinforcement automatic save (E2.284)
+
+Completed beam reinforcement edits in Member Check save automatically on Enter,
+leaving a numeric field, or selecting a diameter. Preserve intermediate drafts,
+reject invalid inputs without overwriting the stored arrangement, retain undo
+and local backup, and update App checks without launching native Excel. The
+project file still uses Save Project. Calculation/selection rules and original
+Excel formulas, VBA and A/B report formatting remain unchanged.
+
+E2.285 clarification: daily Member Check reinforcement editing is App-only.
+Show local beam RC promptly when the load basis is unchanged, without marking
+the whole-building/report output fresh. The user-confirmed native verification
+scope remains selected Check/A/B members; label its explicit command
+"更新至EXCEL並核對" and the restore command "恢復 App 自動選筋".

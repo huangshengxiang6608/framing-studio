@@ -73,7 +73,7 @@ const Loading=(()=>{
    if(sum>0)groups.push(...old.map(g=>({...g,area:g.area*value/sum,b:null,d:null,rects:[],polygons:[],manualArea:true})));
    else groups.push({lo:n,hi:n,area:value,b:null,d:null,rects:[],polygons:[],manualArea:true,automatic:true,areaId:null,areaName:'整层默认'});
   }
-  return {...data,groups:groups.sort((a,b)=>a.lo-b.lo)};
+  return {...data,transfer271:manual?{known:false,sources:[],reason:'手動柱面積表未記錄 transfer column 來源'}:data.transfer271?{...data.transfer271,sources:[...new Map(groups.filter(g=>g.area>0).flatMap(g=>g.transferSources271||[]).map(e=>[e.floor+'|'+e.token,e])).values()]}:undefined,groups:groups.sort((a,b)=>a.lo-b.lo)};
  }
  function supportSummary(p,r,f,c){const model=E.floorModel(r,f),root=c.displayKind==='CB'?cbRoot(p,r,f,c):null;
   return ['a','z'].map(end=>{const label=end==='a'?'A':'B';if(root&&root.fixedEnd!==end)return {end:label,text:root.fixedEnd?'自由端':'固定端未确认'};
@@ -303,7 +303,7 @@ const Loading=(()=>{
     if(b.cbMoments.length)designErrors.push('承托 CB '+b.cbMoments.map(x=>x.id).join('、')+' 根部：竖向反力已传入；根部弯矩及梁系抗扭尚未分析，须另行计算');
     if(b.csMoments.some(x=>x.mULS>tol))designErrors.push('承托 CS '+[...new Set(b.csMoments.map(x=>x.slab))].join('、')+'：竖向传荷已算；固定边弯矩会作用于承托梁，梁系抗扭及节点尚未分析，须另行计算');
     if(error.length)issues.push({floor:f,msg:c.id+'：'+[...new Set(error)].join('；')});
-    if(error.length)rr.result={status:'INPUT REQUIRED',fail:[...new Set([...error,...designErrors])],description:'—'};else try{const lines=[...(manual?[]:b.lines),...varyingSW,...(table?.lines||[])].map(l=>isCB&&o.fixedEnd==='z'?{...l,start:len-l.end,end:len-l.start}:l);rr.actions=actions(len,gd,ql,points,isCB,lines);rr.loading.lines=lines;rr.result=designErrors.length?{status:'INPUT REQUIRED',fail:designErrors,description:'竖向传荷已计算；构件设计待补'}:queue('beam',{kind:isCB?'CB':b.kind,L:len,b:c.b*1000,h:c.d*1000,fcu:b.kind==='TB'?cfg.tbFcu:cfg.fcu,fire:Engine.beamFire241(p,f,b.kind),cover:o.cover??undefined,M:rr.actions.M,V:rr.actions.V,T:o.torsion??0,steel:o.steel});}catch(e){rr.result={status:'INPUT REQUIRED',fail:[e.message],description:'—'};}
+    if(error.length)rr.result={status:'INPUT REQUIRED',fail:[...new Set([...error,...designErrors])],description:'—'};else try{const lines=[...(manual?[]:b.lines),...varyingSW,...(table?.lines||[])].map(l=>isCB&&o.fixedEnd==='z'?{...l,start:len-l.end,end:len-l.start}:l);rr.actions=actions(len,gd,ql,points,isCB,lines);rr.loading.lines=lines;rr.result=designErrors.length?{status:'INPUT REQUIRED',fail:designErrors,description:'竖向传荷已计算；构件设计待补'}:queue('beam',{acceptance261:'rc',kind:isCB?'CB':b.kind,L:len,b:c.b*1000,h:c.d*1000,fcu:b.kind==='TB'?cfg.tbFcu:cfg.fcu,fire:Engine.beamFire241(p,f,b.kind),cover:o.cover??undefined,M:rr.actions.M,V:rr.actions.V,T:o.torsion??0,steel:o.steel});}catch(e){rr.result={status:'INPUT REQUIRED',fail:[e.message],description:'—'};}
     function traceTo(i){if(!areaTracing||!rr.actions)return [];const out=[],reverse=isCB&&o.fixedEnd==='z',take=v=>isCB?v.live.left:i?v.live.right:v.live.left;for(const l of b.lines)for(const x of l.sources101||[]){const line={start:reverse?len-l.end:l.start,end:reverse?len-l.start:l.end,g:0,q:x.area/(l.end-l.start)},area=take(actions(len,0,0,[],isCB,[line]));if(area>tol)out.push({...x,area});}for(const pt of b.points)for(const x of pt.sources101||[]){const area=take(actions(len,0,0,[{x:reverse?len-pt.x:pt.x,g:0,q:x.area}],isCB));if(area>tol)out.push({...x,area});}return out;}
     b.done=true;const ac=rr.actions,err=ac?null:c.id+' 荷载未完整';if(isCB){const idx=o.fixedEnd==='z'?1:0;if(!b.sinks[idx])issues.push({floor:f,msg:c.id+' 固定端反力未找到传荷对象，柱自动累计荷载待确认'});if(ac&&b.sinks[idx]?.type==='BEAM')b.sinks[idx].target.cbMoments.push({id:c.id,mG:ac.dead.M,mQ:ac.live.M,mULS:ac.M});send(b.sinks[idx],ac?.totalDead||0,ac?.totalLive||0,err,c.id,idx?'B':'A',traceTo(idx),b.truss109,ac?.fullPrecision208?{ug183:ac.factoredDead.left,uq183:ac.factoredLive.left,reaction207:true}:null);}else for(let i=0;i<2;i++){if(!b.sinks[i])issues.push({floor:f,msg:c.id+' 端部反力未找到传荷对象，柱自动累计荷载待确认'});send(b.sinks[i],ac?.dead[i?'right':'left']||0,ac?.live[i?'right':'left']||0,err,c.id,i?'B':'A',traceTo(i),b.truss109,ac?.fullPrecision208?{ug183:ac.factoredDead[i?'right':'left'],uq183:ac.factoredLive[i?'right':'left'],reaction207:true}:null);}
    }
@@ -386,9 +386,14 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   const cells=['N40','N44','N52','N59','N69','N77','N78'],labels=['受压面钢筋','受拉面钢筋','最大剪应力','抗剪箍筋','剪扭组合','抗扭箍筋','抗扭纵筋'],v=result.values;
   // Only a complete structural check can establish RC success. N87 is an independent L/d check.
   if(cells.some(k=>!['OKAY','NOT OKAY'].includes(v[k])))return result.status==='OK'?{status:'INPUT REQUIRED',reasons:['RC 檢查結果未完整']}:original;
-  const failed=cells.filter(k=>v[k]!=='OKAY').map(k=>labels[cells.indexOf(k)]),ldOnly=!failed.length&&v.N87==='NOT OKAY';
+  const failed=cells.filter(k=>v[k]!=='OKAY').map(k=>labels[cells.indexOf(k)]),ldOnly=result.acceptance261!=='rc'&&!failed.length&&v.N87==='NOT OKAY';
   const reasons=original.reasons.filter(s=>!widthReasons.includes(s)&&s!=='挠度'&&!(ldOnly&&s==='Excel 选筋规则内未找到通过的单一直径组合'));
   return {status:failed.length||reasons.length?'NOT OK':'OK',reasons:[...new Set([...reasons,...failed])],...(warnings.length?{warnings}: {})};
+ }
+ function beamAcceptance261(p,row){
+  const checks=auditChecks205(p,row),deflection=typeof BeamLoadUI!=='undefined'?BeamLoadUI.deflectionResult214(BeamLoadUI.summary211(p,row)):null;
+  const rc=!row.loadErrors?.length&&!row.result?.autoFailed&&/^OK(?:$|[ (])/.test(checks.b.status),spanDepth=checks.a.status==='OK',actualDeflection=deflection?.pass===true;
+  return {pass:rc&&(spanDepth||actualDeflection),rc,spanDepth,actualDeflection,checks,deflection};
  }
  function auditChecks205(p,row){
   let a={status:'N/A',reasons:[]};
@@ -427,6 +432,6 @@ rr.loadErrors=rr.result.status==='INPUT REQUIRED'?rr.result.fail:[];if(rr.checke
   return {items:items.sort((a,b)=>a.floor-b.floor||a.id.localeCompare(b.id)),total:out.rows.filter(r=>r.checked).length,...(retainOutput226?{output226:{...out,rows:out.rows.map(row=>({...row,checked:p.explorer?.selected?.[row.floor+'|'+row.token]===true}))}}:{})};
  }
  function inspectSlab(p,r,f,t){if(!Number.isInteger(f)||f<1||f>p.total||!E.floorModel(r,f).slabs.some(s=>token('SLAB',s)===t))throw Error('板块已变化，请重新选择');const preview=E.clone(p);init(preview).selected={[f+'|'+t]:true};return run(preview,r,'B',false,f).rows.find(row=>row.floor===f&&row.kind==='SLAB'&&row.token===t);}
- return {auditChecks205,slabTransfer177,slabReaction177,fullSpanSlabLoads179,columnLoadPoint,slabStrips118,slabFace,slabWinner,audit,auditSteps,slabCalculation,beamSpan,beamSpanLoads,slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};
+ return {beamAcceptance261,auditChecks205,slabTransfer177,slabReaction177,fullSpanSlabLoads179,columnLoadPoint,slabStrips118,slabFace,slabWinner,audit,auditSteps,slabCalculation,beamSpan,beamSpanLoads,slabSpan,inspectSlab,columnAreaGroups,supportSummary,contact,parseColumnAreaRows,columnAreaLoads,sharedSupportKeys,framingFloors,saveFramingSupports,clearFramingRecord,oppositeSupports,supportOptions,manualSupport,columnAreas,supportModel,cbRoot,beamSelfWeight,slabDirection,settings,defaults,init,input,members,floorload,token,run,actions};
 })();
 if(typeof module!=='undefined')module.exports=Loading;

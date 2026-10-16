@@ -56,10 +56,10 @@ console.log('PASS served module parity');
   try{if(JSON.stringify(RCPlan.build(p,'B'))!==JSON.stringify(independent))throw Error('Summary result differs from independent report calculation');}
   finally{Loading.run=original;}
   const slab=Loading.members(p,model,1).find(m=>m.kind==='SLAB'),key='1|'+slab.token;
-  p.explorer.reportB={[key]:true};p.explorer.members[key]={slabType:'CS',csFixedEdge:'left'};
+  p.explorer.reportB={[key]:true};p.explorer.members[key]={slabType:'CS',csFixedEdge:'left',slabSpan131:{L:1.5,width:null,selfWeight:'net'}};
   const automatic=RCPlan.build(p,'B');
-  if(automatic.batches.some(b=>b.members.some(m=>m.kind==='CS'&&m.adopt254)))throw Error('Automatic CS bypassed native selection');
-  return {summaryReuse:true,independentParity:true,automaticCsLegacy:true};
+  if(!automatic.batches.some(b=>b.members.some(m=>m.kind==='CS'&&m.adopt254)))throw Error('Automatic CS did not reuse checked inputs and steel');
+  return {summaryReuse:true,independentParity:true,automaticCsAdoption:true};
  })()`);
  console.log('PASS',JSON.stringify(result));
 })().catch(e=>{console.error(e);process.exitCode=1});

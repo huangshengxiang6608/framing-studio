@@ -8,7 +8,8 @@ assert.match(U.suspicious('m',3300),/单位为 m/);assert.match(U.suspicious('m'
 assert.match(U.suspicious('mm',0.6),/单位为 mm/);assert.equal(U.suspicious('mm',25),'');assert.equal(U.suspicious('mm',600),'');
 assert.equal(U.suspicious('mPD',1200),'');assert.equal(U.suspicious('%',0.5),'');assert.equal(U.suspicious('m',0),'');
 const mod=read('source/ui-polish173.js');assert(!/dataset\.unit|data-unit/.test(mod),'No data-* markers (InputFeedback172 builds selectors from data-* attributes)');
-assert(!/dispatchEvent|\.value\s*=|StudioHost|transact\(/.test(mod),'Module never edits values or the project');
+assert(!/dispatchEvent|\.value\s*=|StudioHost|transact\(/.test(mod.split(' function mountEnhancements')[0]),'Field decoration never edits values or the project');
+assert(!/\.transact\(/.test(mod),'Navigation UI never writes project inputs');
 // 7. Canvas hints and selection notes in Simplified Chinese
 const app=read('source/app.js'),hints=app.split('\n').filter(l=>l.includes("$('hint').textContent="));assert(hints.length);
 for(const t of ['單擊','選取','當層','刪除此類','牆','點梁中點'])assert(!hints.some(l=>l.includes(t)),'hint still contains '+t);

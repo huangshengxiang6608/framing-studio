@@ -1,0 +1,17 @@
+const assert=require('assert/strict'),fs=require('fs'),path=require('path'),{webcrypto}=require('crypto'),{context}=require('./audit-performance247.cjs');
+function setup(p){const c=context();c.ctx.crypto=webcrypto;c.ctx.sent279=[];c.run(`globalThis.h279={p:argument};h279.result=Engine.generate(h279.p);globalThis.ui279=ExplorerUI({get:()=>h279,refresh(){},toast(){},transact(fn){fn();h279.result=Engine.generate(h279.p);return true;}});window.ExcelProject=()=>({project:Engine.clone(h279.p)});WorkspacePages.refresh=()=>{};WorkspacePages.clearPDF=()=>{};window.chrome={webview:{postMessage:x=>sent279.push(x)}};`,p);return c;}
+async function dispatched(c,fn){const n=c.ctx.sent279.length;const task=c.run(fn);let done=false;task.finally(()=>done=true);while(c.ctx.sent279.length===n&&!done)await new Promise(r=>setImmediate(r));assert(c.ctx.sent279.length>n,JSON.stringify(c.run('ExcelSync.nativeState279()')));return {task,msg:c.ctx.sent279.at(-1)};}
+async function finish(c,msg,mutate){if(mutate)c.run("h279.p.name='edited during native Check'");for(const j of msg.jobs)await c.run('ExcelSync.receive({record:argument})',{ok:true,preparedRC279:true,compared:20,fingerprint:j.fingerprint,differences:[],label:j.label});await c.run('ExcelSync.receive({done:true})');}
+(async()=>{
+ const seed=context(),p=process.argv[2]?JSON.parse(fs.readFileSync(process.argv[2],'utf8').replace(/^\uFEFF/,'')):seed.run('Engine.clone(loading115Tests().projects.slab)'),c=setup(p);
+ const first=await dispatched(c,'ExcelSync.verifyCheck279()');assert(first.msg.jobs.every(j=>j.prepareRC279&&j.type==='RC'&&!j.columnParts274&&!j.reportPages));assert.equal(first.msg.openWhenReady,false);await finish(c,first.msg);assert(await first.task);
+ const checked=JSON.stringify(c.run('h279.p'));await c.run("ExcelSync.generateReport('AB')");const report=c.ctx.sent279.at(-1);assert(report.jobs.every(j=>!j.prepareRC279));assert.equal(JSON.stringify(c.run('h279.p')),checked);
+ // Every report part is the exact same preparation input, excluding operation/HTML pages.
+ const clean=j=>{j=structuredClone(j);delete j.prepareRC279;delete j.reportPages;return j};
+ for(const j of report.jobs.filter(j=>j.type==='RC'))for(const part of j.columnParts274||[j]){const expected={...part,_reportSection:j._reportSection,fingerprint:j.fingerprint,preview:true};assert(first.msg.jobs.some(x=>JSON.stringify(clean(x))===JSON.stringify(clean(expected))),`Unprepared report part: ${part.label}`);}
+ await c.run('ExcelSync.receive({done:true})');
+ if(process.argv[2]){const out=path.dirname(process.argv[2]);fs.writeFileSync(path.join(out,'check-request.json'),JSON.stringify(first.msg));fs.writeFileSync(path.join(out,'report-request.json'),JSON.stringify(report));fs.writeFileSync(path.join(out,'prepared-model.json'),checked);}
+ const second=await dispatched(c,'ExcelSync.verifyCheck279()');await finish(c,second.msg,true);assert.equal(await second.task,false);assert(c.run('ExcelSync.nativeState279().stale'));assert.equal(c.run('ExcelSync.nativeState279().verified'),false);
+ const fail=setup(seed.run('Engine.clone(loading115Tests().projects.slab)')),third=await dispatched(fail,'ExcelSync.verifyCheck279()');await fail.run("ExcelSync.receive({done:true,error:'Excel interrupted'})");assert.equal(await third.task,false);assert(!fail.run('ExcelSync.nativeState279().verified'));
+ console.log('PASS native Check scope, identical A/B checkpoint inputs, separate report state, mid-flight edit invalidation and interrupted/missing records');
+})().catch(e=>{console.error(e);process.exitCode=1});

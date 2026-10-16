@@ -1,0 +1,89 @@
+{
+  "version": "E2.287",
+  "baseline": "b55f288097eaf5aab683899b631fc27e6d6e63c8",
+  "integratedUI": "21c9c1277b5bb6a73eb2ecc748e55b7c570f7454",
+  "regression": {
+    "passed": 75,
+    "failed": 9,
+    "total": 84,
+    "baselineFailureLogsIdenticalAfterPathNormalization": true,
+    "failures": [
+      "source/tests/audit-performance247.cjs",
+      "source/tests/check-sync226.cjs",
+      "source/tests/compression-count269.cjs",
+      "source/tests/equal-layers268.cjs",
+      "source/tests/member-navigation248.cjs",
+      "source/tests/rebar227.cjs",
+      "source/tests/representative250.cjs",
+      "source/tests/sb-advice220.cjs",
+      "source/tests/summary-rc216.cjs"
+    ]
+  },
+  "additionalTests": [
+    {
+      "test": "check-native279.cjs",
+      "exit": 0,
+      "ms": 525
+    },
+    {
+      "test": "report-slab-preflight276.cjs",
+      "exit": 0,
+      "ms": 1080
+    },
+    {
+      "test": "local-rebar285-ui.cjs",
+      "exit": 0,
+      "ms": 523
+    },
+    {
+      "test": "manual-spacing283-ui.cjs",
+      "exit": 0,
+      "ms": 624
+    },
+    {
+      "test": "rebar-autosave284-ui.cjs",
+      "exit": 0,
+      "ms": 855
+    },
+    {
+      "test": "column-position257-ui.cjs",
+      "exit": 0,
+      "ms": 1610
+    },
+    {
+      "test": "column-spacing258-ui.cjs",
+      "exit": 0,
+      "ms": 1783
+    },
+    {
+      "test": "beam-acceptance261-ui.cjs",
+      "exit": 0,
+      "ms": 2029
+    }
+  ],
+  "ui": {
+    "results": [
+      "All 20 workflows, filter, Enter and Escape",
+      "Command palette selects the actual beam",
+      "Keyboard panel resize persists after reload",
+      "Section A/B sample computed styles identical to E2.286 in screen and print media",
+      "Nine main pages at all three laptop profiles; usable canvas and no page horizontal overflow"
+    ],
+    "errors": []
+  },
+  "launcher": [
+    {
+      "sameContent": true,
+      "exit": 0,
+      "existingServerPreserved": true
+    },
+    {
+      "sameContent": false,
+      "exit": 1,
+      "existingServerPreserved": true
+    }
+  ],
+  "protectedJavaScriptModules": 64,
+  "bundledModules": 36,
+  "nativeExcelPDFRerun": false
+}

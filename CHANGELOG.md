@@ -1,3 +1,17 @@
+# E2.287 — E2.286 + PR #12 UI integration
+
+- Preserve the complete E2.286 calculation, Excel and report baseline.
+- Integrate workflow search, member navigation and high-DPI laptop profiles from PR #12.
+- Keep report views and print media outside the new UI styling. Preserve stored panel widths and make command results select their member.
+- Verify the actual page served by the existing preview port before reuse.
+
+## E2.257 — 多選柱基準位置（2026-10-13）
+
+- 多選柱的基準位置改為可編輯下拉選單，選擇後即套用；新增獨立的批次基準位置操作。
+- 保留 B／D、尺寸模式、柱選取及構件輸入；共用 Framing 樓層同步，一次撤銷。
+- 以整批最終位置檢查邊界、牆和柱衝突；任何衝突均不套用整批。
+- 計算公式、原 Excel 及 Section A／B 抄格式保持不變。
+
 ## E2.228 — 批量處理建議及增量檢查（2026-10-11）
 
 - 套用 TB／SB 建議後保留問題清單、篩選和捲動位置，標記上次結果待更新，可連續處理其他建議；支援撤銷及防止重複套用。

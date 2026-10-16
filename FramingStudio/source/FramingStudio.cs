@@ -14,8 +14,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8",FrameworkDisplayName=".NET Framework 4.8")]
 
 [assembly: System.Reflection.AssemblyTitle("Framing Studio")]
-[assembly: System.Reflection.AssemblyVersion("2.256.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.256.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.287.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.287.0.0")]
 
 static class Program {
     [STAThread] static int Main(string[] args) {
@@ -63,7 +63,7 @@ sealed class Studio : Form {
         Profile = Path.Combine(Data, "WebView2"); Directory.CreateDirectory(Data);
         if (TestDir != null) { Directory.CreateDirectory(TestDir); Opacity = .01; ShowInTaskbar = false; }
         if (BrowserRequest251 != null) { Opacity = 0; ShowInTaskbar = false; }
-        Text = "Framing Studio · E2.256 Desktop"; Width = 1500; Height = 950;
+        Text = "Framing Studio · E2.287 Desktop"; Width = 1500; Height = 950;
         MinimumSize = new Size(900, 650); StartPosition = FormStartPosition.CenterScreen;
         if (File.Exists(Path.Combine(Root,"FramingStudio.ico"))) Icon = new Icon(Path.Combine(Root,"FramingStudio.ico"));
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("项目");
@@ -136,7 +136,7 @@ sealed class Studio : Form {
             await web.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(Path.Combine(Root,"desktop-bridge.js")));
             web.NavigationCompleted += async delegate(object s, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { Log("Navigation: " + e.WebErrorStatus); Status.Text = "页面加载失败：" + e.WebErrorStatus; return; }
-                Ready = true; Status.Text = "离线模式 · E2.256 · 项目请保存为 .framing.json";
+                Ready = true; Status.Text = "离线模式 · E2.287 · 项目请保存为 .framing.json";
                 if (TestDir != null && TestNavigation++ == 0) await SelfTest();
                 if (BrowserRequest251 != null && !BrowserStarted251) {
                     BrowserStarted251=true;
@@ -224,6 +224,11 @@ sealed class Studio : Form {
         }
         if(section!=null)await ExcelNotify(new {sectionDone=section});
     }
+    static bool LiveCheckReady280(string directory,int pid) {
+        try{var result=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(directory,"result.json")));
+            return result.ContainsKey("liveReady280")&&Convert.ToBoolean(result["liveReady280"])&&Convert.ToInt32(result["workerPid280"])==pid&&Convert.ToBoolean(result["ok"])&&Convert.ToBoolean(result["preparedRC279"]);
+        }catch{return false;}
+    }
     async Task RunExcelJob81(Dictionary<string,object> source,string section,int index,int total,bool openWhenReady) {
                       var job=new Dictionary<string,object>(source);job.Remove("_reportSection");string runId=DateTime.Now.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N").Substring(0,8);
                       string directory=Path.Combine(Data,"ExcelRuns",runId);Directory.CreateDirectory(directory);ExcelRuns.Add(runId,directory);
@@ -233,7 +238,7 @@ sealed class Studio : Form {
                     await ExcelNotify(new {progress=(section==null?"":"Section "+section+" · ")+"Excel 正在计算 "+index+" / "+total+" · "+Convert.ToString(job["label"])});
                     var start=new ProcessStartInfo(Path.Combine(Root,"Excel","ExcelBridge.exe"),"\""+Path.Combine(Root,"Excel")+"\" \""+path+"\"") { UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden };
                     Task<List<object>> extraTask=null;
-                    int budget252=ExcelBudget252(job);bool completed;using(var process=Process.Start(start)){if(extraPages!=null)extraTask=PrintReportPages82(extraPages,directory,section);var elapsed=System.Diagnostics.Stopwatch.StartNew();string previous="";long tick252=-1;while(!process.HasExited&&elapsed.ElapsedMilliseconds<budget252){await Task.Delay(400);try{string progressPath=Path.Combine(directory,"progress.json");if(File.Exists(progressPath)){var stage=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(progressPath));string detail=Convert.ToString(stage["message"]);if(detail!=previous||elapsed.ElapsedMilliseconds/15000!=tick252){previous=detail;tick252=elapsed.ElapsedMilliseconds/15000;await ExcelNotify(new {progress=(section==null?"":"Section "+section+" · ")+"Excel "+index+" / "+total+" · "+detail+" · 已用 "+Math.Floor(elapsed.Elapsed.TotalSeconds)+" 秒"});}}}catch{}}completed=process.HasExited;if(!completed)try{process.Kill();}catch{}}
+                    int budget252=ExcelBudget252(job);bool completed,liveReady280=false;bool prepare280=job.ContainsKey("prepareRC279")&&Convert.ToBoolean(job["prepareRC279"]);using(var process=Process.Start(start)){if(extraPages!=null)extraTask=PrintReportPages82(extraPages,directory,section);var elapsed=System.Diagnostics.Stopwatch.StartNew();string previous="";long tick252=-1;while(!process.HasExited&&elapsed.ElapsedMilliseconds<budget252){await Task.Delay(400);if(prepare280&&LiveCheckReady280(directory,process.Id)){liveReady280=true;break;}try{string progressPath=Path.Combine(directory,"progress.json");if(File.Exists(progressPath)){var stage=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(progressPath));string detail=Convert.ToString(stage["message"]);if(detail!=previous||elapsed.ElapsedMilliseconds/15000!=tick252){previous=detail;tick252=elapsed.ElapsedMilliseconds/15000;await ExcelNotify(new {progress=(section==null?"":"Section "+section+" · ")+"Excel "+index+" / "+total+" · "+detail+" · 已用 "+Math.Floor(elapsed.Elapsed.TotalSeconds)+" 秒"});}}}catch{}}completed=process.HasExited||liveReady280;if(!completed)try{process.Kill();}catch{}}
                     List<object> extras=extraTask==null?new List<object>():await extraTask;
                     if(!completed) {
                         await ExcelNotify(new {record=new {ok=false,type=job["type"],label=job["label"],runId=runId,reportSection=section,error="Excel 生成超过本批次 "+(budget252/60000)+" 分钟上限，已停止本次生成进程。请检查 Excel 是否有等待处理的窗口，然后重新生成。"}});

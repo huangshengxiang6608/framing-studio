@@ -59,7 +59,7 @@ const BeamLoadUI=(()=>{
   const classify=s=>/^OK(?:$|[ (])/.test(s)?'P':s==='NOT OK'?'F':'U',v=deflectionResult214(i.deflection211),a=classify(i.checks205.a.status),d=v?(v.pass?'P':'F'):'U',b=classify(i.checks205.b.status),failed=d==='F'||b==='F';
   return {a,d,b,failed,key:[a,d,b].includes('U')?(failed?'pending-fail':'pending'):a+d+b};
  }
- function auditStatus214(i){if(i.fireWidth243?.pass===false)return 'NOT OK';const v=beamResult214(i);if(!v)return i.status;if(v.failed)return 'NOT OK';if(v.d==='U'||v.b==='U')return 'INPUT REQUIRED';return auditStatus212(i);}
+ function auditStatus214(i){if(i.fireWidth243?.pass===false)return 'NOT OK';const v=beamResult214(i);if(!v)return i.status;if(v.b==='F'||v.a==='F'&&v.d==='F')return 'NOT OK';if(v.b==='P'&&(v.a==='P'||v.d==='P'))return v.a==='P'?'OK':'OK (SHORT-TERM)';return 'INPUT REQUIRED';}
  const combinations214=Object.freeze(['PPP','PPF','PFP','PFF','FPP','FPF','FFP','FFF','fire-width','pending-fail','pending','other']);
  function defaultCombinations214(){return combinations214.filter(k=>k==='fire-width'||k==='pending-fail'||k.length===3&&k!=='PFP'&&(k[1]==='F'||k[2]==='F'));}
  function combinationKey214(i){return i.fireWidth243?.pass===false?'fire-width':beamResult214(i)?.key||'other';}

@@ -73,9 +73,9 @@ function ExplorerUI(host){
   const {a,b}=i.checks205,ratio=Number.isFinite(a.ratio)?'<br>L/h'+(a.support!=='Cantilever'&&a.L>10.001?'（含長跨修正）':'')+' = '+num(a.ratio)+'；限值 '+num(a.limit)+'<br><small>L = '+num(a.L)+' m；h = '+num(a.h)+' mm</small>':'',reasons=c=>c.reasons?.length?'<br>'+c.reasons.map(x=>esc(x==='挠度'?'撓度（L/d）':x)).join('；'):'';
   const short=BeamLoadUI.criterion212(i),d=i.deflection211,f=BeamLoads.display208;
   const deflection=short?'<div data-audit-short213 style="margin-top:6px"><span style="font-weight:700;color:'+(short.pass?'#176b46':'#e60000')+'">'+(stale?'上次：':'')+(short.pass?'短期撓度 OK':'短期撓度未通過')+'</span>'+'<br><span data-audit-deflection212>δmax = '+f(d.max)+' '+(short.pass?'&lt;':'≥')+' '+f(short.limit)+' mm（L/250）</span>'+'</div>':'';
-  const sectionA=block('Section A · Span/Depth',{...a,...(short?.pass&&a.status==='NOT OK'?{colour:'#c65300'}:{})},(a.status==='N/A'?'<br><small>柱不適用跨深比</small>':ratio+reasons(a))+deflection);
+  const sectionA=i.kind==='COL'?'':block('Section A · Span/Depth',{...a,...(short?.pass&&a.status==='NOT OK'?{colour:'#c65300'}:{})},(a.status==='N/A'?'<br><small>柱不適用跨深比</small>':ratio+reasons(a))+deflection);
   const sizeWarning=b.warnings?.length?'<div data-audit-size219 style="margin-top:6px;color:#c65300"><b>尺寸提示'+(stale?'（待更新）':'')+'</b><br>'+b.warnings.map(esc).join('；')+'<br><small>自動加闊限制，不影響 RC 判定。</small></div>':'';
-  return sectionA+(short?'':auditDeflectionHTML211(d,stale))+sizeWarning+block('Section B · RC Check',b,i.kind==='COL'?reasons({reasons:i.reasons}):b.reasons?.length?'<details><summary>查看原因</summary>'+reasons(b)+'</details>':'');
+  return sectionA+(i.kind==='COL'||short?'':auditDeflectionHTML211(d,stale))+sizeWarning+block('Section B · RC Check',b,i.kind==='COL'?reasons({reasons:i.reasons}):b.reasons?.length?'<details><summary>查看原因</summary>'+reasons(b)+'</details>':'');
  }
  function sbAdviceHTML220(i,stale,allowBatch=false,applied=false){
   if(!i.sbAdvice220)return '';const a=i.sbAdvice220,g=i.sbFraming220,size=v=>num(v.b)+' × '+num(v.d)+' mm（B × D）';

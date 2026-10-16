@@ -1,3 +1,10 @@
+# E2.290 — Remove members from the Check list
+
+- The member-list remove button now hides the row as well as clearing Check/A/B flags; the physical member remains in the model.
+- Persist explicit removals across refresh, automatic representative extraction and saved projects. Undo restores the row and flags.
+- Keep explicit plan selection available: choosing another member shows it; checking it retains it. Rechecking a removed member clears its list exclusion.
+- Preserve representative ranking, calculations, Section A/B report layout and native Excel templates.
+
 # E2.289 — Reference axes and reliable column deletion
 
 - Remove the separate Column grid panel. Use Column Spacing X/Y to generate evenly divided reference axes over the architectural grid bounds; retain the minimum actual centre-distance meaning.

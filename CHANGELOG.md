@@ -1,3 +1,11 @@
+# E2.291 — Insert axes without moving the existing grid
+
+- Add Insert buttons between every adjacent pair of X/Y axis rows. Enter an axis name and absolute coordinate in metres, preview both resulting gaps, then commit in one undoable transaction.
+- Split the original gap and remap building/Opening cells so existing axis coordinates, references and physical region boundaries remain fixed. Support arbitrary insertion order, inherited/nonzero-origin grids, shared Framing floors and saved projects.
+- Split local-height Area cells with the new axis; validate their union across intermediate floors so a split does not invalidate an unchanged physical Area.
+- Reject duplicate/blank names, coordinates outside the selected interval, gaps under 0.001 m and more than 20 axes; keep drafts and existing project data on failure or cancellation.
+- Preserve calculation equations, Section A/B report content/layout and native Excel/VBA templates.
+
 # E2.290 — Remove members from the Check list
 
 - The member-list remove button now hides the row as well as clearing Check/A/B flags; the physical member remains in the model.

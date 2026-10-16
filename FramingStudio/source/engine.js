@@ -5,6 +5,29 @@ const Engine=(()=>{
  const unique=a=>[...new Set(a.map(x=>+x.toFixed(6)))].sort((a,b)=>a-b);
  function axisData(p,key){return (typeof key==='string'?p.types[key]:key)?.axes||p.axes;}
  function ownAxes(p,key){if(!p.types[key])throw Error('Framing 类型不存在');return p.types[key].axes??=clone(axisData(p,key));}
+ function insertAxis291(p,key,dim,index,id,coordinate){
+  if(!p.types[key]||!['x','y'].includes(dim))throw Error('請選擇有效的 Framing 及軸線方向');
+  const grid=axisData(p,key),ar=grid[dim],positions=axes(p,dim,key);
+  if(!Number.isInteger(index)||index<1||index>=ar.length)throw Error('請選擇兩條相鄰軸線之間插入');
+  if(ar.length>=20)throw Error('每方向最多 20 條軸線');
+  if(typeof id!=='string'||!id.trim()||id.trim().length>20)throw Error('軸名須為 1–20 個字元');
+  id=id.trim();if(ar.some(a=>a.id===id))throw Error('軸名不可重複');
+  const left=positions[index-1],right=positions[index];
+  if(!Number.isFinite(coordinate)||coordinate<=left.v||coordinate>=right.v)throw Error('新軸線坐標須在 '+left.id+'（'+left.v+' m）與 '+right.id+'（'+right.v+' m）之間');
+  const span=ar[index].gap,tolerance=Number.EPSILON*Math.max(1,Math.abs(coordinate),Math.abs(left.v),Math.abs(right.v))*8;
+  // Snap only roundoff at the 1 mm limit, deriving the other gap from the original span.
+  let a=coordinate-left.v;if(Math.abs(a-.001)<=tolerance)a=.001;
+  let b=span-a;if(Math.abs(b-.001)<=tolerance){b=.001;a=span-b;}
+  if(a<.001||b<.001)throw Error('新軸線與左右原軸線的距離均須至少 0.001 m');
+  const t=p.types[key],cellIndex=dim==='x'?0:1,regions={};
+  // Split the containing cell, shift later indices, and retain sparse false/absent cells.
+  for(const layer of ['building','opening']){const out={};for(const [cell,value]of Object.entries(t[layer])){const q=cell.split(',').map(Number),n=q[cellIndex];if(n>=index)q[cellIndex]++;out[q.join(',')]=value;if(n===index-1){q[cellIndex]++;out[q.join(',')]=value;}}regions[layer]=out;}
+  const locals=(p.localHeights96||[]).filter(e=>e.type===key).map(e=>({entry:e,cells:e.cells.flatMap(c=>c[dim+'0']===left.id&&c[dim+'1']===right.id?[{...c,[dim+'1']:id},{...c,[dim+'0']:id}]:[c])}));
+  if(locals.some(e=>e.cells.length>400))throw Error('插入後局部層高 Area 超過 400 格');
+  const own=ownAxes(p,key)[dim];own[index].gap=b;own.splice(index,0,{id,gap:a});
+  Object.assign(t,regions);for(const {entry,cells}of locals)entry.cells=cells;
+  return {id,coordinate:left.v+a};
+ }
  function scoped(p,key){return {...p,axes:axisData(p,key)};}
  function axes(p,d,key){const grid=axisData(p,key);let v=grid.origin?.[d]||0;return grid[d].map((a,i)=>({id:a.id,v:v+=(i?a.gap:0)}));}
  function resolve(p,a,key){return a.ax!==undefined?[axes(p,'x',key).find(x=>x.id===a.ax)?.v+(a.dx||0),axes(p,'y',key).find(x=>x.id===a.ay)?.v+(a.dy||0)]:[a.x,a.y];}
@@ -919,6 +942,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {columnReferenceAxes289,removeColumns289,editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
+ return {insertAxis291,columnReferenceAxes289,removeColumns289,editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

@@ -68,8 +68,14 @@
  function selectableMembers(){const kinds=selectionKinds();return memberRecords().filter(h=>kinds.includes(h.kind)&&(h.kind==='SLAB'||visible[h.kind]!==false));}
  function memberSelectionPanel(){
   const items=selectedMembers();
-  return '<section class="member-selection"><h3>多選／刪除</h3><div class="row"><button type="button" data-member-select-all '+(!selectableMembers().length?'disabled':'')+'>全選當層牆</button><button type="button" data-member-delete '+(!items.length?'disabled':'')+'>刪除所選構件 · Delete</button></div><p id="member-selection-count">已選取 '+items.length+' 個構件</p>'+(items.length?'<p style="overflow-wrap:anywhere">'+items.map(h=>esc(h.kind+' '+h.id)).join('、')+'</p>':'')+'<p class="muted">单击／拖框累加选择，不用 Shift；Esc 清除。删除应用至 '+esc(key)+' 共用樓層，可一次撤銷。</p></section>';
+  return '<section class="member-selection"><h3>多選／複製／刪除</h3><div class="row"><button type="button" data-wall-copy-up292 '+(!items.length||floor>=result.floors.length?'disabled':'')+'>複製至上層</button><button type="button" data-member-select-all '+(!selectableMembers().length?'disabled':'')+'>全選當層牆</button><button type="button" data-member-delete '+(!items.length?'disabled':'')+'>刪除所選構件 · Delete</button></div><p id="member-selection-count">已選取 '+items.length+' 個構件</p>'+(items.length?'<p style="overflow-wrap:anywhere">'+items.map(h=>esc(h.kind+' '+h.id)).join('、')+'</p>':'')+'<p class="muted">單擊／拖框累加選牆，不用 Shift；Esc 清除。複製至上層保留牆的實際座標及厚度，套用至目標 Framing 共用樓層；相同牆略過，衝突時整批不套用。可一次撤銷。刪除應用至 '+esc(key)+' 共用樓層。</p></section>';
  }
+ function copySelectedWalls292(){
+  if(tab!=='walls'||!InputFeedback172.ready())return;const hits=selectedMembers();
+  try{const trial=Engine.clone(p),out=FloorWalls292.copyUp(trial,result,key,floor,hits),targetKey=result.floors[out.target-1].type;if(out.copied&&!transact(()=>{p.types[targetKey]=trial.types[targetKey];}))return;toast(out.message);}catch(e){toast(e.message);}
+ }
+ $('side').addEventListener('pointerdown',e=>{const button=e.target.closest('[data-wall-copy-up292]'),active=document.activeElement;if(e.button!==0||!button||button.disabled||!active?.matches('input[data-action]'))return;const hits=selectedMembers(),index=Number(active.dataset.i),oldId=p.types[key].walls[index]?.id,rename=active.dataset.f==='id';e.preventDefault();button.dataset.wallCopyHandled292='true';active.blur();if(!InputFeedback172.ready())return;if(rename){const id=p.types[key].walls[index]?.id;if(id)chooseMembers(hits.map(h=>h.id===oldId?{...h,id}:h));}copySelectedWalls292();});
+ $('side').addEventListener('click',e=>{const b=e.target.closest('[data-wall-copy-up292]');if(!b||b.disabled)return;if(b.dataset.wallCopyHandled292){delete b.dataset.wallCopyHandled292;return;}copySelectedWalls292();});
  function finishMemberSelection(e){
   if(!memberDrag)return false;const box=memberDrag;memberDrag=null;
   if(['pointercancel','lostpointercapture'].includes(e?.type)||box.f!==floor||box.key!==key||box.tab!==tab){schedule();return true;}

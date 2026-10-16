@@ -1,3 +1,11 @@
+# E2.292 — Copy selected walls to the upper floor
+
+- Add Copy to Upper Floor to the wall selection panel for single, multiple and select-all walls, matching the column workflow.
+- Retain physical wall endpoints, thickness and face alignment across different architectural grids and Opening layouts. Apply to the destination Framing's shared floors; leave the source and other Framings intact.
+- Skip identical walls and shared-Framing no-ops, remap conflicting wall IDs, reject column/parallel-wall conflicts atomically, and preserve existing automatic beam geometry.
+- Commit pending wall name/thickness edits before the first copy click; invalid edits block copying. Retain one-step Undo, local backup, project reopen and top-floor disabling.
+- Keep E2.291 axis insertion, calculation rules, Section A/B reports and native Excel/VBA unchanged.
+
 # E2.291 — Insert axes without moving the existing grid
 
 - Add Insert buttons between every adjacent pair of X/Y axis rows. Enter an axis name and absolute coordinate in metres, preview both resulting gaps, then commit in one undoable transaction.

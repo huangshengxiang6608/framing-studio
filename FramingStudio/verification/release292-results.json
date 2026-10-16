@@ -1,0 +1,182 @@
+{
+  "version": "E2.292",
+  "baseline": "d27d7b379ae7773e42d83d7b061cc4d29898fc92",
+  "modules": 36,
+  "scripts": 40,
+  "protectedModules": [
+    "audit-runner132.js",
+    "beam-layout116.js",
+    "beam-load-ui.js",
+    "beam-loads.js",
+    "beam-rebar116.js",
+    "beam-sizing.js",
+    "checks.js",
+    "column-alignment-ui.js",
+    "column-alignment.js",
+    "column-areas103.js",
+    "column-loads101.js",
+    "column-panel123.js",
+    "deflection-ui.js",
+    "deflection.js",
+    "display-quality.js",
+    "drawing.js",
+    "engine.js",
+    "excel-formulas.js",
+    "excel-sync.js",
+    "explorer-ui.js",
+    "floor-levels.js",
+    "foundation.js",
+    "framing-fold91.js",
+    "framing-symbols98.js",
+    "horizontal-path133.js",
+    "input-feedback172.js",
+    "load-data.js",
+    "load-path84.js",
+    "load-regions.js",
+    "loading.js",
+    "local-heights96.js",
+    "measure189.js",
+    "mobile.js",
+    "overall-report.js",
+    "overall-runtime.js",
+    "overall-source.js",
+    "rc-plan.js",
+    "report-compose.js",
+    "report-content.js",
+    "report-extras.js",
+    "report-paper.js",
+    "reports.js",
+    "review-layout191.js",
+    "right-inputs.js",
+    "slab-geometry120.js",
+    "slab-marks.js",
+    "slab-panel121.js",
+    "slab-support-ui132.js",
+    "slab-support132.js",
+    "steel-catalog.js",
+    "steel.js",
+    "transfer-markers.js",
+    "transfer-truss.js",
+    "truss-analysis.js",
+    "truss-catalog.js",
+    "truss-model.js",
+    "truss-reports.js",
+    "truss-ui.js",
+    "truss-zone.js",
+    "ui-polish173.js",
+    "usage.js",
+    "view-helpers87.js",
+    "wind-average93.js",
+    "workspace-pages.js"
+  ],
+  "nativeFiles": [
+    "FramingStudio/Excel/ExcelBridge.exe",
+    "FramingStudio/Excel/Foundation_Design_Checking_v8.xlsm",
+    "FramingStudio/Excel/ReportImages/horizontal-load-path.png",
+    "FramingStudio/Excel/ReportImages/vertical-load-path.png",
+    "FramingStudio/Excel/Section A RC - Section B v106 Loading.xlsm",
+    "FramingStudio/Excel/Section A RC - Section B v107 Full Loads.xlsm",
+    "FramingStudio/Excel/Section A RC - Section B v108 Area Loads.xlsm",
+    "FramingStudio/Excel/Section A RC - Section B v109 Compact Copy.xlsm",
+    "FramingStudio/Excel/Steel Beam design V095.xlsm",
+    "FramingStudio/Excel/deflection_core_wall_BD_layered.xlsm",
+    "FramingStudio/Excel/overall_checking_BD_copy_ruled.xlsm",
+    "FramingStudio/Excel/templates.json"
+  ],
+  "differentialProjects": [
+    "slab",
+    "cb"
+  ],
+  "tests": [
+    {
+      "test": "wall-copy292",
+      "exit": 0,
+      "ms": 306
+    },
+    {
+      "test": "copy-column196",
+      "exit": 0,
+      "ms": 1247
+    },
+    {
+      "test": "wall-copy292-ui",
+      "exit": 0,
+      "ms": 4257
+    },
+    {
+      "test": "axis-insert291",
+      "exit": 0,
+      "ms": 728
+    },
+    {
+      "test": "copy-column-adjacent",
+      "exit": 0,
+      "ms": 3503
+    },
+    {
+      "test": "column-spacing258",
+      "exit": 0,
+      "ms": 579
+    },
+    {
+      "test": "column-spacing258-ui",
+      "exit": 0,
+      "ms": 3185
+    },
+    {
+      "test": "axis-insert291-ui",
+      "exit": 0,
+      "ms": 4336
+    },
+    {
+      "test": "grid-snap217",
+      "exit": 0,
+      "ms": 852
+    },
+    {
+      "test": "column-delete289-ui",
+      "exit": 0,
+      "ms": 3816
+    },
+    {
+      "test": "column-representatives271",
+      "exit": 0,
+      "ms": 502
+    },
+    {
+      "test": "slab-representatives275",
+      "exit": 0,
+      "ms": 299
+    },
+    {
+      "test": "member-list290-ui",
+      "exit": 0,
+      "ms": 4275
+    },
+    {
+      "test": "report-slab-preflight276",
+      "exit": 0,
+      "ms": 1562
+    },
+    {
+      "test": "check-native279",
+      "exit": 0,
+      "ms": 693
+    },
+    {
+      "test": "check-ui279",
+      "exit": 0,
+      "ms": 574
+    },
+    {
+      "test": "summary-app282",
+      "exit": 0,
+      "ms": 633
+    },
+    {
+      "test": "local-rebar285",
+      "exit": 0,
+      "ms": 1294
+    }
+  ]
+}

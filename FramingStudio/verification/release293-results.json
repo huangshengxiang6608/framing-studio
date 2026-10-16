@@ -1,0 +1,44 @@
+{
+  "version": "E2.293",
+  "baseline": "d5c7cc45c4dfb1ee0603fed7029e4a0a6aba9b0f",
+  "productionJavaScriptIdenticalToVerifiedLocalPackage": 67,
+  "protectedReportAndExcelFiles": 38,
+  "desktopHostVersionOnly": true,
+  "previewMatchesRelease": true,
+  "previewCacheControl": "no-store",
+  "originalProjectUnchanged": true,
+  "nativeExcelRun": false,
+  "fullHistoricalSuiteRun": false,
+  "freshTests": [
+    {
+      "test": "wall-column-allocation",
+      "result": "pass",
+      "fixture": "original area diagnostic fixture: 21 floors / 440 columns"
+    },
+    {
+      "test": "wall-column-allocation-ui",
+      "result": "pass",
+      "fixture": "original area diagnostic fixture"
+    },
+    {
+      "test": "geometry-consistency-local",
+      "result": "pass",
+      "fixture": "latest geometry diagnostic fixture"
+    },
+    {
+      "test": "geometry-consistency-local-ui",
+      "result": "pass",
+      "fixture": "latest geometry diagnostic fixture"
+    }
+  ],
+  "fixtureNotes": "The area regression has fixed expectations for the earlier saved model. A preliminary run against the later edited project hit fixture-specific input-normalization/value assertions; rerunning the original retained fixture passed. The geometry regression independently verifies the latest project and save/reload.",
+  "syntax": {
+    "markedModules": 37,
+    "bundledScripts": 40,
+    "allParse": true,
+    "sourceBundleMatch": true
+  },
+  "desktopVersion": "2.293.0.0",
+  "geometryWarningsAfterCleanup": 0,
+  "columnsAxialOnlyPass": 440
+}

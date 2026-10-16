@@ -66,8 +66,18 @@ const Engine=(()=>{
   if(b.columnSupports164)return b.columnSupports164;
   return ['a','z'].map(end=>{const point=b[end],hits=columns.filter(c=>{if(c.status==='上层柱')return false;const r=columnRect(c);return Math.abs(point[0]-r.x)<=r.w/2+eps&&Math.abs(point[1]-r.y)<=r.d/2+eps;});return hits.length===1?{key:columnPositionKey(hits[0]),reference:columnReference(p,key,hits[0])}:null;});
  }
- function followMainColumns164(p,key,b,columns){
+ function followMainColumns164(p,key,b,columns,walls=[]){
   const links=mainColumnSupports164(p,key,b,columns),find=link=>{if(!link)return null;const live=columns.filter(c=>c.status!=='上层柱'),exact=live.find(c=>columnPositionKey(c)===link.key);if(exact)return exact;const matches=live.filter(c=>columnReference(p,key,c).every((v,i)=>near(v,link.reference[i])));return matches.length===1?matches[0]:null;},ends=links.map(find);
+  if(ends.filter(Boolean).length===1){
+   // A column-to-wall span must follow the column before collision testing.
+   // Keep the wall's connection station; only slide along its physical face.
+   const index=ends[0]?0:1,other=1-index,c=columnRect(ends[index]),horizontal=near(b.rawA[1],b.rawZ[1]),axis=horizontal?0:1,cross=1-axis;
+   const old=[b.a,b.z],next=old.map(q=>[...q]);next[index]=[c.x,c.y];next[other][cross]=next[index][cross];
+   const contains=(w,q)=>{const r=rect(w);return Math.abs(q[0]-r.x)<=r.w/2+eps&&Math.abs(q[1]-r.y)<=r.d/2+eps;};
+   const targets=walls.filter(w=>horizontal!==near(w.a[1],w.z[1])&&contains(w,old[other])&&contains(w,next[other]));
+   if(targets.length!==1||(next[1][axis]-next[0][axis])*(b.rawZ[axis]-b.rawA[axis])<=eps)return null;
+   return {a:next[0],z:next[1],columnSupports164:links};
+  }
   if(ends.some(c=>!c)||ends[0]===ends[1])return null;
   const rects=ends.map(columnRect),a=[rects[0].x,rects[0].y],z=[rects[1].x,rects[1].y],horizontal=near(b.rawA[1],b.rawZ[1]);
   // Unequal column offsets must not create a diagonal in the orthogonal model.
@@ -493,7 +503,7 @@ const Engine=(()=>{
   // displace a correctly positioned replacement when its section grows.
   const duplicateCandidates163=[],manualCandidates=t.beams.filter(c=>c.on).map(c=>{
    const a=resolve(p,c.a),z=resolve(p,c.z),automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?mainBeamWidth(columns,a,z,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??(c.widthMode==='default'?df[c.kind==='SB'?'sb':'mb']:c.b):c.widthMode==='default'?df[c.kind==='TB'?'tb':'mb']:c.b)/1000;
-   const linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns):null,linkedRect=linked&&rect({...linked,b}),fixed=c.positionMode175==='fixed'&&c.fixedA175&&c.fixedZ175?{a:clone(c.fixedA175),z:clone(c.fixedZ175)}:null;
+   const linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns,walls):null,linkedRect=linked&&rect({...linked,b}),fixed=c.positionMode175==='fixed'&&c.fixedA175&&c.fixedZ175?{a:clone(c.fixedA175),z:clone(c.fixedZ175)}:null;
    const original=fixed||lineAllowed(ts,a,z,b,c.edgeInset===true),pos=linkedRect&&rectAllowed(ts,linkedRect.x,linkedRect.y,linkedRect.w,linkedRect.d)?linked:original||(automatic?lineAllowed(ts,a,z,b,true):null);
    return {c,a,z,b,pos,adjusted:!original&&!!pos};
   }).sort((a,b)=>Number(a.adjusted)-Number(b.adjusted));
@@ -514,7 +524,7 @@ const Engine=(()=>{
    // Snapshots preserve topology; automatic MB and CB widths follow columns.
    // Missing widthMode is a legacy automatic snapshot; explicit widths stay fixed.
    const fixed=t.beamWidths83?.[sig(saved.rawA,saved.rawZ)],automatic=['MB','CB'].includes(saved.kind)&&saved.widthMode!=='manual'&&fixed==null;
-   const followed=saved.positionMode175!=='fixed'&&['MB','CB','TB'].includes(saved.kind)?followMainColumns164(p,key,saved,columns):null;
+   const followed=saved.positionMode175!=='fixed'&&['MB','CB','TB'].includes(saved.kind)?followMainColumns164(p,key,saved,columns,walls):null;
    const width=automatic?mainBeamWidth(columns,followed?.a||saved.rawA,followed?.z||saved.rawZ,df.mb/1000):fixed!=null?fixed/1000:saved.widthMode!=='manual'?df[saved.kind==='SB'?'sb':saved.kind==='TB'?'tb':'mb']/1000:saved.b;
    const candidate=followed&&{...followed,b:width},box=candidate&&rect(candidate),canFollow=box&&rectAllowed(ts,box.x,box.y,box.w,box.d)&&!beamSpaceConflict(candidate,beams,columns);
    const prior=rect({...saved,b:width}),pos=saved.positionMode175==='fixed'?{a:saved.a,z:saved.z}:canFollow?followed:automatic||!rectAllowed(ts,prior.x,prior.y,prior.w,prior.d)?lineAllowed(ts,saved.rawA,saved.rawZ,width,true):{a:saved.a,z:saved.z},beam={...clone(saved),...pos,b:width,widthMode:fixed!=null?'manual':automatic?'column':saved.widthMode??'default'};

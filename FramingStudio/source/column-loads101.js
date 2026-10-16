@@ -53,6 +53,7 @@ const ColumnLoads101=(()=>{
  function issueCaption(data){
   const errors=data.errors||[];if(!errors.length)return '';
   const reasons=[];
+  if(errors.some(e=>/受荷分界|墙柱分界|柱墙分界|柱墙受荷面积|楼层受荷面积|受荷面积超出/.test(e)))reasons.push('面积分配待确认');
   if(errors.some(e=>/参考点重合|半跨范围.*重叠/.test(e)))reasons.push('柱位置／面积划分待核对');
   if(errors.some(e=>/荷载区域重叠/.test(e)))reasons.push('Loading 区域重叠');
   if(errors.some(e=>/DL|SDL|LL|荷载基准|荷载区域(?!重叠)/.test(e)))reasons.push('荷载输入待补齐');
@@ -107,7 +108,8 @@ const ColumnLoads101=(()=>{
   ctx.beginPath();ctx.rect(box.x+8,box.y+4,box.w-16,box.h-8);ctx.clip();
   const write=(s,y,size=12,bold=false,ink=colour,whole=false)=>{const font=()=>ctx.font=(bold?'600 ':'')+size+'px "Segoe UI", "Microsoft YaHei", sans-serif';font();ctx.fillStyle=ink;const max=box.w-28;if(whole)while(ctx.measureText(s).width>max&&size>10){size--;font();}while(ctx.measureText(s).width>max&&s.length>1)s=s.slice(0,-2)+'…';ctx.fillText(s,box.x+14,box.y+y);};
   const same=data.floor===data.targetFloor,title=same?data.id+' · '+data.floorName:data.id+' · 目标柱 '+data.targetName;
-  write(title+(data.compact&&!data.auto?' · 手动面积':''),data.compact?14:19,data.compact?11:13,true);write(Number.isFinite(data.area)?'受荷面积 '+num(data.area)+' m²':'受荷面积待确认',data.compact?35:46,data.compact?18:21,true,colour,true);
+  const pendingArea=(data.errors||[]).some(e=>/受荷分界|墙柱分界|柱墙分界|柱墙受荷面积|楼层受荷面积|受荷面积超出/.test(e));
+  write(title+(data.compact&&!data.auto?' · 手动面积':''),data.compact?14:19,data.compact?11:13,true);write(!pendingArea&&Number.isFinite(data.area)?'受荷面积 '+num(data.area)+' m²':'受荷面积待确认',data.compact?35:46,data.compact?18:21,true,colour,true);
   if(!data.compact)write('来源楼层：'+data.floorName,66,12,false,'#36586d');
   const caption=issueCaption(data)||(!data.rects.length&&!data.polygons?.length?(data.auto?'所选范围没有楼板面积':'手动面积，暂无对应几何范围'):data.weighted?'斜线：几何面积经转换梁分配':data.partitioned?'矩形優先分配 · Opening 已扣除':'几何半跨范围 · Opening 已扣除');
   if(!data.compact)write(caption,87,12,false,'#36586d',true);if(dims){const top=data.compact?55:110;write('X = '+num(dims.x)+' m · Y = '+num(dims.y)+' m',top,12,true,colour,true);write('X: '+num(dims.x0)+'–'+num(dims.x1)+' · Y: '+num(dims.y0)+'–'+num(dims.y1)+' m',top+19,11,false,'#36586d',true);write(dims.rectangle?'面積 = X × Y':data.weighted?'外包尺寸；面積按傳荷比例計算':'外包尺寸；實際面積以高亮區為準',top+37,11,false,'#36586d',true);}ctx.restore();

@@ -60,9 +60,9 @@ const BeamLoadUI=(()=>{
   return {a,d,b,failed,key:[a,d,b].includes('U')?(failed?'pending-fail':'pending'):a+d+b};
  }
  function auditStatus214(i){if(i.fireWidth243?.pass===false)return 'NOT OK';const v=beamResult214(i);if(!v)return i.status;if(v.b==='F'||v.a==='F'&&v.d==='F')return 'NOT OK';if(v.b==='P'&&(v.a==='P'||v.d==='P'))return v.a==='P'?'OK':'OK (SHORT-TERM)';return 'INPUT REQUIRED';}
- const combinations214=Object.freeze(['PPP','PPF','PFP','PFF','FPP','FPF','FFP','FFF','fire-width','pending-fail','pending','other']);
- function defaultCombinations214(){return combinations214.filter(k=>k==='fire-width'||k==='pending-fail'||k.length===3&&k!=='PFP'&&(k[1]==='F'||k[2]==='F'));}
- function combinationKey214(i){return i.fireWidth243?.pass===false?'fire-width':beamResult214(i)?.key||'other';}
+ const combinations214=Object.freeze(['PPP','PPF','PFP','PFF','FPP','FPF','FFP','FFF','fire-width','pending-fail','pending','other','geometry']);
+ function defaultCombinations214(){return combinations214.filter(k=>k==='geometry'||k==='fire-width'||k==='pending-fail'||k.length===3&&k!=='PFP'&&(k[1]==='F'||k[2]==='F'));}
+ function combinationKey214(i){if(i.kind==='MODEL')return 'geometry';return i.fireWidth243?.pass===false?'fire-width':beamResult214(i)?.key||'other';}
  function criterion212(i){
   const a=i.checks205?.a,d=i.deflection211;
   if(!['MB','SB','TB','CB'].includes(i.kind)||!['NOT OK','CALC. REQUIRED'].includes(a?.status)||d?.state!=='available'||!Number.isFinite(d.max)||d.max<0||!Number.isFinite(d.L)||d.L<=0)return null;

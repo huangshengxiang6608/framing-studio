@@ -1,3 +1,12 @@
+# E2.293 — Column tributary areas and geometry consistency
+
+- Match adjacent columns using their physical section projection at wall ends, retaining actual centre/reference-line tributary boundaries. Detect missing, overlapping, outside and unresolved allocations and propagate unresolved results to Check/report inputs.
+- List and clean enabled columns wholly outside the current Framing's building outline. Subsequent outline edits synchronize cleanup in the same undoable transaction. Retain openings, edge/partially crossing columns and other Framings.
+- Follow resized column centres for horizontal/vertical column-to-wall beams before overlap checks; preserve explicit fixed coordinates and independently assigned loads/design. Existing protected duplicate handling retains replacement beams.
+- Group geometry warnings by Framing and reason, separate them from member checks, and locate excluded records with temporary dashed outlines.
+- Preserve Section A/B report rendering, formulas, native ExcelBridge and workbook/VBA templates. Desktop host changes only its release version.
+- Based on official E2.290; the unmerged PR #14 E2.292 axis/wall-copy changes are not included.
+
 # E2.290 — Remove members from the Check list
 
 - The member-list remove button now hides the row as well as clearing Check/A/B flags; the physical member remains in the model.

@@ -1,0 +1,655 @@
+{
+  "baseline": "6410f2f4c6c0c7058b0757059a18cdd2e057a645",
+  "modules": 36,
+  "scripts": 40,
+  "protectedFiles": [
+    "audit-runner132.js",
+    "beam-layout116.js",
+    "beam-load-ui.js",
+    "beam-loads.js",
+    "beam-rebar116.js",
+    "beam-sizing.js",
+    "checks.js",
+    "column-alignment-ui.js",
+    "column-alignment.js",
+    "column-areas103.js",
+    "column-loads101.js",
+    "column-panel123.js",
+    "deflection-ui.js",
+    "deflection.js",
+    "display-quality.js",
+    "drawing.js",
+    "excel-formulas.js",
+    "excel-sync.js",
+    "explorer-ui.js",
+    "floor-levels.js",
+    "foundation.js",
+    "framing-fold91.js",
+    "framing-symbols98.js",
+    "horizontal-path133.js",
+    "input-feedback172.js",
+    "load-data.js",
+    "load-path84.js",
+    "load-regions.js",
+    "loading.js",
+    "local-heights96.js",
+    "measure189.js",
+    "mobile.js",
+    "overall-report.js",
+    "overall-runtime.js",
+    "overall-source.js",
+    "rc-plan.js",
+    "report-compose.js",
+    "report-content.js",
+    "report-extras.js",
+    "report-paper.js",
+    "reports.js",
+    "review-layout191.js",
+    "right-inputs.js",
+    "slab-geometry120.js",
+    "slab-marks.js",
+    "slab-panel121.js",
+    "slab-support-ui132.js",
+    "slab-support132.js",
+    "steel-catalog.js",
+    "steel.js",
+    "transfer-markers.js",
+    "transfer-truss.js",
+    "truss-analysis.js",
+    "truss-catalog.js",
+    "truss-model.js",
+    "truss-reports.js",
+    "truss-ui.js",
+    "truss-zone.js",
+    "ui-polish173.js",
+    "usage.js",
+    "view-helpers87.js",
+    "wind-average93.js",
+    "workspace-pages.js"
+  ],
+  "tests": [
+    {
+      "test": "source/tests/audit-performance247.cjs",
+      "exit": 1,
+      "ms": 333
+    },
+    {
+      "test": "source/tests/area-parity247.cjs",
+      "exit": 0,
+      "ms": 1088
+    },
+    {
+      "test": "source/tests/audit-ui247.cjs",
+      "exit": 0,
+      "ms": 853
+    },
+    {
+      "test": "source/tests/bay-record246.cjs",
+      "exit": 0,
+      "ms": 343
+    },
+    {
+      "test": "source/tests/batch228.cjs",
+      "exit": 0,
+      "ms": 621
+    },
+    {
+      "test": "source/tests/beam-acceptance261.cjs",
+      "exit": 0,
+      "ms": 531
+    },
+    {
+      "test": "source/tests/beam-batch244.cjs",
+      "exit": 0,
+      "ms": 13529
+    },
+    {
+      "test": "source/tests/beam-filters214.cjs",
+      "exit": 0,
+      "ms": 869
+    },
+    {
+      "test": "source/tests/beam-loads264.cjs",
+      "exit": 0,
+      "ms": 322
+    },
+    {
+      "test": "source/tests/check-sync226.cjs",
+      "exit": 1,
+      "ms": 393
+    },
+    {
+      "test": "source/tests/check-ui279.cjs",
+      "exit": 0,
+      "ms": 416
+    },
+    {
+      "test": "source/tests/closure224.cjs",
+      "exit": 0,
+      "ms": 202
+    },
+    {
+      "test": "source/tests/column-position257.cjs",
+      "exit": 0,
+      "ms": 276
+    },
+    {
+      "test": "source/tests/column-spacing258.cjs",
+      "exit": 0,
+      "ms": 328
+    },
+    {
+      "test": "source/tests/column-workbook274.cjs",
+      "exit": 0,
+      "ms": 40
+    },
+    {
+      "test": "source/tests/compression-count269.cjs",
+      "exit": 1,
+      "ms": 593
+    },
+    {
+      "test": "source/tests/deflection-criterion212.cjs",
+      "exit": 0,
+      "ms": 744
+    },
+    {
+      "test": "source/tests/deflection210.cjs",
+      "exit": 0,
+      "ms": 58
+    },
+    {
+      "test": "source/tests/diagrams207.cjs",
+      "exit": 0,
+      "ms": 49
+    },
+    {
+      "test": "source/tests/equal-layers268.cjs",
+      "exit": 1,
+      "ms": 632
+    },
+    {
+      "test": "source/tests/fire-filter243.cjs",
+      "exit": 0,
+      "ms": 363
+    },
+    {
+      "test": "source/tests/fire241.cjs",
+      "exit": 0,
+      "ms": 456
+    },
+    {
+      "test": "source/tests/floor-auto249.cjs",
+      "exit": 0,
+      "ms": 401
+    },
+    {
+      "test": "source/tests/floor-status251.cjs",
+      "exit": 0,
+      "ms": 43
+    },
+    {
+      "test": "source/tests/grid-snap217.cjs",
+      "exit": 0,
+      "ms": 270
+    },
+    {
+      "test": "source/tests/incremental228.cjs",
+      "exit": 0,
+      "ms": 1066
+    },
+    {
+      "test": "source/tests/link-policy267.cjs",
+      "exit": 0,
+      "ms": 316
+    },
+    {
+      "test": "source/tests/link-spacing233.cjs",
+      "exit": 0,
+      "ms": 291
+    },
+    {
+      "test": "source/tests/local-rebar285.cjs",
+      "exit": 0,
+      "ms": 1132
+    },
+    {
+      "test": "source/tests/local-report251.cjs",
+      "exit": 0,
+      "ms": 317
+    },
+    {
+      "test": "source/tests/manual-spacing283.cjs",
+      "exit": 0,
+      "ms": 416
+    },
+    {
+      "test": "source/tests/member-design265.cjs",
+      "exit": 0,
+      "ms": 280
+    },
+    {
+      "test": "source/tests/member-navigation248.cjs",
+      "exit": 1,
+      "ms": 398
+    },
+    {
+      "test": "source/tests/precision208.cjs",
+      "exit": 0,
+      "ms": 320
+    },
+    {
+      "test": "source/tests/reaction-rounding207.cjs",
+      "exit": 0,
+      "ms": 337
+    },
+    {
+      "test": "source/tests/rebar-cover240.cjs",
+      "exit": 0,
+      "ms": 260
+    },
+    {
+      "test": "source/tests/rebar-legs239.cjs",
+      "exit": 0,
+      "ms": 236
+    },
+    {
+      "test": "source/tests/rebar-live237.cjs",
+      "exit": 0,
+      "ms": 215
+    },
+    {
+      "test": "source/tests/rebar227.cjs",
+      "exit": 1,
+      "ms": 487
+    },
+    {
+      "test": "source/tests/report-adoption254.cjs",
+      "exit": 0,
+      "ms": 411
+    },
+    {
+      "test": "source/tests/report-handoff248.cjs",
+      "exit": 0,
+      "ms": 337
+    },
+    {
+      "test": "source/tests/representative250.cjs",
+      "exit": 1,
+      "ms": 397
+    },
+    {
+      "test": "source/tests/sb-advice220.cjs",
+      "exit": 1,
+      "ms": 348
+    },
+    {
+      "test": "source/tests/sb-width218.cjs",
+      "exit": 0,
+      "ms": 305
+    },
+    {
+      "test": "source/tests/section-a-acceptance262.cjs",
+      "exit": 0,
+      "ms": 375
+    },
+    {
+      "test": "source/tests/size-criterion230.cjs",
+      "exit": 0,
+      "ms": 339
+    },
+    {
+      "test": "source/tests/slab-failure256.cjs",
+      "exit": 0,
+      "ms": 276
+    },
+    {
+      "test": "source/tests/slab-load223.cjs",
+      "exit": 0,
+      "ms": 312
+    },
+    {
+      "test": "source/tests/slab-selection255.cjs",
+      "exit": 0,
+      "ms": 461
+    },
+    {
+      "test": "source/tests/beam-batch245.cjs",
+      "exit": 0,
+      "ms": 29356
+    },
+    {
+      "test": "source/tests/summary-app282.cjs",
+      "exit": 0,
+      "ms": 523
+    },
+    {
+      "test": "source/tests/summary-rc216.cjs",
+      "exit": 1,
+      "ms": 266
+    },
+    {
+      "test": "source/tests/summary-deflection211.cjs",
+      "exit": 0,
+      "ms": 743
+    },
+    {
+      "test": "source/tests/summary-sections205.cjs",
+      "exit": 0,
+      "ms": 614
+    },
+    {
+      "test": "source/tests/tb-advice221.cjs",
+      "exit": 0,
+      "ms": 784
+    },
+    {
+      "test": "source/tests/treatment229.cjs",
+      "exit": 0,
+      "ms": 530
+    },
+    {
+      "test": "source/tests/tb-apply222.cjs",
+      "exit": 0,
+      "ms": 862
+    },
+    {
+      "test": "source/tests/width-advisory219.cjs",
+      "exit": 0,
+      "ms": 265
+    },
+    {
+      "test": "source/tests/unified-dimensions201.cjs",
+      "exit": 0,
+      "ms": 355
+    },
+    {
+      "test": "source/tests/secondary-split200.cjs",
+      "exit": 0,
+      "ms": 290
+    },
+    {
+      "test": "source/tests/drawing-cb198.cjs",
+      "exit": 0,
+      "ms": 283
+    },
+    {
+      "test": "source/tests/drawing-support197.cjs",
+      "exit": 0,
+      "ms": 354
+    },
+    {
+      "test": "source/tests/column-main194.cjs",
+      "exit": 0,
+      "ms": 273
+    },
+    {
+      "test": "source/tests/selection195.cjs",
+      "exit": 0,
+      "ms": 358
+    },
+    {
+      "test": "source/tests/review193.cjs",
+      "exit": 0,
+      "ms": 341
+    },
+    {
+      "test": "source/tests/review192.cjs",
+      "exit": 0,
+      "ms": 343
+    },
+    {
+      "test": "source/tests/review-layout191.cjs",
+      "exit": 0,
+      "ms": 357
+    },
+    {
+      "test": "source/tests/tributary187.cjs",
+      "exit": 0,
+      "ms": 252
+    },
+    {
+      "test": "source/tests/column-load-centres186.cjs",
+      "exit": 0,
+      "ms": 270
+    },
+    {
+      "test": "source/tests/self-weight185.cjs",
+      "exit": 0,
+      "ms": 257
+    },
+    {
+      "test": "source/tests/beam-surface184.cjs",
+      "exit": 0,
+      "ms": 263
+    },
+    {
+      "test": "source/tests/rounding183.cjs",
+      "exit": 0,
+      "ms": 316
+    },
+    {
+      "test": "source/tests/depth-factors180.cjs",
+      "exit": 0,
+      "ms": 270
+    },
+    {
+      "test": "source/tests/beam-independent179.cjs",
+      "exit": 0,
+      "ms": 261
+    },
+    {
+      "test": "source/tests/slab-bay178.cjs",
+      "exit": 0,
+      "ms": 234
+    },
+    {
+      "test": "source/tests/slab-transfer177.cjs",
+      "exit": 0,
+      "ms": 266
+    },
+    {
+      "test": "source/tests/slab-centres175.cjs",
+      "exit": 0,
+      "ms": 477
+    },
+    {
+      "test": "source/tests/unified-members175.cjs",
+      "exit": 0,
+      "ms": 304
+    },
+    {
+      "test": "source/tests/column-anchors174.cjs",
+      "exit": 0,
+      "ms": 222
+    },
+    {
+      "test": "source/tests/support-cantilever173.cjs",
+      "exit": 0,
+      "ms": 262
+    },
+    {
+      "test": "verification/ui173.cjs",
+      "exit": 0,
+      "ms": 70
+    },
+    {
+      "test": "verification/truss-core-tests.cjs",
+      "exit": 0,
+      "ms": 55
+    },
+    {
+      "test": "verification/integration143.cjs",
+      "exit": 0,
+      "ms": 307
+    },
+    {
+      "test": "verification/downstream143.cjs",
+      "exit": 0,
+      "ms": 526
+    },
+    {
+      "test": "source/tests/column-delete-many.cjs",
+      "exit": 1,
+      "ms": 1487
+    },
+    {
+      "test": "source/tests/column-resize166.cjs",
+      "exit": 0,
+      "ms": 1132
+    },
+    {
+      "test": "source/tests/column-parameter-table.cjs",
+      "exit": 0,
+      "ms": 2432
+    },
+    {
+      "test": "source/tests/copy-column196.cjs",
+      "exit": 0,
+      "ms": 677
+    },
+    {
+      "test": "source/tests/copy-column-adjacent.cjs",
+      "exit": 0,
+      "ms": 1727
+    },
+    {
+      "test": "source/tests/bays171.cjs",
+      "exit": 0,
+      "ms": 1094
+    },
+    {
+      "test": "source/tests/column-centres159.cjs",
+      "exit": 1,
+      "ms": 1108
+    },
+    {
+      "test": "source/tests/auto-transfer.cjs",
+      "exit": 0,
+      "ms": 1545
+    },
+    {
+      "test": "source/tests/column-outline160.cjs",
+      "exit": 1,
+      "ms": 1069
+    },
+    {
+      "test": "source/tests/column-reference-selection.cjs",
+      "exit": 0,
+      "ms": 1690
+    },
+    {
+      "test": "source/tests/column-deferred-boundary.cjs",
+      "exit": 1,
+      "ms": 1344
+    },
+    {
+      "test": "source/tests/column-multiselect.cjs",
+      "exit": 0,
+      "ms": 2307
+    }
+  ],
+  "workingTreeBase": "6410f2f4c6c0c7058b0757059a18cdd2e057a645",
+  "version": "E2.289",
+  "baselineComparison": [
+    {
+      "test": "source/tests/audit-performance247.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/check-sync226.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/compression-count269.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/equal-layers268.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/member-navigation248.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/rebar227.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/representative250.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/sb-advice220.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/summary-rc216.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/column-delete-many.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/column-centres159.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": true
+    },
+    {
+      "test": "source/tests/column-outline160.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": true
+    },
+    {
+      "test": "source/tests/column-deferred-boundary.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    }
+  ],
+  "targetedBrowserTests": [
+    {
+      "test": "source/tests/column-spacing258-ui.cjs",
+      "exit": 0
+    },
+    {
+      "test": "source/tests/column-delete289-ui.cjs",
+      "exit": 0
+    }
+  ],
+  "notes": [
+    "grid-snap217 uses the new Column Spacing reference-grid input instead of the removed independent-grid control; existing beam coordinate snapping remains available without generating columns or supports.",
+    "Native Excel/PDF generation was not rerun."
+  ],
+  "artifactHashes": {
+    "assets/index.html": "8b77f9a8f4467c5b1d47da6129cb6eeea4f07b1ee21ec799bba3d9b7cc8ba428",
+    "FramingStudio.exe": "bf1a16fc9d2a3104cab0144feaa2c3ff79d1b3a1be43ffc878d29ecf638786e4",
+    "source/app.js": "c93fb03eaa3899979547c07c3d523e57e1026a27a1776a12c46a5fb74618f929",
+    "source/engine.js": "73d9aa4ac32609b2e9e1cb2562cce631fe7be4683e4baca9798b5bdabb49e325",
+    "source/floor-tools101.js": "d225ab51744f9bd88b0daaba52e738921b0c469a9340c1629ef83d2e4e814df7"
+  }
+}

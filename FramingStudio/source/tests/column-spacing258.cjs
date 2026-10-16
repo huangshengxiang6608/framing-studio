@@ -1,4 +1,4 @@
-// E2.288: minimum physical centre spacing with retained supplemental column axes.
+// E2.289: blue-axis placement, minimum physical centre spacing and reference-only purple axes.
 const path=require('node:path'),assert=require('node:assert/strict');
 const {context}=require('../../verification/integration143.cjs');
 const c=context(path.resolve(__dirname,'../..'));
@@ -15,15 +15,15 @@ console.log(c.run(`(()=>{
   delete p.types.F1.columnSpacing258;ok(shape(Engine.generate(p).models.F1)===before,'clear restores gridline layout');
  }passed.push('Blank gridline placement; independent X/Y filtering; actual centres; unchanged axes, ids, sections, other Framing and shared floors');
  {const p=fixture();p.types.F1.columnSpacing258={x:6};let m=Engine.generate(p).models.F1;ok(m.columns.length===12,'unset Y does not filter');verify(p,m);p.types.F1.columnSpacing258={y:5};m=Engine.generate(p).models.F1;ok(m.columns.length===12,'unset X does not filter');verify(p,m);
-  p.types.F1.columnGrid={targetX:4,targetY:5,x:[1,5,9],y:[1,6,11]};p.types.F1.columnSpacing258={x:4,y:5};m=Engine.generate(p).models.F1;ok(m.columns.length===9,'equality allowed');verify(p,m);
-  p.types.F1.columnSpacing258.x=4.001;m=Engine.generate(p).models.F1;ok(m.columns.length===6,'below minimum excluded');verify(p,m);
-  delete p.types.F1.columnSpacing258;ok(Engine.generate(p).models.F1.columns.length===9,'blank retains independent column grid');
- }passed.push('One direction, exact equality, independent grid, strict minimum');
- {const p=fixture(),t=p.types.F1;t.columnGrid={targetX:4,targetY:5,x:[1,5,9],y:[1,6,11]};t.columnSpacing258={x:3.5};t.columnAxisPositions=[{key:'axis:@cg:x:1|@cg:y:6',position:'right'}];
-  const m=Engine.generate(p).models.F1;ok(m.columns.some(c=>c.anchorX==='@cg:x:5'&&c.anchorY==='@cg:y:6'),'3.75 m centre gap passes despite 3.25 m clear gap');verify(p,m);
-  t.columnSpacing258.x=4;const m2=Engine.generate(p).models.F1;ok(!m2.columns.some(c=>c.anchorX==='@cg:x:5'&&c.anchorY==='@cg:y:6'),'3.75 m physical centres fail despite 4 m gridlines');verify(p,m2);
-  t.columnAxisPositions.push({key:'axis:@cg:x:5|@cg:y:6',position:'center'});let rejected=false;try{Engine.generate(p);}catch(e){rejected=/小於最小/.test(e.message);}ok(rejected,'fixed manual position conflict blocks application');
- }passed.push('Centre-to-centre, not clear spacing or reference grid spacing; explicit position conflict rejected');
+  const plain=shape(m);p.types.F1.columnGrid={targetX:4,targetY:5,x:[1,5,9],y:[1,6,11]};ok(shape(Engine.generate(p).models.F1)===plain,'legacy independent grid does not control automatic placement');
+  delete p.types.F1.columnSpacing258;ok(Engine.generate(p).models.F1.columns.length===16,'blank uses blue axes even with legacy columnGrid');
+ }passed.push('One direction; legacy independent column grid no longer controls automatic placement');
+ {const p=fixture(),t=p.types.F1;t.columnSpacing258={x:5.5};t.columnAxisPositions=[{key:'axis:2|C',position:'right'}];
+  const m=Engine.generate(p).models.F1;ok(m.columns.some(c=>c.anchorX==='3'&&c.anchorY==='C'),'5.75 m centre gap passes despite 5.25 m clear gap');verify(p,m);
+  t.columnSpacing258.x=6;const m2=Engine.generate(p).models.F1;ok(!m2.columns.some(c=>c.anchorX==='3'&&c.anchorY==='C'),'5.75 m physical centres fail despite 6 m gridlines');verify(p,m2);
+  t.columnAxisPositions.push({key:'axis:3|C',position:'center'});let rejected=false;try{Engine.generate(p);}catch(e){rejected=/小於最小/.test(e.message);}ok(rejected,'fixed manual position conflict blocks application');
+  t.columnAxisPositions[0].position='center';verify(p,Engine.generate(p).models.F1);
+ }passed.push('Centre-to-centre, not clear spacing or reference spacing; equality; explicit position conflict rejected');
  {const p=fixture();p.types.F1.columns=[{id:'C1',x:2,y:7,b:500,d:500,on:true,autoAdded:true,status:'上下贯通'}];p.types.F1.columnSpacing258={x:6,y:5};const m=Engine.generate(p).models.F1;ok(m.columns.some(c=>c.id==='C1'),'manual addition preserved');verify(p,m);
   p.types.F1.mode='manual';const before=shape(Engine.generate(p).models.F1);p.types.F1.columnSpacing258={x:500,y:500};ok(shape(Engine.generate(p).models.F1)===before,'manual mode stores setting only');ok(shape(Engine.generate(JSON.parse(JSON.stringify(p))).models.F1)===before,'save/load');
  }passed.push('Manual additions protected; manual mode unchanged; persistence');
@@ -32,9 +32,15 @@ console.log(c.run(`(()=>{
  {const p=fixture(),before=shape(Engine.generate(p).models.F1);p.groups[0].min=10;p.types.F1.minColumnSpacing=10;ok(shape(Engine.generate(p).models.F1)===before,'blank ignores hidden legacy filters');p.types.F1.columnSpacing258={x:0.001,y:0.001};let rejected=false;try{Engine.generate(p);}catch(e){rejected=/40/.test(e.message);}ok(rejected,'excessive supplemental grid rejected');}
  passed.push('Blank uses gridlines even with legacy hidden limits; excessive supplemental grid rejected');
  {const p=fixture();p.axes.x=[{id:'1',gap:0},{id:'2',gap:8},{id:'3',gap:8}];p.axes.y=[{id:'A',gap:0},{id:'B',gap:7},{id:'C',gap:7}];for(const t of Object.values(p.types))t.building={'0,0':true,'1,0':true,'0,1':true,'1,1':true};const old=Engine.generate(p).models.F1.columns;
-  p.types.F1.columnSpacing258={x:3,y:3};const m=Engine.generate(p).models.F1;ok(m.columns.length===25,'supplemental columns retained');ok(Engine.columnAxes(p,'x','F1').map(a=>a.v).join(',')==='0,4,8,12,16','8 m with 3 m minimum becomes 4+4');verify(p,m);
-  for(const c of old){const next=m.columns.find(n=>n.anchorX===c.anchorX&&n.anchorY===c.anchorY);ok(next&&next.id===c.id,'original ids retained when adding axes');}
-  const supplemental=m.columns.find(c=>c.spacingAdded258);p.types.F1.suppressedColumns=[{ax:supplemental.anchorX,ay:supplemental.anchorY}];ok(!Engine.generate(p).models.F1.columns.some(c=>c.anchorX===supplemental.anchorX&&c.anchorY===supplemental.anchorY),'deleted supplemental column retained');
- }passed.push('Supplemental axes/columns retained; floor subdivision respects minimum; original ids and deleted supplemental columns retained');
+  p.types.F1.columnSpacing258={x:3,y:3};const m=Engine.generate(p).models.F1;ok(m.columns.length===9,'purple intersections never add automatic columns');ok(Engine.columnReferenceAxes289(p,'x','F1').map(a=>a.v).join(',')==='0,3.2,6.4,9.6,12.8,16','whole bounds uniformly divided at or above minimum');verify(p,m);
+  ok(Engine.columnAxes(p,'x','F1').map(a=>a.v).join(',')==='0,8,16','placement axes remain blue');
+  for(const c of old){const next=m.columns.find(n=>n.anchorX===c.anchorX&&n.anchorY===c.anchorY);ok(next&&next.id===c.id,'original ids retained with reference axes');}
+  const axes=JSON.stringify(p.axes),saved=JSON.stringify(p);Engine.columnReferenceAxes289(p,'y','F1');ok(JSON.stringify(p)===saved&&JSON.stringify(p.axes)===axes,'reference generation never mutates geometry');
+ }passed.push('Uniform reference axes from outer bounds; only blue intersections create columns; original ids and input geometry preserved');
+ {const p=fixture();p.types.F1.columnSpacing258={x:6,y:5};const r=Engine.generate(p),before=r.models.F1.columns,pk=Engine.columnPositionKey;
+  for(const c of before){const q=Engine.clone(p);Engine.removeMember(q,'F1',{kind:'COL',id:c.id,f:1});const after=Engine.generate(q).models.F1.columns;ok(shape({columns:after})===shape({columns:before.filter(b=>pk(b)!==pk(c))}),'delete only target without repopulating '+c.id);Engine.validate(q);ok(shape(Engine.generate(JSON.parse(JSON.stringify(q))).models.F1)===shape({columns:after}),'deletion survives reopen');}
+  const q=Engine.clone(p);q.types.F1.columnAxisPositions=[{key:'axis:2|C',position:'center'}];const rm=Engine.generate(q),target=rm.models.F1.columns.find(c=>c.anchorX==='2'&&c.anchorY==='C'),keep=shape({columns:rm.models.F1.columns.filter(c=>c!==target)});FloorColumns101.removeMany(q,rm,'F1',1,[{kind:'COL',id:target.id,f:1}]);ok(shape(Engine.generate(q).models.F1)===keep,'deleting positioned auto column retains other positions');
+  const auto=fixture();auto.types.F1.columns=[{id:'C1',x:2,y:7,b:500,d:500,on:true,autoAdded:true,status:'上下贯通'}];Engine.removeMember(auto,'F1',{kind:'COL',id:'C1',f:1});ok(!Engine.generate(auto).models.F1.columns.some(c=>Math.abs(c.x-2)<1e-7&&Math.abs(c.y-7)<1e-7),'manual added column on blue crossing cannot reappear as automatic');
+ }passed.push('Single and batch deletion; no automatic replacements; positioned-column deletion; manual addition on blue grid; save/reopen');
  for(const invalid of [0,-1,NaN,Infinity,501,'6']){const p=fixture();p.types.F1.columnSpacing258={x:invalid};let rejected=false;try{Engine.generate(p);}catch{rejected=true;}ok(rejected,'invalid minimum rejected');}passed.push('Invalid values rejected');
  return passed.join('\\n');})()`));

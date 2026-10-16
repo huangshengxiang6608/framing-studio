@@ -13,18 +13,17 @@ const Engine=(()=>{
  function secondaryAreaRule(t,panel){const r=panelRect(panel),hits=(t.secondaryAreas||[]).map(zone=>({zone,area:zone.rects.reduce((s,q)=>s+intersectArea(r,q),0)})).filter(x=>x.area>eps),area=(r.x1-r.x0)*(r.y1-r.y0);if(!hits.length)return null;if(hits.length===1&&Math.abs(hits[0].area-area)<eps)return hits[0].zone;return {error:'次梁分区边界与当前主梁格不一致或区域重叠，请重画区域',names:hits.map(x=>x.zone.name).join('、')};}
  function addSecondaryArea(p,key,box,direction,gap=null){if(!['X','Y'].includes(direction))throw Error('请选择 X 横向或 Y 纵向');if(gap!==null&&(!Number.isFinite(gap)||gap<100||gap>20000))throw Error('次梁间距须为 100–20000 mm，留空沿用整体');if(!['x0','x1','y0','y1'].every(k=>Number.isFinite(box[k]))||box.x1-box.x0<.01||box.y1-box.y0<.01)throw Error('请画出有效的次梁区域');const t=p.types[key],m=model(p,key),rects=m.panels.map(panelRect).filter(r=>intersectArea(r,box)>eps);let cantilever101=false,root101=null,cbSupported106=false;if(!rects.length){const xs=unique([...axes(p,'x',key).map(a=>a.v),...m.beams.flatMap(b=>[b.rawA[0],b.rawZ[0]]),...m.walls.flatMap(b=>[b.rawA[0],b.rawZ[0]])]),ys=unique([...axes(p,'y',key).map(a=>a.v),...m.beams.flatMap(b=>[b.rawA[1],b.rawZ[1]]),...m.walls.flatMap(b=>[b.rawA[1],b.rawZ[1]])]),snap=(v,values)=>{const x=values.reduce((a,b)=>Math.abs(a-v)<Math.abs(b-v)?a:b);return Math.abs(x-v)<.75?x:v;},r={x0:snap(box.x0,xs),x1:snap(box.x1,xs),y0:snap(box.y0,ys),y1:snap(box.y1,ys)},edges=[...m.walls,...m.beams.filter(b=>b.supportStatus==='connected'&&b.kind!=='SB'&&b.displayKind!=='CB')],choices=direction==='X'?[['left',[r.x0,r.y0],[r.x0,r.y1]],['right',[r.x1,r.y0],[r.x1,r.y1]]]:[['top',[r.x0,r.y0],[r.x1,r.y0]],['bottom',[r.x0,r.y1],[r.x1,r.y1]]],roots=choices.filter(([,a,z])=>covered(edges,a,z));const cb=m.beams.filter(b=>b.displayKind==='CB'&&b.supportStatus==='connected'),pair=choices.every(([,a,z])=>covered(cb,a,z));if((!pair&&roots.length!==1)||!rectAllowed(m.ts,(r.x0+r.x1)/2,(r.y0+r.y1)/2,r.x1-r.x0,r.y1-r.y0))throw Error('请选择完整梁格、两侧有有效根部的 CB 区域，或只有一条固定边的悬挑区域');rects.push(r);if(pair)cbSupported106=true;else{cantilever101=true;root101=roots[0][0];}}if((t.secondaryAreas||[]).some(z=>z.rects.some(a=>rects.some(b=>intersectArea(a,b)>eps))))throw Error('已选梁格属于另一次梁区域，请修改或删除原区域后重画');let n=1;while((t.secondaryAreas||[]).some(a=>a.id==='SBA'+n))n++;const area={id:'SBA'+n,name:'次梁区域 '+n,direction,gap,rects,...(cantilever101?{cantilever101,root101}:cbSupported106?{cbSupported106}:{})};freezeAutoBeams(p,key,m);t.autoBeams101=true;t.beamLayout116={main:true,secondary:true,mainDirection:'XY',secondaryDirection:p.defaults.direction,gap:p.defaults.gap,...t.beamLayout116,scope:'selected'};(t.secondaryAreas??=[]).push(area);return area;}
 
- function columnAxes(p,d,key){
-  const t=typeof key==='string'?p.types[key]:key,values=t?.columnGrid?.[d],base=values?values.map(v=>({id:'@cg:'+d+':'+v,v})):axes(p,d,key),limit=t?.columnSpacing258?.[d];
-  if(limit==null)return base;
+ // Placement uses only user-entered architectural axes. Purple axes are references.
+ function columnAxes(p,d,key){return axes(p,d,key);}
+ function columnReferenceAxes289(p,d,key){
+  const t=typeof key==='string'?p.types[key]:key,base=axes(p,d,key),limit=t?.columnSpacing258?.[d];
+  if(limit==null)return [];
   if(!Number.isFinite(limit)||limit<=0||limit>500)throw Error('最小柱中心距須大於 0 且不超過 500 m');
-  const out=[{...base[0],spacingBaseIndex258:0}];
-  for(let i=1;i<base.length;i++){
-   const a=base[i-1].v,b=base[i].v,count=Math.max(1,Math.floor((b-a)/limit+1e-10));
-   if(out.length+count>40)throw Error('柱距設定需要超過 '+d.toUpperCase()+' 方向 40 條柱軸線；請增大最小柱距');
-   for(let n=1;n<count;n++){const v=+(a+(b-a)*n/count).toFixed(9);out.push({id:'@cg:'+d+':'+v,v,spacingAdded258:true});}out.push({...base[i],spacingBaseIndex258:i});
-  }
-  return out;
+  const lo=base[0].v,hi=base.at(-1).v,count=Math.max(1,Math.floor((hi-lo)/limit+1e-10));
+  if(count>39)throw Error('柱距設定需要超過 '+d.toUpperCase()+' 方向 40 條參考軸線；請增大最小柱距');
+  return Array.from({length:count+1},(_,i)=>{const v=+(lo+(hi-lo)*i/count).toFixed(9);return {id:'@cg:'+d+':'+v,v};});
  }
+ function suppressedColumn289(t,c){return t.mode==='auto'&&c.anchorX!==undefined&&(t.suppressedColumns||[]).some(q=>q.ax===c.anchorX&&q.ay===c.anchorY);}
  function columnSpacingConflict288(t,a,b,onlyAxis){
   const ar=columnRect(a),br=columnRect(b);
   for(const [axis,cross,anchor] of [['x','y','anchorY'],['y','x','anchorX']]){
@@ -36,7 +35,7 @@ const Engine=(()=>{
  }
  function columnSpacingIssues258(t,columns){
   if(t.mode!=='auto'||!t.columnSpacing258)return;
-  const physical=columns.filter(c=>c.status!=='上层柱');
+  const physical=columns.filter(c=>c.status!=='上层柱'&&!suppressedColumn289(t,c));
   for(let i=0;i<physical.length;i++)for(let j=i+1;j<physical.length;j++){
    const a=physical[i],b=physical[j],conflict=columnSpacingConflict288(t,a,b);if(!conflict)continue;
    const {axis,gap,limit}=conflict;
@@ -161,7 +160,7 @@ const Engine=(()=>{
    if(t.columnGrid){for(const d of ['x','y']){const ar=t.columnGrid[d];if(!Array.isArray(ar)||ar.length<2||ar.length>40)fail('柱轴线每方向须为 2–40 条');ar.forEach((v,i)=>{num(v,-5000,10000,'柱轴线坐标无效');if(i&&v-ar[i-1]<.001)fail('柱轴线坐标须递增且间距至少 0.001 m');});}for(const d of ['targetX','targetY'])num(t.columnGrid[d],.001,500,'目标柱间距无效');}
    if(t.secondaryAreas!==undefined){if(!Array.isArray(t.secondaryAreas)||t.secondaryAreas.length>100)fail('次梁区域最多 100 个');const ids=new Set(),all=[];for(const z of t.secondaryAreas){if(typeof z.id!=='string'||!z.id||ids.has(z.id)||typeof z.name!=='string'||!z.name.trim()||z.name.length>80)fail('次梁区域名称／编号无效');ids.add(z.id);if(!['X','Y'].includes(z.direction))fail('次梁区域方向须为 X 或 Y');if(z.gap!==null)num(z.gap,100,20000,'区域次梁间距须为 100–20000 mm');if(!Array.isArray(z.rects)||!z.rects.length||z.rects.length>400)fail('次梁区域梁格记录无效');for(const r of z.rects){for(const k of ['x0','x1','y0','y1'])num(r[k],-5000,10000,'次梁区域坐标无效');if(r.x1<=r.x0||r.y1<=r.y0)fail('次梁区域范围无效');if(all.some(q=>intersectArea(r,q)>eps))fail('次梁区域不能重叠');all.push(r);if(all.length>400)fail('次梁区域最多覆盖 400 个梁格');}}}
    if(t.noColumnZones!==undefined){if(!Array.isArray(t.noColumnZones)||t.noColumnZones.length>400)fail('禁柱区最多 400 个');for(const r of t.noColumnZones){for(const k of ['x0','x1','y0','y1'])num(r[k],-5000,10000,'禁柱区坐标无效');if(r.x1-r.x0<.001||r.y1-r.y0<.001)fail('禁柱区须有有效宽度和高度');}}
-   if(t.columnSpacing258!==undefined){if(!t.columnSpacing258||typeof t.columnSpacing258!=='object'||Array.isArray(t.columnSpacing258))fail('柱距限制格式無效');for(const d of ['x','y'])columnAxes(p,d,key);}
+   if(t.columnSpacing258!==undefined){if(!t.columnSpacing258||typeof t.columnSpacing258!=='object'||Array.isArray(t.columnSpacing258))fail('柱距限制格式無效');for(const d of ['x','y'])columnReferenceAxes289(p,d,key);}
    if(t.minColumnSpacing!==undefined)num(t.minColumnSpacing,0,500,'旧柱距限制无效');
    if(t.alignmentMinSpacing!==undefined)num(t.alignmentMinSpacing,0,500,'对齐柱距限制无效');
    if(!['manual','auto'].includes(t.mode))fail('柱模式无效');
@@ -479,13 +478,15 @@ const Engine=(()=>{
   if(referenceModel){columns.push(...clone(referenceModel.columns));}else{
   let input=t.columns.filter(c=>c.on).map(c=>({...c,x:resolve(p,c)[0],y:resolve(p,c)[1],b:(c.bMode201==='default'?df.cb:c.b)/1000,d:(c.dMode201==='default'?df.cd:c.d)/1000}));
   {const xx=axes(p,'x'),yy=axes(p,'y');for(const c of input){c.cx=c.x+(near(c.x,xx[0].v)?c.b/2:near(c.x,xx.at(-1).v)?-c.b/2:0);c.cy=c.y+(near(c.y,yy[0].v)?c.d/2:near(c.y,yy.at(-1).v)?-c.d/2:0);}}
-  if(t.mode==='auto'){const added=input.filter(c=>c.autoAdded);input=[];const cx=columnAxes(p,'x',key),cy=columnAxes(p,'y',key);for(const [ix,x]of cx.entries())for(const [iy,y]of cy.entries()){if(noColumn(t,x.v,y.v))continue;if((t.columnGrid||x.spacingAdded258||y.spacingAdded258)&&(t.suppressedColumns||[]).some(q=>q.ax===x.id&&q.ay===y.id))continue;if(added.some(c=>near(c.x,x.v)&&near(c.y,y.v)))continue;const custom=t.columnSizes?.find(q=>q.ax===x.id&&q.ay===y.id),b=(!custom||custom.bMode201==='default'?df.cb:custom.b)/1000,d=(!custom||custom.dMode201==='default'?df.cd:custom.d)/1000;let found=false;for(const dx of [0,b/2,-b/2]){for(const dy of [0,d/2,-d/2]){let id=x.spacingAdded258||y.spacingAdded258?'ACS'+(ix+1)+'_'+(iy+1):t.columnGrid?'ACG'+((x.spacingBaseIndex258??ix)+1)+'_'+((y.spacingBaseIndex258??iy)+1):'AC'+((t.columnSpacing258?input.filter(c=>!c.spacingAdded258).length:input.length)+1);while(added.some(c=>c.id===id))id+='A';const c={id,...(x.spacingAdded258||y.spacingAdded258?{spacingAdded258:true}:{}),anchorX:x.id,anchorY:y.id,x:x.v+dx,y:y.v+dy,b,d,bMode201:custom?custom.bMode201??'manual':'default',dMode201:custom?custom.dMode201??'manual':'default',status:'上下贯通',on:true};const r={...c,w:b};if(!rectAllowed(ts,c.x,c.y,b,d,true)||wr.some(w=>overlap(r,w))||input.some(o=>overlap(r,{...o,w:o.b})))continue;input.push(c);found=true;break;}if(found)break;}}input.push(...added);}
+  if(t.mode==='auto'){const added=input.filter(c=>c.autoAdded);input=[];const cx=columnAxes(p,'x',key),cy=columnAxes(p,'y',key);for(const [ix,x]of cx.entries())for(const [iy,y]of cy.entries()){if(noColumn(t,x.v,y.v))continue;if(added.some(c=>near(c.x,x.v)&&near(c.y,y.v)))continue;const custom=t.columnSizes?.find(q=>q.ax===x.id&&q.ay===y.id),b=(!custom||custom.bMode201==='default'?df.cb:custom.b)/1000,d=(!custom||custom.dMode201==='default'?df.cd:custom.d)/1000;let found=false;for(const dx of [0,b/2,-b/2]){for(const dy of [0,d/2,-d/2]){let id='AC'+(input.length+1);while(added.some(c=>c.id===id))id+='A';const c={id,anchorX:x.id,anchorY:y.id,x:x.v+dx,y:y.v+dy,b,d,bMode201:custom?custom.bMode201??'manual':'default',dMode201:custom?custom.dMode201??'manual':'default',status:'上下贯通',on:true};const r={...c,w:b};if(!rectAllowed(ts,c.x,c.y,b,d,true)||wr.some(w=>overlap(r,w))||input.some(o=>overlap(r,{...o,w:o.b})))continue;input.push(c);found=true;break;}if(found)break;}}input.push(...added);}
   for(const c of input){const placement=(t.columnPlacements||[]).find(v=>v.key===(c.anchorX!==undefined?'axis:'+c.anchorX+'|'+c.anchorY:'id:'+c.id));if(placement){c.alignmentReference=[c.x,c.y];c.x=c.cx=placement.resize174?placement.resize174.x+placement.resize174.dx*c.b/2:placement.x;c.y=c.cy=placement.resize174?placement.resize174.y+placement.resize174.dy*c.d/2:placement.y;c.alignmentNote='已应用柱对齐 · 可撤销';}}
   // Apply only explicit manual section positions after the unchanged auto-column search.
   for(const c of input){const record=columnPositionRecord(t,c);if(record&&!t.columnPlacements?.some(v=>v.key===columnPositionKey(c))){const ref=columnReference(p,key,c),offset=columnDirections[record.position];c.cx=ref[0]+offset[0]*c.b/2;c.cy=ref[1]+offset[1]*c.d/2;c.axisPosition=record.position;}}
-  for(const c of input){if(c.anchorX===undefined&&noColumn(t,c.x,c.y))issue(c.id,'手动柱位于禁柱区内部，请移动或删除；现有柱保留');if(t.mode==='auto'&&c.anchorX!==undefined){const custom=t.columnSizes?.find(o=>o.ax===c.anchorX&&o.ay===c.anchorY);if(custom){c.b=(custom.bMode201==='default'?df.cb:custom.b)/1000;c.d=(custom.dMode201==='default'?df.cd:custom.d)/1000;}}if(t.mode==='auto'&&c.anchorX!==undefined&&(t.suppressedColumns||[]).some(s=>s.ax===c.anchorX&&s.ay===c.anchorY))continue;const allowed=[-1e-5,1e-5].some(dx=>[-1e-5,1e-5].some(dy=>inside(ts,c.x+dx,c.y+dy,true)));if(!allowed){issue(c.id,'柱位于建筑外，未作为支承');continue;}if(wr.some(w=>overlap(columnRect(c),w))){issue(c.id,'柱与墙重叠，未生成此柱');continue;}columns.push(c);if(!rectAllowed(ts,columnRect(c).x,columnRect(c).y,c.b,c.d,true))issue(c.id,'柱截面跨过建筑边界，请调整坐标');}
+  for(const c of input){if(c.anchorX===undefined&&noColumn(t,c.x,c.y))issue(c.id,'手动柱位于禁柱区内部，请移动或删除；现有柱保留');if(t.mode==='auto'&&c.anchorX!==undefined){const custom=t.columnSizes?.find(o=>o.ax===c.anchorX&&o.ay===c.anchorY);if(custom){c.b=(custom.bMode201==='default'?df.cb:custom.b)/1000;c.d=(custom.dMode201==='default'?df.cd:custom.d)/1000;}}const allowed=[-1e-5,1e-5].some(dx=>[-1e-5,1e-5].some(dy=>inside(ts,c.x+dx,c.y+dy,true)));if(!allowed){issue(c.id,'柱位于建筑外，未作为支承');continue;}if(wr.some(w=>overlap(columnRect(c),w))){issue(c.id,'柱与墙重叠，未生成此柱');continue;}columns.push(c);if(!rectAllowed(ts,columnRect(c).x,columnRect(c).y,c.b,c.d,true))issue(c.id,'柱截面跨过建筑边界，请调整坐标');}
   }
   filterColumnSpacing288(t,columns);
+  // Apply deletions after spacing selection so a delete does not repopulate nearby candidates.
+  columns.splice(0,columns.length,...columns.filter(c=>!suppressedColumn289(t,c)));
   for(let i=0;i<columns.length;i++)for(let j=i+1;j<columns.length;j++){const a=columns[i],b=columns[j],ar=columnRect(a),br=columnRect(b),limit=t.alignmentMinSpacing||0;if(Math.hypot(ar.x-br.x,ar.y-br.y)<limit-eps)issue(a.id+'/'+b.id,'柱距小于 '+limit+' m');if(overlap(ar,br))issue(a.id+'/'+b.id,'柱截面重叠');}
   const support=q=>columns.some(c=>Math.abs(columnRect(c).x-q[0])<=c.b/2+eps&&Math.abs(columnRect(c).y-q[1])<=c.d/2+eps&&c.status!=='上层柱')||walls.some(w=>on(q,{...w,a:w.rawA,z:w.rawZ}));
   // Keep already valid records first: an older, auto-width record must not
@@ -890,11 +891,23 @@ const Engine=(()=>{
   for(const {kind,target}of targets){if(kind==='SLAB')voids.push(...clone(target.rects));else if(kind==='WALL')walls.add(target.id);else{if(target.source==='manual')manual.add((target.baseKind||kind)+':'+target.id);signatures.add(sig(beamIdentity173(target).rawA,beamIdentity173(target).rawZ));}}
   t.beams=t.beams.filter(b=>!manual.has(b.kind+':'+b.id));t.walls=t.walls.filter(w=>!walls.has(w.id));t.suppressed=[...signatures];if(voids.length)t.slabVoids=[...(t.slabVoids||[]),...voids];return targets.length;
  }
+ function removeColumns289(p,key,columns,m){
+  const t=p.types[key],auto=columns.filter(c=>t.mode==='auto'&&c.anchorX!==undefined),manual=columns.filter(c=>!auto.includes(c));
+  freezeAutoBeams(p,key,m);
+  const removed=new Set(manual.map(c=>c.id)),keys=new Set(manual.map(columnPositionKey));
+  t.columns=t.columns.filter(c=>!removed.has(c.id));
+  const deleted=auto.map(c=>({ax:c.anchorX,ay:c.anchorY}));
+  // Deleting a manually added column on a blue intersection must not reveal its automatic replacement.
+  if(t.mode==='auto')for(const c of manual){const ref=columnReference(p,key,c),x=axes(p,'x',key).find(a=>near(a.v,ref[0])),y=axes(p,'y',key).find(a=>near(a.v,ref[1]));if(x&&y)deleted.push({ax:x.id,ay:y.id});}
+  t.suppressedColumns=[...(t.suppressedColumns||[])];for(const d of deleted)if(!t.suppressedColumns.some(q=>q.ax===d.ax&&q.ay===d.ay))t.suppressedColumns.push(d);
+  // Retain automatic-column positioning records as spacing reservations until explicit re-layout.
+  for(const field of ['columnAxisPositions','columnPlacements'])if(t[field])t[field]=t[field].filter(v=>!keys.has(v.key));
+ }
  function removeMember(p,key,hit){
   if(['MB','SB','TB','CB'].includes(hit.kind)){removeBeam(p,key,hit.id,hit.kind,hit.f);return;}
   const t=p.types[key];if(!t)throw Error('Framing 类型不存在');const m=hit.f?floorModel(generate(p),hit.f,key):model(p,key);
   if(hit.kind==='SLAB'){const s=m.slabs.find(s=>s.id===hit.slabId);if(!s)throw Error('所选板块已不存在');t.slabVoids=[...(t.slabVoids||[]),...clone(s.rects)];return;}
-  if(hit.kind==='COL'){const c=m.columns.find(c=>c.id===hit.id);if(!c)throw Error('所选柱已不存在');if(t.columnAxisPositions)t.columnAxisPositions=t.columnAxisPositions.filter(r=>r.key!==columnPositionKey(c));if(t.mode==='auto'&&c.anchorX!==undefined){t.suppressedColumns=[...(t.suppressedColumns||[]),{ax:c.anchorX,ay:c.anchorY}];}else t.columns=t.columns.filter(c=>c.id!==hit.id);return;}
+  if(hit.kind==='COL'){const c=m.columns.find(c=>c.id===hit.id);if(!c)throw Error('所选柱已不存在');removeColumns289(p,key,[c],m);return;}
   if(hit.kind==='WALL'){if(!m.walls.some(w=>w.id===hit.id))throw Error('所选墙已不存在');t.walls=t.walls.filter(w=>w.id!==hit.id);return;}
   throw Error('请选择梁、楼板、柱或墙');
  }
@@ -906,6 +919,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
+ return {columnReferenceAxes289,removeColumns289,editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

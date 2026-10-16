@@ -1,3 +1,11 @@
+# E2.289 — Reference axes and reliable column deletion
+
+- Remove the separate Column grid panel. Use Column Spacing X/Y to generate evenly divided reference axes over the architectural grid bounds; retain the minimum actual centre-distance meaning.
+- Purple axes are display references only. Automatic placement uses user-entered blue-axis intersections, ignores legacy independent column grids and keeps manual columns. Empty spacing values use the original blue grid without extra references.
+- Apply automatic deletion exclusions after spacing selection, so deleting a column does not repopulate nearby previously filtered candidates. Deleting a manually added column on a blue intersection suppresses its automatic replacement.
+- Unify single/popup/multiple column deletion and clear stale selection. Prevent input blur from replacing the delete button before its first click completes. Preserve shared Framing behavior, Undo, saved deletion records and other-floor reference protection.
+- Keep unrelated calculation modules and Section A/B report/Excel rendering unchanged.
+
 # E2.288 — Minimum column centre spacing
 
 - Treat Column Spacing X/Y as a minimum actual centre-to-centre distance (m) along the same grid row/column.

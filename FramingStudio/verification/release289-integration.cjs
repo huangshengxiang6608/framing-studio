@@ -1,0 +1,24 @@
+const fs=require('fs'),path=require('path'),cp=require('child_process'),vm=require('vm'),assert=require('assert/strict');
+const args=process.argv.slice(2).filter(x=>!x.startsWith('--'));
+const repo=args[0]||path.resolve(__dirname,'../..'), app=path.join(repo,'FramingStudio'), out=args[1]||path.join(repo,'tmp/release289-integration'), base='6410f2f4c6c0c7058b0757059a18cdd2e057a645';
+fs.mkdirSync(out,{recursive:true});
+const show=(ref,p)=>cp.execFileSync('git',['show',ref+':'+p],{cwd:repo,maxBuffer:40e6});
+for(const [file,ref] of [['checks.js',base],['rc-plan.js',base]])fs.writeFileSync(path.join(out,'baseline-'+file),show(ref,'FramingStudio/source/'+file));
+const perf=path.join(out,'baseline246');fs.mkdirSync(perf,{recursive:true});for(const f of ['loading.js','column-areas103.js'])fs.writeFileSync(path.join(perf,f),show(base,'FramingStudio/source/'+f));
+const env={...process.env,FRAMING_CHECKS_BASELINE255:path.join(out,'baseline-checks.js'),FRAMING_PLAN_BASELINE255:path.join(out,'baseline-rc-plan.js'),FRAMING_PERFORMANCE_BASELINE:perf};
+const html=fs.readFileSync(path.join(app,'assets/index.html'),'utf8'),norm=s=>s.replace(/\r\n/g,'\n').replace(/^\uFEFF/,'').trim();
+let modules=0;for(const m of html.matchAll(/\/\* studio-source:([a-z0-9.-]+):start \*\/([\s\S]*?)\/\* studio-source:\1:end \*\//g)){assert.equal(norm(m[2]),norm(fs.readFileSync(path.join(app,'source',m[1]),'utf8')),m[1]);modules++;}assert.equal(modules,36);
+assert(norm(html).includes(norm(fs.readFileSync(path.join(app,'source/floor-tools101.js'),'utf8'))),'unmarked floor-tools101 source/bundle mismatch');
+for(const n of fs.readdirSync(path.join(app,'source')).filter(n=>n.endsWith('.js')))new vm.Script(fs.readFileSync(path.join(app,'source',n),'utf8'),{filename:n});
+let scripts=0;for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){if(/\bsrc=|type=["'](?:application\/json|importmap)/i.test(m[1])||/id=["']seed/.test(m[1]))continue;new vm.Script(m[2],{filename:'bundle-'+scripts++});}
+const protectedFiles=fs.readdirSync(path.join(app,'source')).filter(n=>n.endsWith('.js')&&!['app.js','engine.js','floor-tools101.js'].includes(n));for(const n of protectedFiles)assert(fs.readFileSync(path.join(app,'source',n)).equals(show(base,'FramingStudio/source/'+n)),n+' report changes');
+for(const f of ['source/ui-polish173.css','Excel/ExcelBridge.exe','Excel/Section A RC - Section B v109 Compact Copy.xlsm','Excel/templates.json','source/ExcelBridge.cs'])assert(fs.readFileSync(path.join(app,f)).equals(show(base,'FramingStudio/'+f)),f+' preserved');
+console.log('PASS 36 bundled modules, JS parse, '+protectedFiles.length+' calculation/report modules and Excel files unchanged');
+if(process.argv.includes('--static-only'))process.exit(0);
+const dir=path.join(app,'source/tests');
+const tests=fs.readdirSync(dir).filter(n=>/2\d\d\.cjs$/.test(n)&&Number(n.match(/(2\d\d)\.cjs$/)[1])>=204&&!/playwright|process\.argv\[2\]/.test(fs.readFileSync(path.join(dir,n),'utf8'))).map(n=>'source/tests/'+n);
+tests.push(...['unified-dimensions201','secondary-split200','drawing-cb198','drawing-support197','column-main194','selection195','review193','review192','review-layout191','tributary187','column-load-centres186','self-weight185','beam-surface184','rounding183','depth-factors180','beam-independent179','slab-bay178','slab-transfer177','slab-centres175','unified-members175','column-anchors174','support-cantilever173'].map(n=>'source/tests/'+n+'.cjs'),...['ui173','truss-core-tests','integration143','downstream143'].map(n=>'verification/'+n+'.cjs'));
+tests.push(...['column-delete-many','column-parameter-table','column-resize166','copy-column-adjacent','copy-column196','bays171','auto-transfer','column-centres159','column-outline160','column-reference-selection','column-multiselect','column-deferred-boundary'].map(n=>'source/tests/'+n+'.cjs'));
+const results=[];
+async function worker(){while(tests.length){const test=tests.shift(),start=Date.now();const r=await new Promise(resolve=>cp.execFile(process.execPath,[path.join(app,test)],{cwd:repo,env,encoding:'utf8',timeout:240000,maxBuffer:12e6},(error,stdout,stderr)=>resolve({code:error?.code||0,error:error?.message,stdout,stderr})));fs.writeFileSync(path.join(out,path.basename(test)+'.log'),r.stdout+'\n'+r.stderr);const result={test,exit:r.code,ms:Date.now()-start};results.push(result);console.log((r.code===0?'PASS ':'FAIL ')+test+' '+result.ms+'ms');if(r.code)console.log((r.stderr||r.error||'').slice(-1800));}}
+Promise.all([worker(),worker()]).then(()=>{const report={baseline:base,head:cp.execFileSync('git',['rev-parse','HEAD'],{cwd:repo,encoding:'utf8'}).trim(),modules,scripts,protectedFiles,tests:results};fs.writeFileSync(path.join(out,'verification.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({tests:results.length,failed:results.filter(x=>x.exit!==0)}));if(results.some(x=>x.exit!==0))process.exitCode=1;}).catch(e=>{console.error(e);process.exitCode=1;});

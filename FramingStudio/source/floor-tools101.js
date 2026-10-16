@@ -39,13 +39,7 @@ const FloorColumns101=(()=>{
   if(!Array.isArray(hits)||!hits.length)throw Error('請先選取當層柱');
   const model=Engine.floorModel(result,f,key),ids=new Set();
   const columns=hits.map(hit=>{assertEditable(hit,f);if(hit.kind!=='COL')throw Error('只能刪除當層柱');const c=model.columns.find(c=>c.id===hit.id);if(!c)throw Error('所選柱已不存在');ids.add(c.id);return c;});
-  const keys=new Set(columns.map(Engine.columnPositionKey));
-  mutate(p,key,f,q=>{const t=q.types[key];Engine.freezeAutoBeams(q,key,Engine.model(q,key));
-   const auto=columns.filter(c=>t.mode==='auto'&&c.anchorX!==undefined),manual=new Set(columns.filter(c=>!auto.includes(c)).map(c=>c.id));
-   t.columns=t.columns.filter(c=>!manual.has(c.id));
-   t.suppressedColumns=[...(t.suppressedColumns||[]),...auto.filter((c,i)=>auto.findIndex(a=>a.anchorX===c.anchorX&&a.anchorY===c.anchorY)===i&&!(t.suppressedColumns||[]).some(a=>a.ax===c.anchorX&&a.ay===c.anchorY)).map(c=>({ax:c.anchorX,ay:c.anchorY}))];
-   for(const field of ['columnAxisPositions','columnPlacements'])if(t[field])t[field]=t[field].filter(v=>!keys.has(v.key));
-  });return ids.size;
+  mutate(p,key,f,q=>Engine.removeColumns289(q,key,columns,Engine.model(q,key)));return ids.size;
  }
  // Resolve all shared-Framing targets before editing; generated IDs may change.
  function recommendationPlan(p,result,items,only=null){

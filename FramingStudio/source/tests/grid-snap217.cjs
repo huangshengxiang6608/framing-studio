@@ -18,7 +18,7 @@ const result=c.run(`(()=>{
   const m=Engine.floorModel(result,1),raw=t.beams[0],supports=m.beams.length?Loading.supportSummary(p,result,1,m.beams[0]):[];
   return {kind,error,raw,beams:m.beams.map(b=>({kind:b.kind,a:b.rawA,z:b.rawZ})),columns:m.columns.length,supports};};
  const created=['MB','SB','TB','CB'].map(k=>newBeam(k,[6,1.5])),verticalCreated=['MB','SB','TB','CB'].map(k=>newBeam(k,[2,4])),blocked=newBeam('CB',[6,1.5],true);
- reset();showColumnGrid=false;p.types.F1.columnGrid={targetX:3,targetY:2,x:[0,3,6],y:[0,2,4]};result=Engine.generate(p);const hiddenColumn=snap([3,1.5]);showColumnGrid=true;const visibleColumn=snap([3,1.5]);
+ reset();showColumnGrid=false;p.types.F1.columnSpacing258={x:3,y:2};result=Engine.generate(p);const hiddenColumn=snap([3,1.5]);showColumnGrid=true;const visibleColumn=snap([3,1.5]);
  reset();p.types.F1.columns.push(...[0,4].map((y,i)=>({id:'C'+i,x:5.8,y,b:250,d:250,on:true,status:'上下贯通'})));p.types.F1.beams=[{id:'PRIOR',kind:'MB',a:{x:5.8,y:0},z:{x:5.8,y:4},b:250,d:350,on:true}];result=Engine.generate(p);const memberPriority=snap([6,1.5]);
  reset();start=null;const noStart=snap([6,1.5]),noTargets=beamGridPoints217().length;
  reset();plot.scale=100;const zoomOutside=snap([6.2,1.5]);

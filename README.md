@@ -1,5 +1,7 @@
 # Framing Studio
 
+E2.297：修复手动梁类型保留、贴边梁端支承识别和报告预览滚动跳回；保留 E2.294 柱结果显示及 E2.295 恢复预设代表构件、E2.296 定位保留当前页面及 E2.293 面积／几何修复。Section A／B 和 Excel 模板不变。
+
 E2.293：修复墙端与偏移柱的受荷面积分配；同步建筑范围外残留柱及接墙短梁端点；几何提示按 Framing／原因归组并可定位。保留 Section A／B 报表及 Excel 模板。基于 E2.290，本次不包含尚未合并的 PR #14（E2.292）。
 
 E2.290：构件清单点击 × 后立即移出该行，保留模型构件；刷新、重算和重新打开项目后仍保留移除状态。可撤销或手动重新选入。
@@ -56,7 +58,7 @@ E2.208 統一荷載精度：原始 DL／LL、自重、反力及中間傳荷均�
 
 新增 Legend 箭嘴，可收起／展開柱關係、構件顯示及標註選項，並記住本機狀態。保留 E2.205 的 Section A／B 分開檢查結果及手動梁深編輯。
 
-Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.293**，在 E2.204 可编辑梁深的基础上，Summary Check 分开显示 Section A Span/Depth 与 Section B RC Check 的通过状态，补回仅 A 未通过的构件。保留既有支承及 RC 验算规则、Section A／B 抄格式、Excel／VBA 模板，以及界面提示和保存保护。包含源码、重新编译的 Windows 程序及离线浏览器资源。
+Windows 结构建模与工程检查工具。当前 Windows／网页版本为 **E2.297**，在 E2.204 可编辑梁深的基础上，Summary Check 分开显示 Section A Span/Depth 与 Section B RC Check 的通过状态，补回仅 A 未通过的构件。保留既有支承及 RC 验算规则、Section A／B 抄格式、Excel／VBA 模板，以及界面提示和保存保护。包含源码、重新编译的 Windows 程序及离线浏览器资源。
 
 新增 S460 转换桁架、同层／跨层布置、杆件验算、反力向下传递及独立 Excel 导出。无桁架模型使用本次更新后的 RC 建模与计算；原 Section A／B 抄格式及 Excel 模板保留。桁架反力影响的柱可进入 Section B 验算；原 Section A 面积表无法表达该反力，明确阻止该项导出。详见 `FramingStudio/docs/transfer-truss.md`。
 

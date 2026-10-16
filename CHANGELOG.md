@@ -1,3 +1,10 @@
+# E2.287 — E2.286 + PR #12 UI integration
+
+- Preserve the complete E2.286 calculation, Excel and report baseline.
+- Integrate workflow search, member navigation and high-DPI laptop profiles from PR #12.
+- Keep report views and print media outside the new UI styling. Preserve stored panel widths and make command results select their member.
+- Verify the actual page served by the existing preview port before reuse.
+
 ## E2.257 — 多選柱基準位置（2026-10-13）
 
 - 多選柱的基準位置改為可編輯下拉選單，選擇後即套用；新增獨立的批次基準位置操作。

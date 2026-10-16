@@ -75,7 +75,9 @@ const Engine=(()=>{
    const old=[b.a,b.z],next=old.map(q=>[...q]);next[index]=[c.x,c.y];next[other][cross]=next[index][cross];
    const contains=(w,q)=>{const r=rect(w);return Math.abs(q[0]-r.x)<=r.w/2+eps&&Math.abs(q[1]-r.y)<=r.d/2+eps;};
    const targets=walls.filter(w=>horizontal!==near(w.a[1],w.z[1])&&contains(w,old[other])&&contains(w,next[other]));
-   if(targets.length!==1||(next[1][axis]-next[0][axis])*(b.rawZ[axis]-b.rawA[axis])<=eps)return null;
+   // A one-column CB keeps its free-end station, but its root must follow
+   // the column before overlap checks, just like the adjacent column-to-wall beam.
+   if((targets.length!==1&&(b.kind!=='CB'||links[other]||targets.length>1))||(next[1][axis]-next[0][axis])*(b.rawZ[axis]-b.rawA[axis])<=eps)return null;
    return {a:next[0],z:next[1],columnSupports164:links};
   }
   if(ends.some(c=>!c)||ends[0]===ends[1])return null;
@@ -502,8 +504,8 @@ const Engine=(()=>{
   // Keep already valid records first: an older, auto-width record must not
   // displace a correctly positioned replacement when its section grows.
   const duplicateCandidates163=[],manualCandidates=t.beams.filter(c=>c.on).map(c=>{
-   const a=resolve(p,c.a),z=resolve(p,c.z),automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?mainBeamWidth(columns,a,z,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??(c.widthMode==='default'?df[c.kind==='SB'?'sb':'mb']:c.b):c.widthMode==='default'?df[c.kind==='TB'?'tb':'mb']:c.b)/1000;
-   const linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns,walls):null,linkedRect=linked&&rect({...linked,b}),fixed=c.positionMode175==='fixed'&&c.fixedA175&&c.fixedZ175?{a:clone(c.fixedA175),z:clone(c.fixedZ175)}:null;
+   const a=resolve(p,c.a),z=resolve(p,c.z),linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns,walls):null,automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?mainBeamWidth(columns,c.kind==='CB'&&linked?linked.a:a,c.kind==='CB'&&linked?linked.z:z,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??(c.widthMode==='default'?df[c.kind==='SB'?'sb':'mb']:c.b):c.widthMode==='default'?df[c.kind==='TB'?'tb':'mb']:c.b)/1000;
+   const linkedRect=linked&&rect({...linked,b}),fixed=c.positionMode175==='fixed'&&c.fixedA175&&c.fixedZ175?{a:clone(c.fixedA175),z:clone(c.fixedZ175)}:null;
    const original=fixed||lineAllowed(ts,a,z,b,c.edgeInset===true),pos=linkedRect&&rectAllowed(ts,linkedRect.x,linkedRect.y,linkedRect.w,linkedRect.d)?linked:original||(automatic?lineAllowed(ts,a,z,b,true):null);
    return {c,a,z,b,pos,adjusted:!original&&!!pos};
   }).sort((a,b)=>Number(a.adjusted)-Number(b.adjusted));

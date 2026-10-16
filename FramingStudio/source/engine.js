@@ -126,8 +126,8 @@ const Engine=(()=>{
 
  }
  function freezeAutoBeams(p,key,m){
-  const snapshot={main:[],primary:[],secondary:[]};
-  for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,...(source.autoCantilever173?source.cantileverOrigin173:{}),kind:source.baseKind||source.kind};if(source.autoCantilever173)delete b.fixedEnd101;if(b.kind==='SB'&&m.panels){const bay=beamBay171(b,m.panels);if(bay)b.bay171=bay;}if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':b.kind==='SB'?'secondary':'primary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164','bay171','positionMode175','fixedA175','fixedZ175','loadKind194','depthOverride184','extendToBoundary173','manualKind294'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
+  const snapshot={main:[],primary:[],secondary:[]},boundaries300=bayEdges171([...m.walls,...m.beams.filter(v=>v.kind!=='SB'&&v.supportStatus==='connected')],m.columns);
+  for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,...(source.autoCantilever173?source.cantileverOrigin173:{}),kind:source.baseKind||source.kind};if(source.autoCantilever173)delete b.fixedEnd101;if(b.kind==='SB'&&m.panels){const bay=beamBay171(b,m.panels);if(bay){b.bay171=bay;const signature=bayBoundary300(bay,boundaries300);if(signature)b.bayBoundary300=signature;else delete b.bayBoundary300;}}if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':b.kind==='SB'?'secondary':'primary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164','bay171','bayBoundary300','positionMode175','fixedA175','fixedZ175','loadKind194','depthOverride184','extendToBoundary173','manualKind294'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
   p.types[key].autoBeamSnapshot=snapshot;
  }
  // Adding a real column can turn an existing secondary span into a primary span.
@@ -344,6 +344,29 @@ const Engine=(()=>{
    return point;
   });return {...b,rawA:ends[0],rawZ:ends[1]};
  });}
+ // Identify a bay by its ordered boundary members, not changing coordinates.
+ // Full coverage and a unique match are required; split/merged bays stay guarded.
+ function bayBoundary300(bay,edges){
+  const [x0,x1,y0,y1]=bay,sides=[[[x0,y0],[x1,y0]],[[x1,y0],[x1,y1]],[[x0,y1],[x1,y1]],[[x0,y0],[x0,y1]]],keys=[];
+  for(const [a,z]of sides){const axis=near(a[1],z[1])?0:1,cross=1-axis,hits=edges.filter(b=>near(b.rawA[cross],a[cross])&&near(b.rawZ[cross],a[cross])&&Math.min(Math.max(b.rawA[axis],b.rawZ[axis]),z[axis])-Math.max(Math.min(b.rawA[axis],b.rawZ[axis]),a[axis])>eps);
+   if(!hits.length||!covered(hits,a,z))return null;
+   keys.push([...new Set(hits.map(b=>(b.kind==='WALL'?'W:':'B:')+b.id))].sort());
+  }return JSON.stringify(keys);
+ }
+ function followedBays300(saved,edges,currentEdges,bays,beams){
+  const groups=new Map(),current=new Map(),out=new Map(),referenceEdges=bayEdges171(edges.map(e=>({...e,a:e.rawA,z:e.rawZ})),[]);
+  for(const bay of bays){const signature=bayBoundary300(bay,currentEdges);if(signature){const matches=current.get(signature)||[];matches.push(bay);current.set(signature,matches);}}
+  for(const s of saved){if(!s.bay171)continue;const key=bayKey171(s.bay171),group=groups.get(key)||[];group.push(s);groups.set(key,group);}
+  const signatures=new Map();
+  for(const [key,group]of groups){const values=[...new Set(group.map(s=>s.bayBoundary300||bayBoundary300(s.bay171,edges)||bayBoundary300(s.bay171,referenceEdges)))];if(values.length!==1||!values[0])continue;const sig=values[0],matches=signatures.get(sig)||[];matches.push(key);signatures.set(sig,matches);}
+  for(const [signature,keys]of signatures){const matches=current.get(signature);if(keys.length!==1||matches?.length!==1)continue;const bay=matches[0],group=groups.get(keys[0]);
+   const fits=group.every(s=>{const live=beams.find(b=>b.kind==='SB'&&b.source==='auto'&&b.id===s.id&&sig(b.rawA,b.rawZ)===sig(s.rawA,s.rawZ));if(!live||!beamBay171(live,[bay]))return false;
+    const axis=near(live.a[1],live.z[1])?0:near(live.a[0],live.z[0])?1:-1;if(axis<0)return false;
+    return [live.a,live.z].every(q=>currentEdges.some(e=>{const r=rect(e);return near(e.rawA[axis],e.rawZ[axis])&&(near(e.rawA[axis],bay[axis?2:0])||near(e.rawA[axis],bay[axis?3:1]))&&Math.abs(q[0]-r.x)<=r.w/2+eps&&Math.abs(q[1]-r.y)<=r.d/2+eps;}));
+   });
+   if(fits)for(const s of group)out.set(s,{bay,signature});
+  }return out;
+ }
  const bayKey171=r=>r.map(v=>Number(v.toFixed(6))).join('|');
  function beamBay171(b,panels){const a=b.a||b.rawA,z=b.z||b.rawZ,x=(a[0]+z[0])/2,y=(a[1]+z[1])/2;return panels.find(r=>x>r[0]+eps&&x<r[1]-eps&&y>r[2]+eps&&y<r[3]-eps);}
  // Split existing main beams at current, load-bearing columns, including saved layouts.
@@ -578,8 +601,10 @@ const Engine=(()=>{
    if(fits)for(const s of inside)if(!s.bay171)recoveredBays246.set(s,bay);
   }
   for(const s of savedSB171){const bay=recoveredBays246.get(s);if(!bay)continue;const live=beams.find(b=>b.source==='auto'&&b.kind==='SB'&&b.id===s.id&&sig(b.rawA,b.rawZ)===sig(s.rawA,s.rawZ));if(live)live.bay171=clone(bay);}
+  const followed300=followedBays300(savedSB171,edges,bayEdges171(edges,columns),currentBays171,beams);
+  for(const [s,{bay,signature}]of followed300){const live=beams.find(b=>b.source==='auto'&&b.kind==='SB'&&b.id===s.id&&sig(b.rawA,b.rawZ)===sig(s.rawA,s.rawZ));live.bay171=clone(bay);live.bayBoundary300=signature;}
   // Repair only bays whose primary boundaries changed, retaining other saved spacing.
-  for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=b.bay171||recoveredBays246.get(b)||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
+  for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=followed300.get(b)?.bay||b.bay171||recoveredBays246.get(b)||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
    const customized=affected.some(b=>{const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null;return token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length)||t.beamWidths83?.[sig(b.rawA,b.rawZ)]!=null||t.beamDepths201?.[sig(b.rawA,b.rawZ)]!=null||b.depthOverride184!=null;});
    if(customized){issue('SB','主梁 bay 已改變，但原次梁有構件輸入；請核對後重新布置該 bay');continue;}changedBays171.add(key171);
   }
@@ -890,7 +915,7 @@ const Engine=(()=>{
    const preservedBay246=snap.secondary?.find(v=>v.id===b.id&&sig(v.rawA,v.rawZ)===signature)?.bay171;
    for(const group of ['main','secondary','primary'])snap[group]=(snap[group]||[]).filter(v=>!(v.id===b.id&&sig(v.rawA,v.rawZ)===signature));
    const saved={id:row.id,kind:row.kind,rawA:clone(original.rawA),rawZ:clone(original.rawZ),a:clone(original.a),z:clone(original.z),b:row.b/1000,d:row.d==null?b.d:row.d/1000};
-   for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','fixedEnd101','secondaryCantilever101','extendToBoundary173','manualKind294'])if(row[k]!==undefined)saved[k]=clone(row[k]);
+   for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','bayBoundary300','fixedEnd101','secondaryCantilever101','extendToBoundary173','manualKind294'])if(row[k]!==undefined)saved[k]=clone(row[k]);
    if(row.kind==='SB'&&preservedBay246)saved.bay171=clone(preservedBay246);
    if(!size.depthOverride184&&!size.preserveDepth184&&row.kind==='SB'&&size.d!=null)saved.depthOverride184=size.d;
    if(b.autoCantilever173&&row.kind==='MB')delete saved.fixedEnd101;

@@ -1,0 +1,16 @@
+{
+  "version": "E2.297",
+  "baseline": "471c66f5c037fe014054ee46ddbdfabb35f85849",
+  "includedPR16": "c644fdcbc68f1bb73bd33c9938660b5a1db8fab3",
+  "unchangedTrackedApplicationFiles": 530,
+  "reportContentAndWorkbookSourcesUnchanged": true,
+  "viewerRefreshOnly": true,
+  "drawingMemberInfoOnly": true,
+  "nativeHostVersionOnly": true,
+  "pr16UiPreservedExactly": true,
+  "previewMatches": true,
+  "previewCacheControl": "no-store",
+  "sourceHtmlSha256": "43fc8180372302b1c34b53e19bbc726ce9d164a1d2ba0621880ca0f746983816",
+  "nativeExcelRerun": false,
+  "fullHistoricalSuiteRun": false
+}

@@ -77,7 +77,25 @@ window.WorkspacePages=(()=>{
   }catch(e){if(alive())box.textContent='预览未完成：'+e.message;}
  }
 
- function render(tab){if(current.startsWith('report')&&!tab.startsWith('report')){pdfCleanup?.();pdfCleanup=null;pdfObserver?.disconnect();if(pdfDocument){++paintGeneration;pdfDocument.destroy();pdfDocument=null;}lastHTML='';}current=tab;if(tab!=='deflection')DeflectionFraming91.park();const full=['foundation','sections','steel','truss','deflection','reportA','reportB'].includes(tab);document.querySelector('.layout').dataset.full=String(full);if(!full)return;const {p,result}=host.get();let html=tab==='truss'?TrussUI109.render(p,result):tab==='sections'?LoadPath84.preview(p,result):tab==='foundation'?FoundationUI.render(p,result):tab==='deflection'?DeflectionUI.render(p,result):tab==='steel'?steel(p,result):report(tab);if(html!==lastHTML){DeflectionFraming91.park();root.innerHTML=html;lastHTML=html;}if(tab==='deflection')DeflectionFraming91.mount();if(tab.startsWith('report')){paintPDF();}}
+ function updateReportStatus296(html){
+  const box=root.querySelector('[data-pdf]'),template=document.createElement('template');template.innerHTML=html;
+  const nextBox=template.content.querySelector('[data-pdf]');if(!box||!nextBox||box.dataset.pdf!==nextBox.dataset.pdf)return false;
+  // Progress belongs to the viewer chrome. Keep the live PDF/canvases attached,
+  // so status changes cannot destroy its height, render tasks or scroll position.
+  const top=root.scrollTop,left=root.scrollLeft,offset=()=>box.getBoundingClientRect().top-root.getBoundingClientRect().top+root.scrollTop,before=offset();
+  const old=[...root.children],used=new Set(),key=node=>node.tagName+'|'+node.className;
+  const next=[...template.content.children].map(node=>{
+   if(node===nextBox){used.add(box);return box;}
+   const previous=old.find(item=>item!==box&&!used.has(item)&&key(item)===key(node));if(!previous)return node;used.add(previous);
+   if(previous.tagName==='DETAILS')node.open=previous.open;
+   if(previous.isEqualNode(node))return previous;
+   previous.replaceWith(node);return node;
+  });
+  for(const node of old)if(!used.has(node))node.remove();
+  let cursor=root.firstElementChild;for(const node of next){if(node!==cursor)root.insertBefore(node,cursor);cursor=node.nextElementSibling;}
+  root.scrollTop=top+(top>=before?offset()-before:0);root.scrollLeft=left;return true;
+ }
+ function render(tab){const previousTab=current;if(current.startsWith('report')&&!tab.startsWith('report')){pdfCleanup?.();pdfCleanup=null;pdfObserver?.disconnect();if(pdfDocument){++paintGeneration;pdfDocument.destroy();pdfDocument=null;}lastHTML='';}current=tab;if(tab!=='deflection')DeflectionFraming91.park();const full=['foundation','sections','steel','truss','deflection','reportA','reportB'].includes(tab);document.querySelector('.layout').dataset.full=String(full);if(!full)return;const {p,result}=host.get();let html=tab==='truss'?TrussUI109.render(p,result):tab==='sections'?LoadPath84.preview(p,result):tab==='foundation'?FoundationUI.render(p,result):tab==='deflection'?DeflectionUI.render(p,result):tab==='steel'?steel(p,result):report(tab);if(html!==lastHTML){DeflectionFraming91.park();if(!(tab===previousTab&&tab.startsWith('report')&&updateReportStatus296(html))){root.innerHTML=html;if(tab.startsWith('report'))root.scrollTop=0;}lastHTML=html;}if(tab==='deflection')DeflectionFraming91.mount();if(tab.startsWith('report')){paintPDF();}}
  function clearPDF(section){if(reportUrls[section])URL.revokeObjectURL(reportUrls[section]);delete reportUrls[section];}
  async function setPDF(section,bytes){if(reportUrls[section])URL.revokeObjectURL(reportUrls[section]);reportUrls[section]=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));render(current);}
  function axisRect(p,key){const xs=Engine.axes(p,'x',key),ys=Engine.axes(p,'y',key);const pos=x=>x.pos??x.v??x.x;return {x0:pos(xs[0]),x1:pos(xs[1]),y0:pos(ys[0]),y1:pos(ys[1])};}

@@ -1,0 +1,637 @@
+{
+  "baseline": "df956bb86c501afc7f1c4cfe0a346f2a220661c2",
+  "head": "df956bb86c501afc7f1c4cfe0a346f2a220661c2",
+  "modules": 36,
+  "scripts": 40,
+  "protectedFiles": [
+    "audit-runner132.js",
+    "beam-layout116.js",
+    "beam-load-ui.js",
+    "beam-loads.js",
+    "beam-rebar116.js",
+    "beam-sizing.js",
+    "checks.js",
+    "column-alignment-ui.js",
+    "column-alignment.js",
+    "column-areas103.js",
+    "column-loads101.js",
+    "column-panel123.js",
+    "deflection-ui.js",
+    "deflection.js",
+    "display-quality.js",
+    "drawing.js",
+    "excel-formulas.js",
+    "excel-sync.js",
+    "explorer-ui.js",
+    "floor-levels.js",
+    "floor-tools101.js",
+    "foundation.js",
+    "framing-fold91.js",
+    "framing-symbols98.js",
+    "horizontal-path133.js",
+    "input-feedback172.js",
+    "load-data.js",
+    "load-path84.js",
+    "load-regions.js",
+    "loading.js",
+    "local-heights96.js",
+    "measure189.js",
+    "mobile.js",
+    "overall-report.js",
+    "overall-runtime.js",
+    "overall-source.js",
+    "rc-plan.js",
+    "report-compose.js",
+    "report-content.js",
+    "report-extras.js",
+    "report-paper.js",
+    "reports.js",
+    "review-layout191.js",
+    "right-inputs.js",
+    "slab-geometry120.js",
+    "slab-marks.js",
+    "slab-panel121.js",
+    "slab-support-ui132.js",
+    "slab-support132.js",
+    "steel-catalog.js",
+    "steel.js",
+    "transfer-markers.js",
+    "transfer-truss.js",
+    "truss-analysis.js",
+    "truss-catalog.js",
+    "truss-model.js",
+    "truss-reports.js",
+    "truss-ui.js",
+    "truss-zone.js",
+    "ui-polish173.js",
+    "usage.js",
+    "view-helpers87.js",
+    "wind-average93.js",
+    "workspace-pages.js"
+  ],
+  "tests": [
+    {
+      "test": "source/tests/audit-performance247.cjs",
+      "exit": 1,
+      "ms": 355
+    },
+    {
+      "test": "source/tests/area-parity247.cjs",
+      "exit": 0,
+      "ms": 1126
+    },
+    {
+      "test": "source/tests/audit-ui247.cjs",
+      "exit": 0,
+      "ms": 920
+    },
+    {
+      "test": "source/tests/bay-record246.cjs",
+      "exit": 0,
+      "ms": 356
+    },
+    {
+      "test": "source/tests/batch228.cjs",
+      "exit": 0,
+      "ms": 660
+    },
+    {
+      "test": "source/tests/beam-acceptance261.cjs",
+      "exit": 0,
+      "ms": 553
+    },
+    {
+      "test": "source/tests/beam-batch244.cjs",
+      "exit": 0,
+      "ms": 13025
+    },
+    {
+      "test": "source/tests/beam-filters214.cjs",
+      "exit": 0,
+      "ms": 838
+    },
+    {
+      "test": "source/tests/beam-loads264.cjs",
+      "exit": 0,
+      "ms": 304
+    },
+    {
+      "test": "source/tests/check-sync226.cjs",
+      "exit": 1,
+      "ms": 346
+    },
+    {
+      "test": "source/tests/check-ui279.cjs",
+      "exit": 0,
+      "ms": 410
+    },
+    {
+      "test": "source/tests/closure224.cjs",
+      "exit": 0,
+      "ms": 191
+    },
+    {
+      "test": "source/tests/column-position257.cjs",
+      "exit": 0,
+      "ms": 267
+    },
+    {
+      "test": "source/tests/column-spacing258.cjs",
+      "exit": 0,
+      "ms": 246
+    },
+    {
+      "test": "source/tests/column-workbook274.cjs",
+      "exit": 0,
+      "ms": 42
+    },
+    {
+      "test": "source/tests/compression-count269.cjs",
+      "exit": 1,
+      "ms": 591
+    },
+    {
+      "test": "source/tests/deflection-criterion212.cjs",
+      "exit": 0,
+      "ms": 765
+    },
+    {
+      "test": "source/tests/deflection210.cjs",
+      "exit": 0,
+      "ms": 57
+    },
+    {
+      "test": "source/tests/diagrams207.cjs",
+      "exit": 0,
+      "ms": 44
+    },
+    {
+      "test": "source/tests/equal-layers268.cjs",
+      "exit": 1,
+      "ms": 662
+    },
+    {
+      "test": "source/tests/fire-filter243.cjs",
+      "exit": 0,
+      "ms": 355
+    },
+    {
+      "test": "source/tests/fire241.cjs",
+      "exit": 0,
+      "ms": 388
+    },
+    {
+      "test": "source/tests/floor-auto249.cjs",
+      "exit": 0,
+      "ms": 415
+    },
+    {
+      "test": "source/tests/floor-status251.cjs",
+      "exit": 0,
+      "ms": 44
+    },
+    {
+      "test": "source/tests/grid-snap217.cjs",
+      "exit": 0,
+      "ms": 272
+    },
+    {
+      "test": "source/tests/incremental228.cjs",
+      "exit": 0,
+      "ms": 1012
+    },
+    {
+      "test": "source/tests/link-policy267.cjs",
+      "exit": 0,
+      "ms": 298
+    },
+    {
+      "test": "source/tests/link-spacing233.cjs",
+      "exit": 0,
+      "ms": 312
+    },
+    {
+      "test": "source/tests/local-rebar285.cjs",
+      "exit": 0,
+      "ms": 1189
+    },
+    {
+      "test": "source/tests/local-report251.cjs",
+      "exit": 0,
+      "ms": 334
+    },
+    {
+      "test": "source/tests/manual-spacing283.cjs",
+      "exit": 0,
+      "ms": 472
+    },
+    {
+      "test": "source/tests/member-design265.cjs",
+      "exit": 0,
+      "ms": 321
+    },
+    {
+      "test": "source/tests/member-navigation248.cjs",
+      "exit": 1,
+      "ms": 408
+    },
+    {
+      "test": "source/tests/precision208.cjs",
+      "exit": 0,
+      "ms": 330
+    },
+    {
+      "test": "source/tests/reaction-rounding207.cjs",
+      "exit": 0,
+      "ms": 368
+    },
+    {
+      "test": "source/tests/rebar-cover240.cjs",
+      "exit": 0,
+      "ms": 273
+    },
+    {
+      "test": "source/tests/rebar-legs239.cjs",
+      "exit": 0,
+      "ms": 259
+    },
+    {
+      "test": "source/tests/rebar-live237.cjs",
+      "exit": 0,
+      "ms": 224
+    },
+    {
+      "test": "source/tests/rebar227.cjs",
+      "exit": 1,
+      "ms": 440
+    },
+    {
+      "test": "source/tests/report-adoption254.cjs",
+      "exit": 0,
+      "ms": 380
+    },
+    {
+      "test": "source/tests/report-handoff248.cjs",
+      "exit": 0,
+      "ms": 323
+    },
+    {
+      "test": "source/tests/representative250.cjs",
+      "exit": 1,
+      "ms": 390
+    },
+    {
+      "test": "source/tests/sb-advice220.cjs",
+      "exit": 1,
+      "ms": 349
+    },
+    {
+      "test": "source/tests/sb-width218.cjs",
+      "exit": 0,
+      "ms": 321
+    },
+    {
+      "test": "source/tests/beam-batch245.cjs",
+      "exit": 0,
+      "ms": 27142
+    },
+    {
+      "test": "source/tests/section-a-acceptance262.cjs",
+      "exit": 0,
+      "ms": 356
+    },
+    {
+      "test": "source/tests/size-criterion230.cjs",
+      "exit": 0,
+      "ms": 324
+    },
+    {
+      "test": "source/tests/slab-failure256.cjs",
+      "exit": 0,
+      "ms": 260
+    },
+    {
+      "test": "source/tests/slab-load223.cjs",
+      "exit": 0,
+      "ms": 311
+    },
+    {
+      "test": "source/tests/slab-selection255.cjs",
+      "exit": 0,
+      "ms": 463
+    },
+    {
+      "test": "source/tests/summary-app282.cjs",
+      "exit": 0,
+      "ms": 522
+    },
+    {
+      "test": "source/tests/summary-rc216.cjs",
+      "exit": 1,
+      "ms": 281
+    },
+    {
+      "test": "source/tests/summary-deflection211.cjs",
+      "exit": 0,
+      "ms": 774
+    },
+    {
+      "test": "source/tests/summary-sections205.cjs",
+      "exit": 0,
+      "ms": 628
+    },
+    {
+      "test": "source/tests/tb-advice221.cjs",
+      "exit": 0,
+      "ms": 790
+    },
+    {
+      "test": "source/tests/treatment229.cjs",
+      "exit": 0,
+      "ms": 535
+    },
+    {
+      "test": "source/tests/tb-apply222.cjs",
+      "exit": 0,
+      "ms": 888
+    },
+    {
+      "test": "source/tests/width-advisory219.cjs",
+      "exit": 0,
+      "ms": 275
+    },
+    {
+      "test": "source/tests/unified-dimensions201.cjs",
+      "exit": 0,
+      "ms": 372
+    },
+    {
+      "test": "source/tests/secondary-split200.cjs",
+      "exit": 0,
+      "ms": 316
+    },
+    {
+      "test": "source/tests/drawing-cb198.cjs",
+      "exit": 0,
+      "ms": 331
+    },
+    {
+      "test": "source/tests/drawing-support197.cjs",
+      "exit": 0,
+      "ms": 399
+    },
+    {
+      "test": "source/tests/column-main194.cjs",
+      "exit": 0,
+      "ms": 289
+    },
+    {
+      "test": "source/tests/selection195.cjs",
+      "exit": 0,
+      "ms": 382
+    },
+    {
+      "test": "source/tests/review193.cjs",
+      "exit": 0,
+      "ms": 369
+    },
+    {
+      "test": "source/tests/review192.cjs",
+      "exit": 0,
+      "ms": 354
+    },
+    {
+      "test": "source/tests/review-layout191.cjs",
+      "exit": 0,
+      "ms": 378
+    },
+    {
+      "test": "source/tests/tributary187.cjs",
+      "exit": 0,
+      "ms": 254
+    },
+    {
+      "test": "source/tests/column-load-centres186.cjs",
+      "exit": 0,
+      "ms": 274
+    },
+    {
+      "test": "source/tests/self-weight185.cjs",
+      "exit": 0,
+      "ms": 265
+    },
+    {
+      "test": "source/tests/beam-surface184.cjs",
+      "exit": 0,
+      "ms": 279
+    },
+    {
+      "test": "source/tests/rounding183.cjs",
+      "exit": 0,
+      "ms": 335
+    },
+    {
+      "test": "source/tests/depth-factors180.cjs",
+      "exit": 0,
+      "ms": 285
+    },
+    {
+      "test": "source/tests/beam-independent179.cjs",
+      "exit": 0,
+      "ms": 282
+    },
+    {
+      "test": "source/tests/slab-bay178.cjs",
+      "exit": 0,
+      "ms": 250
+    },
+    {
+      "test": "source/tests/slab-transfer177.cjs",
+      "exit": 0,
+      "ms": 305
+    },
+    {
+      "test": "source/tests/slab-centres175.cjs",
+      "exit": 0,
+      "ms": 539
+    },
+    {
+      "test": "source/tests/unified-members175.cjs",
+      "exit": 0,
+      "ms": 330
+    },
+    {
+      "test": "source/tests/column-anchors174.cjs",
+      "exit": 0,
+      "ms": 246
+    },
+    {
+      "test": "verification/ui173.cjs",
+      "exit": 0,
+      "ms": 72
+    },
+    {
+      "test": "source/tests/support-cantilever173.cjs",
+      "exit": 0,
+      "ms": 289
+    },
+    {
+      "test": "verification/truss-core-tests.cjs",
+      "exit": 0,
+      "ms": 58
+    },
+    {
+      "test": "verification/integration143.cjs",
+      "exit": 0,
+      "ms": 351
+    },
+    {
+      "test": "verification/downstream143.cjs",
+      "exit": 0,
+      "ms": 550
+    },
+    {
+      "test": "source/tests/column-resize166.cjs",
+      "exit": 0,
+      "ms": 1458
+    },
+    {
+      "test": "source/tests/column-parameter-table.cjs",
+      "exit": 0,
+      "ms": 2665
+    },
+    {
+      "test": "source/tests/copy-column196.cjs",
+      "exit": 0,
+      "ms": 627
+    },
+    {
+      "test": "source/tests/copy-column-adjacent.cjs",
+      "exit": 0,
+      "ms": 1918
+    },
+    {
+      "test": "source/tests/bays171.cjs",
+      "exit": 0,
+      "ms": 1361
+    },
+    {
+      "test": "source/tests/auto-transfer.cjs",
+      "exit": 0,
+      "ms": 1964
+    },
+    {
+      "test": "source/tests/column-centres159.cjs",
+      "exit": 1,
+      "ms": 1317
+    },
+    {
+      "test": "source/tests/column-outline160.cjs",
+      "exit": 1,
+      "ms": 1396
+    },
+    {
+      "test": "source/tests/column-reference-selection.cjs",
+      "exit": 0,
+      "ms": 2039
+    },
+    {
+      "test": "source/tests/column-multiselect.cjs",
+      "exit": 0,
+      "ms": 2574
+    },
+    {
+      "test": "source/tests/column-deferred-boundary.cjs",
+      "exit": 1,
+      "ms": 1692
+    }
+  ],
+  "baselineComparison": [
+    {
+      "test": "source/tests/audit-performance247.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/check-sync226.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/compression-count269.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/equal-layers268.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/member-navigation248.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/rebar227.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/representative250.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/sb-advice220.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/summary-rc216.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    },
+    {
+      "test": "source/tests/column-centres159.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": true
+    },
+    {
+      "test": "source/tests/column-outline160.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": true
+    },
+    {
+      "test": "source/tests/column-deferred-boundary.cjs",
+      "baselineExit": 1,
+      "sameNormalizedOutput": true,
+      "missingFixture": false
+    }
+  ],
+  "targetedBrowser": {
+    "test": "source/tests/column-spacing258-ui.cjs",
+    "result": "PASS",
+    "scope": [
+      "physical centre minimum",
+      "blank gridlines",
+      "supplemental axes display and toggle",
+      "invalid/manual conflict rejection",
+      "undo",
+      "save/load",
+      "shared framing",
+      "manual mode"
+    ]
+  }
+}

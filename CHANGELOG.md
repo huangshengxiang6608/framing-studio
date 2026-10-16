@@ -1,3 +1,11 @@
+# E2.288 — Minimum column centre spacing
+
+- Treat Column Spacing X/Y as a minimum actual centre-to-centre distance (m) along the same grid row/column.
+- Blank uses existing architectural/adopted column gridlines, without supplemental spacing axes or hidden legacy automatic-column filters.
+- Keep supplemental axes: subdivide existing intervals only with spans at least the specified minimum, then filter positioned automatic columns by actual centre distance. Show supplemental axes with the existing column-grid toggle.
+- Preserve explicit manual positions, exclusions, openings, deletions and retained column IDs/sections. Conflicting fixed positions reject the edit with existing inline feedback; manual mode only stores the settings.
+- Preserve unrelated calculations, E2.287 layout, Section A/B report rendering, Excel/VBA and prior packages.
+
 # E2.287 — E2.286 + PR #12 UI integration
 
 - Preserve the complete E2.286 calculation, Excel and report baseline.

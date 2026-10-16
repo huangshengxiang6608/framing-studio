@@ -46,6 +46,9 @@ const ColumnAreas103=(()=>{
  // Walls own geometric tributaries as connected groups. Split at half spans
  // to neighbouring support lines; a core includes the half-bays at its ends.
  const wallPartitions158=new WeakMap();
+ const allocationChecks=new WeakMap();
+ const supportBox=c=>{const r=Engine.columnRect(c);return {x0:r.x-r.w/2,x1:r.x+r.w/2,y0:r.y-r.d/2,y1:r.y+r.d/2};};
+ const covers=(lo,hi,value)=>value>=lo-eps&&value<=hi+eps;
  function subtractConvex158(subject,clip){
   let rest=subject;const out=[];for(let i=0;i<clip.length&&rest.length;i++){const u=clip[i],v=clip[(i+1)%clip.length],nx=v[1]-u[1],ny=u[0]-v[0],k=nx*u[0]+ny*u[1],outside=half(rest,-nx,-ny,-k);if(outside.length)out.push(outside);rest=half(rest,nx,ny,k);}return out;
  }
@@ -53,23 +56,38 @@ const ColumnAreas103=(()=>{
   if(wallPartitions158.has(m))return wallPartitions158.get(m);
   const solid=R.difference(R.union(m.ts.filter(t=>t.state===1)),m.slabVoids||[]),building=m.ts.filter(t=>t.state!==0);
   if(!building.length||!m.walls.length){wallPartitions158.set(m,[]);return [];}
-  const limit=bounds(building.flatMap(rectangle)),cols=active(m).map(c=>point(p,m,c)),groups=[];
+  const limit=bounds(building.flatMap(rectangle)),cols=active(m).map(c=>({point:point(p,m,c),box:supportBox(c)})),groups=[];
   const touches=(w,v)=>[0,1].every(i=>Math.max(Math.min(a(w)[i],z(w)[i]),Math.min(a(v)[i],z(v)[i]))<=Math.min(Math.max(a(w)[i],z(w)[i]),Math.max(a(v)[i],z(v)[i]))+eps);
   for(const w of m.walls){const touching=groups.filter(g=>g.members.some(v=>touches(w,v)));const g={members:[w,...touching.flatMap(g=>g.members)]};for(const old of touching)groups.splice(groups.indexOf(old),1);groups.push(g);}
   const low=(vs,v,edge)=>{const q=vs.filter(q=>q<v-eps);return q.length?(Math.max(...q)+v)/2:edge;},high=(vs,v,edge)=>{const q=vs.filter(q=>q>v+eps);return q.length?(Math.min(...q)+v)/2:edge;};
   for(const g of groups){
    g.signature=g.members.map(w=>Engine.sig(a(w),z(w))).sort().join(';');g.box=bounds(g.members.flatMap(w=>[a(w),z(w)]));g.point=[(g.box.x0+g.box.x1)/2,(g.box.y0+g.box.y1)/2];
-   const candidates=[];
+   const candidates=[];g.errors=[];
    for(const w of g.members){const u=a(w),v=z(w),horizontal=Math.abs(u[1]-v[1])<eps,axis=horizontal?0:1,cross=1-axis,lo=Math.min(u[axis],v[axis]),hi=Math.max(u[axis],v[axis]),at=u[cross];
-    const along=cols.filter(q=>Math.abs(q[cross]-at)<eps).map(q=>q[axis]),across=cols.filter(q=>q[axis]>=lo-eps&&q[axis]<=hi+eps).map(q=>q[cross]);
+    // Perimeter columns are inset by half their section. Match the physical
+    // section against the support line, then use its centre for half-spans.
+    // A broad numeric snapping tolerance would also catch unrelated columns.
+    const aa=axis?'y':'x',cc=cross?'y':'x';
+    const along=cols.filter(q=>covers(q.box[cc+'0'],q.box[cc+'1'],at)).map(q=>q.point[axis]),across=cols.filter(q=>q.box[aa+'0']<=hi+eps&&q.box[aa+'1']>=lo-eps).map(q=>q.point[cross]);
     for(const other of m.walls){if(other===w)continue;const x=a(other),y=z(other);if(Math.abs(x[axis]-y[axis])<eps&&at>=Math.min(x[cross],y[cross])-eps&&at<=Math.max(x[cross],y[cross])+eps)along.push(x[axis]);if(Math.abs(x[cross]-y[cross])<eps&&Math.min(hi,Math.max(x[axis],y[axis]))>=Math.max(lo,Math.min(x[axis],y[axis]))-eps)across.push(x[cross]);}
-    const aa=axis?'y':'x',cc=cross?'y':'x',box={[aa+'0']:low(along,lo,limit[aa+'0']),[aa+'1']:high(along,hi,limit[aa+'1']),[cc+'0']:low(across,at,limit[cc+'0']),[cc+'1']:high(across,at,limit[cc+'1'])};candidates.push(box);
+    const boundary=(values,value,key,side)=>{
+     if(values.some(q=>side*(q-value)>eps))return side<0?low(values,value,limit[key+'0']):high(values,value,limit[key+'1']);
+     const edge=limit[key+(side<0?'0':'1')],i=key==='x'?0:1;
+     // Reaching the outside boundary is valid only if no intervening support
+     // is being skipped. Off-line supports require confirmation, not an
+     // unbounded wall claim across the rest of the floor.
+     const beyond=q=>side*(q-value)>eps&&side*(edge-q)>=-eps;
+     const missed=cols.some(q=>beyond(q.point[i]))||m.walls.some(other=>!g.members.includes(other)&&(beyond(a(other)[i])||beyond(z(other)[i])));
+     if(missed&&Math.abs(edge-value)>eps){g.errors.push('墙 '+w.id+' '+key.toUpperCase()+(side<0?' 负向':' 正向')+'未找到明确相邻支承，受荷分界待确认');return value;}
+     return edge;
+    };
+    const box={[aa+'0']:boundary(along,lo,aa,-1),[aa+'1']:boundary(along,hi,aa,1),[cc+'0']:boundary(across,at,cc,-1),[cc+'1']:boundary(across,at,cc,1)};candidates.push(box);
    }
    g.rects=R.union(candidates.flatMap(q=>solid.map(r=>R.intersect(q,r)).filter(Boolean)));
   }
   // Different wall groups divide any shared candidate area once, independently
   // of input order. Connected wall legs are already unioned into a single group.
-  const answer=groups.map(g=>{let ps=g.rects.map(rectangle);for(const other of groups){if(other===g)continue;const dx=other.point[0]-g.point[0],dy=other.point[1]-g.point[1],k=(other.point[0]**2+other.point[1]**2-g.point[0]**2-g.point[1]**2)/2;for(const r of other.rects)ps=ps.flatMap(poly=>{const hit=clipPolygon(poly,r);if(!hit.length)return [poly];const out=subtractPolygon(poly,r),keep=half(hit,dx,dy,k);if(keep.length)out.push(keep);return out;});}return {...g,...format(ps),errors:[],method:'wall-half-bay'};});
+  const answer=groups.map(g=>{let ps=g.rects.map(rectangle);for(const other of groups){if(other===g)continue;const dx=other.point[0]-g.point[0],dy=other.point[1]-g.point[1],k=(other.point[0]**2+other.point[1]**2-g.point[0]**2-g.point[1]**2)/2;for(const r of other.rects)ps=ps.flatMap(poly=>{const hit=clipPolygon(poly,r);if(!hit.length)return [poly];const out=subtractPolygon(poly,r),keep=half(hit,dx,dy,k);if(keep.length)out.push(keep);return out;});}return {...g,...format(ps),errors:[...new Set(g.errors)],method:'wall-half-bay'};});
   wallPartitions158.set(m,answer);return answer;
  }
  // A geometric tributary includes support footprints. Recover a saved drawn
@@ -82,6 +100,7 @@ const ColumnAreas103=(()=>{
   const selected=wallShapes(p,Engine.floorModel(result,f)).find(g=>g.members.some(w=>w.id===id));if(!selected)return {rows:[],errors:['所選牆已不存在'],totalG:null,totalQ:null};
   const rows=[],errors=[];let continuous=true;
   for(let n=f;n<=p.total;n++){const model=Engine.floorModel(result,n),group=wallShapes(p,model).find(g=>g.signature===selected.signature);if(!group){continuous=false;continue;}if(!continuous){errors.push(FloorLevels.name(p,n)+' 牆組不連續，未自動累加');continue;}
+   errors.push(...allocationAudit(p,model).errors.map(e=>FloorLevels.name(p,n)+' '+e));
    let free=pieces(group),G=0,Q=0,valid=true;const parts=[],loads=geometricAreas158(p,n,model);
    const add=(ps,load)=>{const shape=format(ps);if(shape.area<eps)return;const ll=LoadData.live(load),good=[load.dl,load.sdl,ll].every(v=>Number.isFinite(v)&&v>=0)&&load.basis==='total';valid&&=good;const g=good?shape.area*(load.dl+load.sdl):null,q=good?shape.area*ll:null;G+=g||0;Q+=q||0;parts.push({...shape,name:load.name||'整層荷載',dl:load.dl,sdl:load.sdl,ll,G:g,Q:q});};
    for(let i=0;i<loads.length;i++)for(let j=0;j<i;j++)if(R.region(loads[i]).some(a=>R.region(loads[j]).some(b=>{const hit=R.intersect(a,b);return hit&&free.some(poly=>clipPolygon(poly,hit).length);})))errors.push(FloorLevels.name(p,n)+' 牆受荷範圍內荷載區重疊');
@@ -124,8 +143,27 @@ const ColumnAreas103=(()=>{
    }
    const s=format(ps),oldArea=c.rects.reduce((n,r)=>n+area(r),0);map.set(c.column,{...s,box:c.box,partitioned:oldArea-s.area>eps,errors,method:'geometric-half-bay'});
   }
-  partitions.set(m,map);return map;
+  const walls=wallShapes(p,m),check=checkAllocation(solid,[...map.values()],walls);
+  if(raw.length&&check.solidArea>eps&&check.columnArea<eps)check.errors.push('本层所有柱受荷面积为零，墙柱分界待核对');
+  for(const c of raw){const shape=map.get(c.column);if(c.rects.length&&shape.area<eps)shape.errors.push('柱 '+c.column.id+' 受荷面积为零，墙柱分界待核对');shape.errors=[...new Set([...shape.errors,...check.errors])];}
+  allocationChecks.set(m,check);partitions.set(m,map);return map;
  }
+ // Verify the union, not only the sum: a gap and an overlap can cancel in
+ // totals. This check is cached with the immutable floor model.
+ function checkAllocation(solid,columns,walls){
+  let free=solid.map(rectangle);const sum=ps=>ps.reduce((s,q)=>s+polygonArea(q),0),solidArea=solid.reduce((s,r)=>s+area(r),0);
+  const columnArea=columns.reduce((s,q)=>s+q.area,0),wallArea=walls.reduce((s,q)=>s+q.area,0),errors=walls.flatMap(q=>q.errors||[]);let inside=0;
+  for(const shape of [...columns,...walls])for(const poly of pieces(shape)){
+   inside+=solid.reduce((s,r)=>s+polygonArea(clipPolygon(poly,r)),0);
+   const box=bounds(poly);free=free.flatMap(q=>R.intersect(bounds(q),box)?subtractConvex158(q,poly):[q]);
+  }
+  const unassignedArea=sum(free),overlapArea=Math.max(0,inside-(solidArea-unassignedArea)),outsideArea=Math.max(0,columnArea+wallArea-inside),tolerance=Math.max(1e-6,solidArea*1e-9),label=n=>n.toFixed(3)+' m²';
+  if(unassignedArea>tolerance)errors.push('楼层受荷面积未分配 '+label(unassignedArea)+'，柱墙分界待确认');
+  if(overlapArea>tolerance)errors.push('柱墙受荷面积重叠 '+label(overlapArea)+'，分界待确认');
+  if(outsideArea>tolerance)errors.push('受荷面积超出有效楼面 '+label(outsideArea)+'，分界待确认');
+  return {solidArea,columnArea,wallArea,unassignedArea,overlapArea,outsideArea,errors:[...new Set(errors)]};
+ }
+ function allocationAudit(p,m){partition(p,m);return allocationChecks.get(m)||{solidArea:0,columnArea:0,wallArea:0,unassignedArea:0,overlapArea:0,outsideArea:0,errors:[]};}
  function footprint(p,m,c){return partition(p,m).get(c)||{rects:[],polygons:[],b:null,d:null,box:null,area:0,errors:[],method:'geometric-half-bay'};}
 
  function calculate(p,result,f,target){
@@ -195,5 +233,5 @@ const ColumnAreas103=(()=>{
   }
   const answer={groups:[...grouped.values()],errors:[...new Set(errors)],method:'geometric-half-bay',transfer271:{known:!errors.length&&(sources271(groups.filter(g=>g.area>eps)).length>0||!groups.some(g=>g.area>eps&&g.transferUnknown271)),sources:sources271(groups.filter(g=>g.area>eps))}};cache.set(id,answer);return copy(answer);
  }
- return {snapshot228,calculate,footprint,wallShapes,wallSchedule,polygonArea,clipPolygon,subtractPolygon};
+ return {snapshot228,calculate,footprint,wallShapes,wallSchedule,allocationAudit,polygonArea,clipPolygon,subtractPolygon};
 })();

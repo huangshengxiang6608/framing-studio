@@ -14,8 +14,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8",FrameworkDisplayName=".NET Framework 4.8")]
 
 [assembly: System.Reflection.AssemblyTitle("Framing Studio")]
-[assembly: System.Reflection.AssemblyVersion("2.290.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.290.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.293.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.293.0.0")]
 
 static class Program {
     [STAThread] static int Main(string[] args) {
@@ -63,7 +63,7 @@ sealed class Studio : Form {
         Profile = Path.Combine(Data, "WebView2"); Directory.CreateDirectory(Data);
         if (TestDir != null) { Directory.CreateDirectory(TestDir); Opacity = .01; ShowInTaskbar = false; }
         if (BrowserRequest251 != null) { Opacity = 0; ShowInTaskbar = false; }
-        Text = "Framing Studio · E2.290 Desktop"; Width = 1500; Height = 950;
+        Text = "Framing Studio · E2.293 Desktop"; Width = 1500; Height = 950;
         MinimumSize = new Size(900, 650); StartPosition = FormStartPosition.CenterScreen;
         if (File.Exists(Path.Combine(Root,"FramingStudio.ico"))) Icon = new Icon(Path.Combine(Root,"FramingStudio.ico"));
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("项目");
@@ -136,7 +136,7 @@ sealed class Studio : Form {
             await web.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(Path.Combine(Root,"desktop-bridge.js")));
             web.NavigationCompleted += async delegate(object s, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { Log("Navigation: " + e.WebErrorStatus); Status.Text = "页面加载失败：" + e.WebErrorStatus; return; }
-                Ready = true; Status.Text = "离线模式 · E2.290 · 项目请保存为 .framing.json";
+                Ready = true; Status.Text = "离线模式 · E2.293 · 项目请保存为 .framing.json";
                 if (TestDir != null && TestNavigation++ == 0) await SelfTest();
                 if (BrowserRequest251 != null && !BrowserStarted251) {
                     BrowserStarted251=true;

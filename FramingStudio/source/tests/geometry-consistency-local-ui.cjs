@@ -1,0 +1,26 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{pathToFileURL}=require('url'),{chromium}=require('playwright');
+(async()=>{
+ const input=process.argv[2];assert(input,'Supply saved 2019 project path');const bytes=fs.readFileSync(input),out='tmp/framing-geometry-local';
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+ try{
+  const page=await browser.newPage({viewport:{width:1650,height:1050},acceptDownloads:true}),errors=[],passed=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+  await page.goto(pathToFileURL(path.resolve('FramingStudio/assets/index.html')).href);await page.waitForFunction(()=>window.StudioHost);
+  await page.locator('#file').setInputFiles({name:'2019.framing.json',mimeType:'application/json',buffer:bytes});await page.waitForFunction(()=>StudioHost.get().p.name==='2019');
+  await page.evaluate(()=>{const draw=Drawing.plan;Drawing.plan=(...args)=>window.geometryPlotLocal=draw(...args);StudioHost.viewFloor(5);StudioHost.navigate('columns');window.geometryBeforeLocal=JSON.stringify(StudioHost.get().p);});
+  assert.equal(await page.locator('[data-geometry-group-local]').count(),1);const text=await page.locator('[data-geometry-groups-local]').innerText();assert(text.includes('85'));assert(text.includes('17 层'));assert(text.includes('5 个构件'));
+  await page.locator('[data-geometry-locate-local="C6"]').click();await page.waitForFunction(()=>document.querySelector('[data-geometry-focus-local]')?.textContent.includes('C6'));
+  await page.waitForFunction(()=>window.geometryPlotLocal&&StudioHost.get().floor===5);assert((await page.locator('[data-geometry-focus-local]').innerText()).includes('不参与计算'));
+  await page.locator('#canvas').screenshot({path:out+'/outside-column-location.png'});assert.equal(await page.evaluate(()=>JSON.stringify(StudioHost.get().p)),await page.evaluate(()=>geometryBeforeLocal));passed.push('85 records grouped by Framing; missing C6 located on plan with explicit non-calculated dashed marker; locating does not change input');
+  await page.evaluate(()=>StudioHost.navigate('columns'));await page.locator('[data-geometry-clean-local="F03"]').click();assert.equal(await page.evaluate(()=>StudioHost.get().p.types.F03.columns.length),20);assert.equal(await page.evaluate(()=>StudioHost.get().result.issues.length),0);
+  await page.locator('#undo').click();assert.equal(await page.evaluate(()=>JSON.stringify(StudioHost.get().p)),await page.evaluate(()=>geometryBeforeLocal));passed.push('Cleanup removes only F03 outside columns; one Undo restores project and inputs exactly');
+  await page.locator('[data-geometry-clean-local="F03"]').click();await page.evaluate(()=>StudioHost.navigate('beams'));await page.locator('.summary-issues131 > summary').click();await page.locator('[data-ex="audit-run131"]').click();await page.waitForFunction(()=>document.querySelector('[data-audit-progress132]')?.textContent==='检查完成',null,{timeout:60000});
+  assert.equal(await page.locator('[data-beam-count214="geometry"]').textContent(),'0');assert.equal(await page.locator('[data-beam-count214="other"]').textContent(),'0');assert.equal(await page.locator('[data-geometry-group-local]').count(),0);assert((await page.locator('.beam-filter214').innerText()).includes('其他構件驗算'));passed.push('Fresh real audit shows zero geometry groups; geometry and other-member check categories are separate');
+  await page.screenshot({path:out+'/summary-clean.png',fullPage:false});
+  const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#save').click()]);await download.saveAs(out+'/2019.browser-saved.framing.json');const saved=JSON.parse(fs.readFileSync(out+'/2019.browser-saved.framing.json','utf8'));assert.equal(saved.types.F03.columns.length,20);
+  await page.locator('#file').setInputFiles(path.resolve(out+'/2019.browser-saved.framing.json'));assert.equal(await page.evaluate(()=>StudioHost.get().result.issues.length),0);passed.push('Save Project and reopen retain cleanup and connected replacement beams without stale warnings');
+  // A new outline edit must synchronize cleanup and Undo as one operation.
+  await page.evaluate(()=>{const h=StudioHost.get();if(!StudioHost.transact(()=>h.p.types.F03.columns.push({id:'OUTLINE_TEST',x:39,y:4,b:500,d:500,on:true,status:'上下贯通'})))throw Error('fixture failed');window.outlineBeforeLocal=JSON.stringify(StudioHost.get().p);const q=StudioHost.get().p;if(!StudioHost.transact(()=>Engine.setRegion(q,'F03','5,0','building',false)))throw Error('outline change failed');});
+  assert.equal(await page.evaluate(()=>StudioHost.get().p.types.F03.columns.some(c=>c.id==='OUTLINE_TEST')),false);await page.locator('#undo').click();assert.equal(await page.evaluate(()=>JSON.stringify(StudioHost.get().p)),await page.evaluate(()=>outlineBeforeLocal));passed.push('Subsequent building-outline shrink removes fully outside column; one Undo restores outline and column');
+  assert.deepEqual(errors,[]);assert(fs.readFileSync(input).equals(bytes));fs.writeFileSync(out+'/ui-results.json',JSON.stringify({passed,errors,originalFileUnchanged:true},null,2));console.log(passed.join('\n'));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1});

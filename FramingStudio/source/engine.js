@@ -87,6 +87,13 @@ const Engine=(()=>{
   const axis=horizontal?0:1;if((z[axis]-a[axis])*(b.rawZ[axis]-b.rawA[axis])<=eps)return null;
   return {a,z,columnSupports164:links};
  }
+ // Resolve stored support identity before reading automatic width: an old
+ // endpoint can lie outside a column after shrinking its anchored section.
+ function linkedMainWidth299(p,key,b,columns,fallback){
+  const links=mainColumnSupports164(p,key,b,columns),live=columns.filter(c=>c.status!=='上层柱');
+  const ends=links.map(link=>{if(!link)return null;const exact=live.find(c=>columnPositionKey(c)===link.key);if(exact)return exact;const matches=live.filter(c=>columnReference(p,key,c).every((v,i)=>near(v,link.reference[i])));return matches.length===1?matches[0]:null;}).filter(Boolean);
+  return ends.length?Math.min(...ends.map(c=>near(b.rawA[1],b.rawZ[1])?c.d:c.b)):mainBeamWidth(columns,b.rawA,b.rawZ,fallback);
+ }
  function bindMainColumns164(p,key,m){
   for(const b of [...p.types[key].autoBeamSnapshot?.main||[],...p.types[key].autoBeamSnapshot?.primary||[],...p.types[key].beams.filter(v=>['MB','CB','TB'].includes(v.kind))])if(!b.columnSupports164){const live=m.beams.find(v=>v.id===b.id&&(v.baseKind||v.kind)===b.kind);if(live)b.columnSupports164=mainColumnSupports164(p,key,live,m.columns);}
  }
@@ -98,19 +105,20 @@ const Engine=(()=>{
   const mains=beams.filter(automatic),groups=[],groupOf=new Map(),findColumn=link=>{if(!link)return null;const cs=columns.filter(c=>c.status!=='上层柱'),exact=cs.find(c=>columnPositionKey(c)===link.key);if(exact)return exact;const match=cs.filter(c=>columnReference(p,key,c).every((v,i)=>near(v,link.reference[i])));return match.length===1?match[0]:null;};
   const links=new Map(mains.map(b=>[b,mainColumnSupports164(p,key,b,columns).map(findColumn)]));
   for(const first of mains){if(groupOf.has(first))continue;const group=[first];groupOf.set(first,group);for(let i=0;i<group.length;i++)for(const b of mains){if(groupOf.has(b)||horizontal(b)!==horizontal(first))continue;const a=axis(b),cross=1-a;if(!near(b.rawA[cross],first.rawA[cross]))continue;if(![group[i].rawA,group[i].rawZ].some(q=>[b.rawA,b.rawZ].some(v=>near(q[a],v[a]))))continue;group.push(b);groupOf.set(b,group);}groups.push(group);}
-  const proposals=new Map(),targetCross=new Map();
+  const proposals=new Map(),targetCross=new Map(),blocked=new Set();
   for(const group of groups){const a=axis(group[0]),cross=1-a,centres=unique(group.flatMap(b=>links.get(b).filter(Boolean).map(c=>{const r=columnRect(c);return cross?r.y:r.x;})));if(centres.length!==1)continue;for(const b of group)targetCross.set(b,centres[0]);}
   const position=b=>proposals.get(b)||b;
   // Walls retain their existing face connection; snapping to a wall centre can
   // extend an otherwise valid beam into the adjacent opening.
   function receiver(point,b){const a=axis(b),cross=1-a,hits=beams.filter(v=>v!==b&&horizontal(v)!==horizontal(b)&&near(v.rawA[a],point[a])&&point[cross]>=Math.min(v.rawA[cross],v.rawZ[cross])-eps&&point[cross]<=Math.max(v.rawA[cross],v.rawZ[cross])+eps),values=unique(hits.map(v=>targetCross.get(v)??position(v).a[a]));return values.length===1?values[0]:null;}
-  function valid(b,q){const a=axis(b),r=rect(q),others=beams.filter(v=>v!==b).map(position),supports=[...others.filter(v=>horizontal(v)!==horizontal(b)),...walls].map(rect).concat(columns.filter(c=>c.status!=='上层柱').map(columnRect)),connected=['a','z'].every(end=>q[end].every((v,i)=>near(v,b[end][i]))||supports.some(s=>Math.abs(q[end][0]-s.x)<=s.w/2+eps&&Math.abs(q[end][1]-s.y)<=s.d/2+eps));return connected&&(q.z[a]-q.a[a])*(b.rawZ[a]-b.rawA[a])>eps&&rectAllowed(ts,r.x,r.y,r.w,r.d)&&!beamSpaceConflict(q,others,columns);}
-  // Validate adjoining main spans together. If one chain cannot move, recalculate
-  // dependent connections using its original position instead of a rejected target.
+  function valid(b,q,checkBoundary=true){const a=axis(b),r=rect(q),others=beams.filter(v=>v!==b).map(position),supports=[...others.filter(v=>horizontal(v)!==horizontal(b)),...walls].map(rect).concat(columns.filter(c=>c.status!=='上层柱').map(columnRect)),connected=['a','z'].every(end=>q[end].every((v,i)=>near(v,b[end][i]))||supports.some(s=>Math.abs(q[end][0]-s.x)<=s.w/2+eps&&Math.abs(q[end][1]-s.y)<=s.d/2+eps));return connected&&(q.z[a]-q.a[a])*(b.rawZ[a]-b.rawA[a])>eps&&(!checkBoundary||rectAllowed(ts,r.x,r.y,r.w,r.d))&&!beamSpaceConflict(q,others,columns);}
+  // Resolve connected ends together before geometry checks. A boundary conflict
+  // retains the synchronized main geometry and its width for explicit review.
+  // Invalid/reversed or overlapping connections still reject the affected chain.
   let rejected=true;while(rejected){
    rejected=false;proposals.clear();
-   for(const b of mains){const a=axis(b),cross=1-a,value=targetCross.get(b);if(value===undefined)continue;const ends=['a','z'].map((end,i)=>{const q=[...b[end]],c=links.get(b)[i];q[cross]=value;if(c){const r=columnRect(c);q[a]=a?r.y:r.x;}else{const v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;}return q;});proposals.set(b,{...b,a:ends[0],z:ends[1]});}
-   for(const [b,q]of proposals){if(valid(b,q))continue;for(const member of groupOf.get(b))targetCross.delete(member);rejected=true;}
+   for(const b of mains){if(blocked.has(b))continue;const a=axis(b),cross=1-a,value=targetCross.get(b)??b.a[cross];const ends=['a','z'].map((end,i)=>{const q=[...b[end]],c=links.get(b)[i];q[cross]=value;if(c){const r=columnRect(c);q[a]=a?r.y:r.x;}else{const v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;}return q;});proposals.set(b,{...b,a:ends[0],z:ends[1]});}
+   for(const [b,q]of proposals){if(valid(b,q,false))continue;for(const member of groupOf.get(b)){targetCross.delete(member);blocked.add(member);}rejected=true;}
   }
   for(const [b,q]of proposals){b.a=q.a;b.z=q.z;}proposals.clear();targetCross.clear();
   // SB spacing stays fixed; endpoints follow only the accepted receiving beams.
@@ -504,7 +512,7 @@ const Engine=(()=>{
   // Keep already valid records first: an older, auto-width record must not
   // displace a correctly positioned replacement when its section grows.
   const duplicateCandidates163=[],manualCandidates=t.beams.filter(c=>c.on).map(c=>{
-   const a=resolve(p,c.a),z=resolve(p,c.z),linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns,walls):null,automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?mainBeamWidth(columns,c.kind==='CB'&&linked?linked.a:a,c.kind==='CB'&&linked?linked.z:z,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??(c.widthMode==='default'?df[c.kind==='SB'?'sb':'mb']:c.b):c.widthMode==='default'?df[c.kind==='TB'?'tb':'mb']:c.b)/1000;
+   const a=resolve(p,c.a),z=resolve(p,c.z),linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns,walls):null,automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?linkedMainWidth299(p,key,{...c,a,z,rawA:a,rawZ:z},columns,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??(c.widthMode==='default'?df[c.kind==='SB'?'sb':'mb']:c.b):c.widthMode==='default'?df[c.kind==='TB'?'tb':'mb']:c.b)/1000;
    const linkedRect=linked&&rect({...linked,b}),fixed=c.positionMode175==='fixed'&&c.fixedA175&&c.fixedZ175?{a:clone(c.fixedA175),z:clone(c.fixedZ175)}:null;
    const original=fixed||lineAllowed(ts,a,z,b,c.edgeInset===true),pos=linkedRect&&rectAllowed(ts,linkedRect.x,linkedRect.y,linkedRect.w,linkedRect.d)?linked:original||(automatic?lineAllowed(ts,a,z,b,true):null);
    return {c,a,z,b,pos,adjusted:!original&&!!pos};
@@ -527,7 +535,7 @@ const Engine=(()=>{
    // Missing widthMode is a legacy automatic snapshot; explicit widths stay fixed.
    const fixed=t.beamWidths83?.[sig(saved.rawA,saved.rawZ)],automatic=['MB','CB'].includes(saved.kind)&&saved.widthMode!=='manual'&&fixed==null;
    const followed=saved.positionMode175!=='fixed'&&['MB','CB','TB'].includes(saved.kind)?followMainColumns164(p,key,saved,columns,walls):null;
-   const width=automatic?mainBeamWidth(columns,followed?.a||saved.rawA,followed?.z||saved.rawZ,df.mb/1000):fixed!=null?fixed/1000:saved.widthMode!=='manual'?df[saved.kind==='SB'?'sb':saved.kind==='TB'?'tb':'mb']/1000:saved.b;
+   const width=automatic?linkedMainWidth299(p,key,saved,columns,df.mb/1000):fixed!=null?fixed/1000:saved.widthMode!=='manual'?df[saved.kind==='SB'?'sb':saved.kind==='TB'?'tb':'mb']/1000:saved.b;
    const candidate=followed&&{...followed,b:width},box=candidate&&rect(candidate),canFollow=box&&rectAllowed(ts,box.x,box.y,box.w,box.d)&&!beamSpaceConflict(candidate,beams,columns);
    const prior=rect({...saved,b:width}),pos=saved.positionMode175==='fixed'?{a:saved.a,z:saved.z}:canFollow?followed:automatic||!rectAllowed(ts,prior.x,prior.y,prior.w,prior.d)?lineAllowed(ts,saved.rawA,saved.rawZ,width,true):{a:saved.a,z:saved.z},beam={...clone(saved),...pos,b:width,widthMode:fixed!=null?'manual':automatic?'column':saved.widthMode??'default'};
    // Saved automatic candidates outside the current model are dormant records, not current members.
@@ -599,6 +607,11 @@ const Engine=(()=>{
   }
   for(const b of beams)if(b.kind==='SB'&&b.displayKind==='CB')b.d=sh;
   followBeamNetwork165(p,key,beams,columns,walls,ts);
+  // Report after both follow passes, so each affected member appears once.
+  // Do not disguise a retained manual-width conflict as a successful fit.
+  for(const b of beams.filter(b=>['MB','CB','TB'].includes(b.kind)&&b.positionMode175!=='fixed')){
+   const r=rect(b);if(!rectAllowed(ts,r.x,r.y,r.w,r.d))issue(b.displayId||b.id,'梁端已跟隨柱及相連梁同步；梁截面越出建築邊界或穿越 Opening（梁寬 '+Math.round(b.b*1000)+' mm'+(b.widthMode==='manual'?'，保留手動梁寬':'')+'），請核對梁寬、柱位或邊界；未取消整列移動');
+  }
   const slabVoids=(t.slabVoids||[]).flatMap(r=>ts.filter(t=>t.state===1).map(t=>({x0:Math.max(t.x0,r.x0),x1:Math.min(t.x1,r.x1),y0:Math.max(t.y0,r.y0),y1:Math.min(t.y1,r.y1)})).filter(r=>r.x1>r.x0&&r.y1>r.y0));
   const columnsOnly=layout?.columnsOnly===true&&!beams.length;
   const slabs=columnsOnly?[]:slabPanels(ts,beams,walls,slabVoids,columns);if(slabs===null)issue('SLAB','板块分隔过于复杂，未显示板块信息；请减少自由坐标分段');

@@ -27,6 +27,14 @@ const FloorColumns101=(()=>{
   }
   Engine.validate(trial);Engine.generate(trial);p.types[key]=trial.types[key];return true;
  }
+ // E2.313: grid-cell input writes ordinary no-column rectangles; free rectangles stay independent.
+ function noColumnGrid313(p,key,a,z,enabled){
+  const t=p.types[key],rows=t.noColumnZones??=[],tiles=Engine.tiles(p,t),hit=cell=>{
+   let lo=0,hi=1;for(const [axis,min,max] of [[0,cell.x0,cell.x1],[1,cell.y0,cell.y1]]){const d=z[axis]-a[axis];if(Math.abs(d)<1e-12){if(a[axis]<min||a[axis]>=max)return false;}else{let u=(min-a[axis])/d,v=(max-1e-9-a[axis])/d;if(u>v)[u,v]=[v,u];lo=Math.max(lo,u);hi=Math.min(hi,v);if(lo>hi)return false;}}return true;
+  },same=(r,c)=>['x0','x1','y0','y1'].every(k=>Math.abs(r[k]-c[k])<1e-8);
+  for(const cell of tiles.filter(hit)){const found=rows.findIndex(r=>r.gridCell313===true&&same(r,cell));if(enabled&&found<0)rows.push({x0:cell.x0,x1:cell.x1,y0:cell.y0,y1:cell.y1,gridCell313:true});else if(!enabled&&found>=0)rows.splice(found,1);}
+ }
+ function allNoColumnGrid313(p,key,enabled){const t=p.types[key];t.noColumnZones=(t.noColumnZones||[]).filter(r=>r.gridCell313!==true);if(enabled)for(const c of Engine.tiles(p,t))t.noColumnZones.push({x0:c.x0,x1:c.x1,y0:c.y0,y1:c.y1,gridCell313:true});}
  function models(){return {};}
  const isReference=(hit,f)=>hit?.kind==='COL'&&hit.f!=null&&hit.f!==f;
  function assertEditable(hit,f){if(isReference(hit,f))throw Error('非當層的柱只供參考，請切換至所屬樓層修改。');}
@@ -218,7 +226,7 @@ const FloorColumns101=(()=>{
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-copy]');if(!a||a.disabled)return;const box=a.closest('[data-column-floor]'),f=Number(box.dataset.columnFloor),step=Number(a.dataset.c101Copy),h=StudioHost.get();if(f!==h.floor||box.dataset.columnFraming!==h.key){h&&StudioHost.toast('請先選擇當層柱');return;}const hit={kind:'COL',id:box.dataset.columnId,f};let outcome;if(StudioHost.transact(()=>{const now=StudioHost.get();outcome=copyAdjacent(now.p,now.result,now.key,now.floor,hit,step);}))StudioHost.toast(outcome.message);});
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-delete]');if(!a)return;const b=a.closest('[data-column-floor]'),f=+b.dataset.columnFloor;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=b.dataset.columnFraming;mutate(p,key,f,q=>Engine.removeMember(q,key,{kind:'COL',id:b.dataset.columnId}));});});
  for(const name of ['editSize','removeMember','setTransferColumn']){const original=Engine[name];Engine[name]=function(p,key,hit,...args){if(name==='editSize'&&hit.kind==='COL'){const f=hit.f||Engine.floors(p).find(v=>v.type===key)?.n,k=key||Engine.floors(p)[f-1]?.type;if(!k||!f)throw Error('柱楼层不存在');const size=args[0],df={...p.defaults,...p.types[k].columnDefaults101},result=Engine.generate(p),c=Engine.floorModel(result,f,k).columns.find(c=>c.id===hit.id);return resizeMany(p,result,k,f,[{hit:{...hit,f},b:size.b??df.cb,d:size.d??df.cd,bMode201:size.preserveColumnB201?c?.bMode201??'manual':size.b==null?'default':'manual',dMode201:size.preserveColumnD201?c?.dMode201??'manual':size.d==null?'default':'manual'}]);}if(hit.kind==='COL'&&hit.f){const f=hit.f,k=key||Engine.floors(p)[f-1]?.type;if(!k)throw Error('柱楼层不存在');return mutate(p,k,f,q=>original(q,k,{...hit,f:undefined},...args));}return original(p,key,hit,...args);};}
- return {follows311,update311,transform308,positionMany257,resizeMany,recommendationPlan,applyRecommendations,record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
+ return {noColumnGrid313,allNoColumnGrid313,follows311,update311,transform308,positionMany257,resizeMany,recommendationPlan,applyRecommendations,record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
 })();
 
 // E2.292: copy physical wall geometry to the floor above without inheriting axis names.

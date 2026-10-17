@@ -281,8 +281,35 @@ const Engine=(()=>{
  }
  const overlap=(r,s)=>Math.abs(r.x-s.x)<(r.w+s.w)/2-eps&&Math.abs(r.y-s.y)<(r.d+s.d)/2-eps;
  const on=(q,m)=>{const r=rect(m);return Math.abs(q[0]-r.x)<=r.w/2+eps&&Math.abs(q[1]-r.y)<=r.d/2+eps;};
+ // Drawing uses actual column centres and the facing physical wall surface.
+ // Return a unique orthogonal joint only; callers retain OP/overlap validation.
+ function beamDrawPath301(model,a,z){
+  const points=[a,z],same=(p,q)=>p.every((v,i)=>near(v,q[i]));
+  const cols=points.map(q=>model.columns.filter(c=>c.status!=='上层柱'&&[ [columnRect(c).x,columnRect(c).y],[c.x,c.y] ].some(v=>same(q,v))));
+  if(cols.some(c=>c.length>1))return null;
+  const centres=points.map((q,i)=>cols[i].length?[columnRect(cols[i][0]).x,columnRect(cols[i][0]).y]:[...q]),choices=[];
+  for(const axis of [0,1]){
+   const cross=1-axis;
+   if(!near(a[cross],z[cross])&&!cols.some((cs,i)=>cs.length&&near((cross?cs[0].y:cs[0].x),points[1-i][cross])))continue;
+   const ends=centres.map(q=>[...q]);let ambiguous=false;
+   for(let i=0;i<2;i++){
+    if(cols[i].length)continue;
+    const q=points[i],other=centres[1-i],hits=[];
+    for(const w of model.walls){
+     if(!near(w.a[axis],w.z[axis])||!on(q,w))continue;
+     const r=rect(w),half=(axis?r.d:r.w)/2,centre=axis?r.y:r.x,lo=Math.min(w.a[cross],w.z[cross]),hi=Math.max(w.a[cross],w.z[cross]);
+     if(other[cross]<lo-eps||other[cross]>hi+eps||Math.abs(other[axis]-centre)<=half+eps)continue;
+     const end=[...other];end[axis]=centre+Math.sign(other[axis]-centre)*half;
+     if(!hits.some(v=>same(v,end)))hits.push(end);
+    }
+    if(hits.length>1){ambiguous=true;break;}if(hits.length===1)ends[i]=hits[0];
+   }
+   if(!ambiguous&&near(ends[0][cross],ends[1][cross])&&Math.abs(ends[0][axis]-ends[1][axis])>eps&&!choices.some(v=>same(v.a,ends[0])&&same(v.z,ends[1])))choices.push({a:ends[0],z:ends[1]});
+  }
+  return choices.length===1?choices[0]:null;
+ }
  const sig=(a,z)=>[a,z].map(v=>v.map(n=>n.toFixed(5)).join(',')).sort().join('|');
- function covered(list,a,z){const h=near(a[1],z[1]),idx=h?0:1,fix=h?1:0;let at=Math.min(a[idx],z[idx]),end=Math.max(a[idx],z[idx]);const intervals=list.filter(m=>near(m.rawA[fix],a[fix])&&near(m.rawZ[fix],a[fix])).map(m=>[Math.min(m.rawA[idx],m.rawZ[idx]),Math.max(m.rawA[idx],m.rawZ[idx])]).sort((a,b)=>a[0]-b[0]);for(const [lo,hi]of intervals){if(lo>at+eps)break;if(hi>at)at=hi;}return at>=end-eps;}
+ function covered(list,a,z){const h=near(a[1],z[1]);if(!h&&!near(a[0],z[0]))return false;const idx=h?0:1,fix=h?1:0;let at=Math.min(a[idx],z[idx]),end=Math.max(a[idx],z[idx]);const intervals=list.filter(m=>near(m.rawA[fix],a[fix])&&near(m.rawZ[fix],a[fix])).map(m=>[Math.min(m.rawA[idx],m.rawZ[idx]),Math.max(m.rawA[idx],m.rawZ[idx])]).sort((a,b)=>a[0]-b[0]);for(const [lo,hi]of intervals){if(lo>at+eps)break;if(hi>at)at=hi;}return at>=end-eps;}
  const columnRect=c=>({x:c.cx??c.x,y:c.cy??c.y,w:c.b,d:c.d});
  // Vertical column loads act at the physical section centre, independently of its grid reference.
  const columnLoadPoint=c=>{const r=columnRect(c);return [r.x,r.y];};
@@ -993,6 +1020,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {columnReferenceAxes289,insertAxis291,removeColumns289,editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
+ return {columnReferenceAxes289,beamDrawPath301,insertAxis291,removeColumns289,editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

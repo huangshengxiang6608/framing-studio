@@ -4,7 +4,17 @@ const LoadData=(()=>{
  const clone=x=>JSON.parse(JSON.stringify(x)),label=f=>f+'/F',key=(f,t)=>f+'|'+t;
  function init(p){p.explorer??={};const e=p.explorer;for(const k of ['settings','floors','members','selected','reportA','reportB','areas'])e[k]??={};e.schema=2;return e;}
  function floor(p,f){const old=p.explorer?.floors?.[f];return old?{usage:'',...old,basis:old.basis||'legacy-additional'}:{usage:'',dl:null,sdl:0,ll:null,direction:'短跨',basis:'total'};}
- function areas(p,f){return p.explorer?.areas?.[f]||[];}
+ const scopes306=new WeakMap();
+ function rawAreas306(p,f){return p.explorer?.areas?.[f]||[];}
+ // Only remove concrete wall occupancy inside valid floor area. Keep real
+ // outside-building/Opening errors and preserve the original saved selection.
+ function wallAreas306(p,f,model){
+  const R=LoadRegions83,floor=R.difference(R.union((model.ts||[]).filter(t=>t.state===1).map(({x0,x1,y0,y1})=>({x0,x1,y0,y1}))),model.slabVoids||[]),walls=model.walls.map(w=>{const r=Engine.rect(w);return {x0:r.x-r.w/2,x1:r.x+r.w/2,y0:r.y-r.d/2,y1:r.y+r.d/2};}),cuts=R.union(walls.flatMap(w=>floor.map(r=>R.intersect(w,r)).filter(Boolean)));
+  return rawAreas306(p,f).map(a=>{if(!a.rects?.length)return a;const rects=R.difference(a.rects,cuts),removed=a.rects.reduce((n,r)=>n+R.area(r),0)-rects.reduce((n,r)=>n+R.area(r),0);return removed>1e-7?{...a,rects,wallClip306:{originalRects:a.wallClip306?.originalRects||clone(a.rects),removedArea:(a.wallClip306?.removedArea||0)+removed}}:a;});
+ }
+ function areas(p,f){const scope=scopes306.get(p);if(!scope)return rawAreas306(p,f);if(!scope.areas.has(f))scope.areas.set(f,wallAreas306(p,f,Engine.floorModel(scope.result,f)));return scope.areas.get(f);}
+ function snapshot306(p,result,areas=new Map()){const previous=scopes306.get(p);scopes306.set(p,{result,areas});return ()=>{if(previous)scopes306.set(p,previous);else scopes306.delete(p);};}
+
  function live(v){return v.ll!==null&&v.ll!==undefined&&v.ll!==''?v.ll:U.find(u=>u.name===v.usage)?.ll??null;}
  function clean(v){for(const k of ['dl','sdl','ll'])if(v[k]!==null&&v[k]!==undefined&&(!Number.isFinite(v[k])||v[k]<0))throw Error(k+' 须为非负数或留空');return {usage:String(v.usage||''),dl:v.dl??null,sdl:v.sdl??null,ll:v.ll??null,direction:v.direction||'短跨',basis:'total'};}
  function setFloor(p,f,v,confirm=true){const basis=confirm?'total':floor(p,f).basis;init(p).floors[f]={...clean(v),basis};if(basis!=='total')return;const e=p.explorer;for(const [k,o]of Object.entries(e.members))if(k.startsWith(f+'|SLAB|'))for(const field of ['dl','sdl','ll'])if(o[field]!==undefined){(o.legacyLoading??={})[field]=o[field];delete o[field];}}
@@ -16,7 +26,7 @@ const LoadData=(()=>{
  function reconcile(p,result,tokenFn){let repaired=0;const rects=t=>{try{if(!t.startsWith('SLAB|'))return null;const r=JSON.parse(t.slice(5));return Array.isArray(r)&&r.length&&r.every(x=>Array.isArray(x)&&x.length===4&&x.every(Number.isFinite)&&x[1]>x[0]&&x[3]>x[2])?r:null;}catch{return null;}};
   const unionArea=rs=>{const xs=[...new Set(rs.flatMap(r=>[r[0],r[1]]))].sort((a,b)=>a-b);let area=0;for(let i=1;i<xs.length;i++){const mid=(xs[i]+xs[i-1])/2,ys=rs.filter(r=>r[0]<mid&&r[1]>mid).map(r=>[r[2],r[3]]).sort((a,b)=>a[0]-b[0]);let end=-Infinity,len=0;for(const [a,b]of ys){len+=Math.max(0,b-Math.max(a,end));end=Math.max(end,b);}area+=(xs[i]-xs[i-1])*len;}return area;};
   const intersect=(a,b)=>{const r=[Math.max(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.min(a[3],b[3])];return r[1]>r[0]&&r[3]>r[2]?[r]:[];};
-  for(const f of result.floors){const aa=areas(p,f.n),current=Engine.floorModel(result,f).slabs.map(s=>({token:tokenFn('SLAB',s),rs:s.rects.map(r=>[r.x0,r.x1,r.y0,r.y1])})),valid=new Set(current.map(s=>s.token));
+  for(const f of result.floors){const adjusted=wallAreas306(p,f.n,Engine.floorModel(result,f.n));if(adjusted.some((a,i)=>a!==rawAreas306(p,f.n)[i])){p.explorer.areas[f.n]=adjusted;repaired++;}const aa=areas(p,f.n),current=Engine.floorModel(result,f).slabs.map(s=>({token:tokenFn('SLAB',s),rs:s.rects.map(r=>[r.x0,r.x1,r.y0,r.y1])})),valid=new Set(current.map(s=>s.token));
    const proposals=aa.map(a=>{if(a.rects)return a.panels||[];if(a.panels.every(t=>valid.has(t)))return a.panels;const parsed=a.panels.map(rects);if(parsed.some(x=>!x))return a.panels;const region=parsed.flat(),total=unionArea(region),eps=Math.max(1e-8,total*1e-9),picked=[];let covered=0;
     for(const s of current){const overlap=unionArea(region.flatMap(a=>s.rs.flatMap(b=>intersect(a,b)))),size=unionArea(s.rs);if(overlap<=eps)continue;if(Math.abs(overlap-size)>eps)return a.panels;picked.push(s.token);covered+=size;}
     return Math.abs(covered-total)<=eps&&picked.length?picked:a.panels;
@@ -27,12 +37,12 @@ const LoadData=(()=>{
   }return repaired;
  }
 
- function validate(p,f,tokens,model=null){const set=new Set(tokens),seen=new Set(),errors=[],aa=areas(p,f);for(let i=0;i<aa.length;i++)for(let j=i+1;j<aa.length;j++)if(LoadRegions83.region(aa[i]).some(a=>LoadRegions83.region(aa[j]).some(b=>LoadRegions83.intersect(a,b))))errors.push('荷载区域重叠，请重新框选');for(const a of areas(p,f)){if(a.rects){const footprint=model?LoadRegions83.surface(model):LoadRegions83.region({panels:tokens}),clipped=LoadRegions83.union(a.rects.flatMap(r=>footprint.map(q=>LoadRegions83.intersect(r,q)).filter(Boolean)));if(Math.abs(clipped.reduce((n,r)=>n+LoadRegions83.area(r),0)-a.rects.reduce((n,r)=>n+LoadRegions83.area(r),0))>1e-6)errors.push(a.name+' 的范围已改变，请重新框选');}for(const t of a.panels){if(!set.has(t))errors.push(a.name+' 的板块已改变，请重新点选区域');if(seen.has(t))errors.push('板块荷载区域重复');seen.add(t);}}return [...new Set(errors)];}
+ function validate(p,f,tokens,model=null){const set=new Set(tokens),seen=new Set(),errors=[],aa=areas(p,f);for(let i=0;i<aa.length;i++)for(let j=i+1;j<aa.length;j++)if(LoadRegions83.region(aa[i]).some(a=>LoadRegions83.region(aa[j]).some(b=>LoadRegions83.intersect(a,b))))errors.push('荷载区域重叠，请重新框选');for(const a of areas(p,f)){if(a.rects){if(!a.rects.length)errors.push(a.name+' 沒有有效荷載範圍，請重新框選');const footprint=model?LoadRegions83.surface(model):LoadRegions83.region({panels:tokens}),clipped=LoadRegions83.union(a.rects.flatMap(r=>footprint.map(q=>LoadRegions83.intersect(r,q)).filter(Boolean)));if(Math.abs(clipped.reduce((n,r)=>n+LoadRegions83.area(r),0)-a.rects.reduce((n,r)=>n+LoadRegions83.area(r),0))>1e-6)errors.push(a.name+' 的范围已改变，请重新框选');}for(const t of a.panels){if(!set.has(t))errors.push(a.name+' 的板块已改变，请重新点选区域');if(seen.has(t))errors.push('板块荷载区域重复');seen.add(t);}}return [...new Set(errors)];}
  function copy(p,result,from,lo,hi,tokenFn){if(!Number.isInteger(lo)||!Number.isInteger(hi)||lo<1||hi>p.total||lo>hi)throw Error('楼层范围无效');const source=floor(p,from);const aa=areas(p,from);for(let f=lo;f<=hi;f++){const model=Engine.floorModel(result,f),tokens=new Set(model.slabs.map(c=>tokenFn('SLAB',c)));if(aa.some(a=>a.panels.some(t=>!tokens.has(t))))throw Error(f+'/F 板块不同，不能直接复制区域；请单独设置');}for(let f=lo;f<=hi;f++){setFloor(p,f,source);init(p).areas[f]=clone(aa);}}
  function parseRange(text,total){const s=String(text).trim().toUpperCase().replace(/\s/g,'').replace(/／/g,'/').replace(/[–—~～至]/g,'-');const m=s.match(/^(\d+)(?:\/F)?(?:-(\d+)(?:\/F)?)?$/);if(!m)throw Error('楼层范围请填 1-10/F 或 3/F');const lo=Number(m[1]),hi=Number(m[2]||m[1]);if(!Number.isSafeInteger(lo)||!Number.isSafeInteger(hi)||lo<1||hi<lo||hi>total)throw Error('楼层范围须在 1-'+total+'/F 内，且起始层不大于结束层');return {lo,hi};}
  function applyRange(p,text,v){const range=parseRange(text,p.total),value=clean(v);if(value.sdl===null||live(value)===null)throw Error('请填写 SDL 和 LL；LL 可由 Usage 自动带出');for(let f=range.lo;f<=range.hi;f++)setFloor(p,f,{...floor(p,f),usage:value.usage,dl:value.dl,sdl:value.sdl,ll:value.ll});return range;}
 
- return {reconcile,parseRange,applyRange,init,floor,areas,live,clean,setFloor,addArea,toggle,effective,validate,copy,label,key,colours};
+ return {snapshot306,wallAreas306,reconcile,parseRange,applyRange,init,floor,areas,live,clean,setFloor,addArea,toggle,effective,validate,copy,label,key,colours};
 })();
 if(typeof module!=='undefined')module.exports=LoadData;
 

@@ -1,0 +1,11 @@
+// UI-only gate: every shipped calculation/report/native input remains the published main version.
+const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'../..'),base='f9ac54addd0fc8cd89ab919c18f725ecff37a8c4',git=process.env.GIT_EXE||'C:/Users/fuwei/.workbuddy-ai/binaries/PortableGit/versions/1.3.0/cmd/git.exe';
+const show=p=>cp.execFileSync(git,['show',base+':'+p],{cwd:root,maxBuffer:40e6});
+const html=fs.readFileSync(path.join(root,'FramingStudio/assets/index.html')),css=fs.readFileSync(path.join(root,'FramingStudio/source/ui-polish173.css'));
+const oldCss=show('FramingStudio/source/ui-polish173.css'),strip=b=>b.toString('utf8').replace(/^[\r\n]+|[\r\n]+$/g,''),text=html.toString('utf8'),style=strip(css);
+assert.equal(text.split(style).length,2,'exact one synced CSS block');assert.equal(text.replace(style,strip(oldCss)),show('FramingStudio/assets/index.html').toString('utf8'),'all HTML/scripts/report/print content outside the shell CSS unchanged');
+const names=fs.readdirSync(path.join(root,'FramingStudio/source')).filter(n=>n.endsWith('.js'));for(const name of names)assert(fs.readFileSync(path.join(root,'FramingStudio/source',name)).equals(show('FramingStudio/source/'+name)),name+' unchanged');
+const native=cp.execFileSync(git,['ls-tree','-r','--name-only',base,'--','FramingStudio/Excel'],{cwd:root,encoding:'utf8'}).trim().split('\n');for(const name of [...native,'FramingStudio/FramingStudio.exe','FramingStudio/source/FramingStudio.cs','FramingStudio/source/ExcelBridge.cs','FramingStudio/source/app.manifest','FramingStudio/version.json'])assert(fs.readFileSync(path.join(root,name)).equals(show(name)),name+' unchanged');
+let scripts=0;for(const m of text.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){if(/\bsrc=|type=["'](?:application\/json|importmap)/i.test(m[1])||/id=["']seed/.test(m[1]))continue;new vm.Script(m[2]);scripts++;}
+console.log(JSON.stringify({baseline:base,existingJavaScriptModulesPreserved:names.length,inlineScriptsParsed:scripts,nativeExcelFilesPreserved:native.length,hostAndVersionUnchanged:true,allOtherHTMLAndPrintPreserved:true},null,2));

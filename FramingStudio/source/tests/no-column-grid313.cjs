@@ -1,0 +1,21 @@
+const {context}=require('./audit-performance247.cjs');
+const c=context();
+console.log(c.run(`(()=>{
+ const check=(v,m)=>{if(!v)throw Error(m)},p=Engine.clone(loading115Tests().projects.slab),key='F1',t=p.types[key];
+ p.axes={x:[{id:'1',gap:0},{id:'2',gap:5},{id:'3',gap:5},{id:'4',gap:5}],y:[{id:'A',gap:0},{id:'B',gap:5},{id:'C',gap:5}]};
+ Object.assign(t,{mode:'auto',columns:[],beams:[],walls:[],building:{'0,0':true,'0,1':true,'1,0':true,'1,1':true,'2,0':true,'2,1':true},noColumnZones:[{x0:1,y0:1,x1:4,y1:4}]});
+ const free=JSON.stringify(t.noColumnZones[0]),inputs=JSON.stringify([t.building,t.opening,t.columns,t.beams,t.walls]);
+ FloorColumns101.noColumnGrid313(p,key,[2,2],[2,2],true);check(t.noColumnZones.length===2,'single click adds one cell');check(JSON.stringify(t.noColumnZones[1])===JSON.stringify({x0:0,x1:5,y0:0,y1:5,gridCell313:true}),'actual axis cell bounds');
+ FloorColumns101.noColumnGrid313(p,key,[2,2],[2,2],true);check(t.noColumnZones.length===2,'repeated paint is idempotent');
+ FloorColumns101.noColumnGrid313(p,key,[2,2],[13,2],true);check(t.noColumnZones.length===4,'fast horizontal drag fills intervening cells');
+ FloorColumns101.noColumnGrid313(p,key,[13,2],[13,8],true);check(t.noColumnZones.length===5,'vertical drag adds only crossed cell');
+ FloorColumns101.noColumnGrid313(p,key,[2,2],[13,2],false);check(t.noColumnZones.length===2&&JSON.stringify(t.noColumnZones[0])===free,'grid erase preserves overlapping free rectangle');
+ FloorColumns101.allNoColumnGrid313(p,key,true);check(t.noColumnZones.length===7,'all cells plus existing free zone');FloorColumns101.allNoColumnGrid313(p,key,true);check(t.noColumnZones.length===7,'all selection is idempotent');
+ const q=JSON.parse(JSON.stringify(p));check(q.types[key].noColumnZones.length===7,'save/reopen retains both methods');for(const zone of q.types[key].noColumnZones)delete zone.gridCell313;
+ check(JSON.stringify(Engine.generate(p))===JSON.stringify(Engine.generate(q)),'grid rectangles use exactly the original exclusion rules');
+ FloorColumns101.allNoColumnGrid313(p,key,false);check(t.noColumnZones.length===1&&JSON.stringify(t.noColumnZones[0])===free,'clear grid keeps free rectangles');
+ FloorColumns101.noColumnGrid313(p,key,[-3,-3],[-1,-1],true);check(t.noColumnZones.length===1,'outside grid does nothing');
+ FloorColumns101.noColumnGrid313(p,key,[1,1],[9,9],true);check(t.noColumnZones.length===3,'diagonal through corner does not paint off-path cells');
+ check(JSON.stringify([t.building,t.opening,t.columns,t.beams,t.walls])===inputs,'other model inputs unchanged');Engine.validate(p);
+ return 'PASS: click, continuous drag, erase, all/clear, deduplication, free-zone preservation, save/reopen and original exclusion-rule parity';
+})()`));

@@ -36,6 +36,7 @@ const GeometryIssuesLocal=(()=>{
  function syncBoundary(p,before){
   if(!before)return [];
   Engine.bindWallChanges302(p,before);
+  for(const key of Object.keys(p.types))if(before.types[key]&&JSON.stringify(p.types[key].noColumnZones)!==JSON.stringify(before.types[key].noColumnZones))Engine.bindMainColumns164(p,key,Engine.model(before,key));
   const changes=[];for(const key of Object.keys(p.types)){if(!before.types[key])continue;
    const shape=q=>JSON.stringify([q.types[key].building,Engine.axisData(q,key)]);
    if(shape(p)===shape(before))continue;const ids=cleanup(p,key);if(ids.length)changes.push({key,ids});

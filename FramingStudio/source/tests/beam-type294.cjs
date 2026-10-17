@@ -24,7 +24,9 @@ if(require.main===module){
   ok(b.kind==='MB'&&status.supportStatus==='connected','Physical edge beam keeps MB with two supports');
   const end=reverse?'a':'z',opts=Loading.supportOptions(m,b,end),target=opts.find(v=>v.member.id==='TOP_CB');
   ok(target?.contact.section,'Top end uses physical perpendicular section');
-  near(target.contact.x,reverse?0:9.25,'Contact projected to receiver reference span');
+  // The CB now retains x=10; the 300 mm edge MB centre is at 9.85.
+  // A physical section contact therefore lies 150 mm inside the retained tip.
+  near(target.contact.x,reverse?.15:9.1,'Contact projected to receiver reference span');
   ok(Loading.supportSummary(p,r,1,b).every(s=>s.text.includes('CB')),'Both support summaries show actual receivers');
   for(const f of [1,2])LoadData.setFloor(p,f,{usage:'Dormitory',dl:10,sdl:0,ll:2});
   const beamOnly=Engine.clone(r);for(const q of [...Object.values(beamOnly.models),...Object.values(beamOnly.floorModels||{})])q.slabs=[];

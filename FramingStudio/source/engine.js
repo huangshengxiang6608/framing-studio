@@ -131,6 +131,16 @@ const Engine=(()=>{
   const proposals=new Map(),targetCross=new Map(),blocked=new Set();
   for(const group of groups){const a=axis(group[0]),cross=1-a,centres=unique(group.flatMap(b=>links.get(b).filter(Boolean).map(c=>{const r=columnRect(c);return cross?r.y:r.x;})));if(centres.length!==1)continue;for(const b of group)targetCross.set(b,centres[0]);}
   const position=b=>proposals.get(b)||b;
+  // A receiving cantilever owns its free-end station. An attached MB must
+  // connect to the CB, not pull the CB tip onto its inset centre line.
+  // Use the existing root resolver so manual roots and conflicts agree with Check.
+  const freeEnds303=new Map();
+  if(typeof Loading!=='undefined'){
+   const fs=floors(p),f=fs.find(v=>v.type===key)?.n;
+   if(f){const r={floors:fs,models:{[key]:{key,ts,beams,columns,walls}}};
+    for(const b of mains.filter(b=>b.kind==='CB')){const root=Loading.cbRoot(p,r,f,b).fixedEnd;if(root)freeEnds303.set(b,root==='a'?'z':'a');}
+   }
+  }
   // Walls retain their existing face connection; snapping to a wall centre can
   // extend an otherwise valid beam into the adjacent opening.
   function receiver(point,b){const a=axis(b),cross=1-a,hits=beams.filter(v=>v!==b&&horizontal(v)!==horizontal(b)&&near(v.rawA[a],point[a])&&point[cross]>=Math.min(v.rawA[cross],v.rawZ[cross])-eps&&point[cross]<=Math.max(v.rawA[cross],v.rawZ[cross])+eps),values=unique(hits.map(v=>targetCross.get(v)??position(v).a[a]));if(values.length)return values.length===1?values[0]:null;return wallEnd302(b,point===b.rawA?'a':'z',walls);}
@@ -140,7 +150,7 @@ const Engine=(()=>{
   // Invalid/reversed or overlapping connections still reject the affected chain.
   let rejected=true;while(rejected){
    rejected=false;proposals.clear();
-   for(const b of mains){if(blocked.has(b))continue;const a=axis(b),cross=1-a,value=targetCross.get(b)??b.a[cross];const ends=['a','z'].map((end,i)=>{const q=[...b[end]],c=links.get(b)[i];q[cross]=value;if(c){const r=columnRect(c);q[a]=a?r.y:r.x;}else{const v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;}return q;});proposals.set(b,{...b,a:ends[0],z:ends[1]});}
+   for(const b of mains){if(blocked.has(b))continue;const a=axis(b),cross=1-a,value=targetCross.get(b)??b.a[cross];const ends=['a','z'].map((end,i)=>{const q=[...b[end]],c=links.get(b)[i];q[cross]=value;if(freeEnds303.get(b)===end){q[a]=(i?b.rawZ:b.rawA)[a];}else if(c){const r=columnRect(c);q[a]=a?r.y:r.x;}else{const v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;}return q;});proposals.set(b,{...b,a:ends[0],z:ends[1]});}
    for(const [b,q]of proposals){if(valid(b,q,false))continue;for(const member of groupOf.get(b)){targetCross.delete(member);blocked.add(member);}rejected=true;}
   }
   for(const [b,q]of proposals){b.a=q.a;b.z=q.z;}proposals.clear();targetCross.clear();

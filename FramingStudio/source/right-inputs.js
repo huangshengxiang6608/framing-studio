@@ -10,7 +10,7 @@ const RightInputPreview=(()=>{
    side.querySelectorAll('.notice').forEach(n=>{if(n.textContent.startsWith('墙明细就在图旁边。'))n.remove()});
   }
   if(tab==='columns'){
-   const children=[...side.children],intro=children.filter(e=>e.tagName==='H2'||e.classList.contains('muted')),settings=children.find(e=>e.querySelector('#colmode'));
+   const children=[...side.children],intro=children.filter(e=>e.tagName==='H2'||e.classList.contains('muted')),settings=children.find(e=>e.querySelector('#column-follow311'));
    fold(side,'常用参数',[settings],'column-defaults',true);const legend=document.createElement('p');legend.className='preview-colour-pair';legend.innerHTML='<span>蓝色：Column above／上层柱</span><span style="color:#593696">紫色：Column below／下层柱</span>';side.append(legend);
    side.querySelectorAll(':scope > .table-wrap').forEach(e=>e.remove());
 

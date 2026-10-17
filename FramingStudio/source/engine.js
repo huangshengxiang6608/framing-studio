@@ -57,7 +57,7 @@ const Engine=(()=>{
   return null;
  }
  function columnSpacingIssues258(t,columns){
-  if(t.mode!=='auto'||!t.columnSpacing258)return;
+  if(t.mode!=='auto'||t.columnFrozen311||!t.columnSpacing258)return;
   const physical=columns.filter(c=>c.status!=='上层柱'&&!suppressedColumn289(t,c));
   for(let i=0;i<physical.length;i++)for(let j=i+1;j<physical.length;j++){
    const a=physical[i],b=physical[j],conflict=columnSpacingConflict288(t,a,b);if(!conflict)continue;
@@ -66,7 +66,7 @@ const Engine=(()=>{
   }
  }
  function filterColumnSpacing288(t,columns){
-  if(t.mode!=='auto'||!t.columnSpacing258)return;
+  if(t.mode!=='auto'||t.columnFrozen311||!t.columnSpacing258)return;
   // Preserve manual additions, explicit positions and transfer-column choices.
   const fixed=c=>c.anchorX===undefined||c.autoAdded||c.alignmentReference||columnPositionRecord(t,c)||(t.transferColumns||[]).some(q=>q.ax===c.anchorX&&q.ay===c.anchorY);
   columnSpacingIssues258(t,columns.filter(fixed));
@@ -252,6 +252,7 @@ const Engine=(()=>{
    if(t.columnSpacing258!==undefined){if(!t.columnSpacing258||typeof t.columnSpacing258!=='object'||Array.isArray(t.columnSpacing258))fail('柱距限制格式無效');for(const d of ['x','y'])columnReferenceAxes289(p,d,key);}
    if(t.minColumnSpacing!==undefined)num(t.minColumnSpacing,0,500,'旧柱距限制无效');
    if(t.alignmentMinSpacing!==undefined)num(t.alignmentMinSpacing,0,500,'对齐柱距限制无效');
+   if(t.columnFrozen311!==undefined){const rows=t.columnFrozen311?.columns;if(!Array.isArray(rows)||rows.length>2000)fail('固定柱位記錄無效');const ids=new Set();for(const c of rows){if(typeof c.id!=='string'||ids.has(c.id)||typeof c.anchorX!=='string'||typeof c.anchorY!=='string')fail('固定柱位識別無效');ids.add(c.id);for(const k of ['x','y'])num(c[k],-5000,10000,'固定柱位座標無效');for(const k of ['b','d'])num(c[k],.001,20,'固定柱尺寸無效');if(!Array.isArray(c.reference311)||c.reference311.length!==2)fail('固定柱定位無效');for(const v of c.reference311)num(v,-5000,10000,'固定柱定位無效');}}
    if(!['manual','auto'].includes(t.mode))fail('柱模式无效');
    for(const layer of ['building','opening']){if(!t[layer]||typeof t[layer]!=='object'||Object.keys(t[layer]).length>400)fail('区域数据无效');for(const [k,v] of Object.entries(t[layer]))if(!/^\d+,\d+$/.test(k)||typeof v!=='boolean')fail('区域格数据无效');}
    for(const list of ['columns','walls','beams']){if(!Array.isArray(t[list])||t[list].length>2000)fail('构件数过多');const ids=new Set();for(const c of t[list]){if(typeof c.id!=='string'||!c.id||c.id.length>50||ids.has(c.id))fail(key+' 构件编号重复或无效');ids.add(c.id);num(c.b,1,20000,'构件宽度无效');if(typeof c.on!=='boolean')fail('启用状态无效');if(list==='columns'){for(const field of ['bMode201','dMode201'])if(c[field]!==undefined&&!['default','manual'].includes(c[field]))fail('柱尺寸模式無效');if(c.transferColumn!==undefined&&typeof c.transferColumn!=='boolean')fail('Transfer column 标记无效');point(c,key);num(c.d,1,20000,'柱 D 无效');if(!['上下贯通','下层柱','上层柱'].includes(c.status))fail('柱状态无效');}else{point(c.a,key);point(c.z,key);if(list==='walls'&&c.axisPosition!==undefined){const a=resolve(p,c.a,key),z=resolve(p,c.z,key);if(!(near(a[1],z[1])?['auto','up','center','down']:['auto','left','center','right']).includes(c.axisPosition))fail('墙轴线位置与方向不符');}if(list==='beams'){if(c.widthMode!==undefined&&!['column','manual','default'].includes(c.widthMode))fail('梁宽模式无效');for(const [field,modes] of [['positionMode175',['fixed','follow']]])if(c[field]!==undefined&&!modes.includes(c[field]))fail('梁跟隨設定無效');for(const field of ['fixedA175','fixedZ175'])if(c[field]!==undefined&&(!Array.isArray(c[field])||c[field].length!==2||!c[field].every(Number.isFinite)))fail('固定梁位置無效');if(!['MB','SB','TB','CB'].includes(c.kind))fail('梁种类无效');if(c.d!==null)num(c.d,1,20000,'梁深无效');if(c.depthOverride184!=null)num(c.depthOverride184,1,20000,'指定梁深無效');}}}}
@@ -703,7 +704,8 @@ const Engine=(()=>{
   if(referenceModel){columns.push(...clone(referenceModel.columns));}else{
   let input=t.columns.filter(c=>c.on).map(c=>({...c,x:resolve(p,c)[0],y:resolve(p,c)[1],b:(c.bMode201==='default'?df.cb:c.b)/1000,d:(c.dMode201==='default'?df.cd:c.d)/1000}));
   {const xx=axes(p,'x'),yy=axes(p,'y');for(const c of input){c.cx=c.x+(near(c.x,xx[0].v)?c.b/2:near(c.x,xx.at(-1).v)?-c.b/2:0);c.cy=c.y+(near(c.y,yy[0].v)?c.d/2:near(c.y,yy.at(-1).v)?-c.d/2:0);}}
-  if(t.mode==='auto'){const added=input.filter(c=>c.autoAdded);input=[];const cx=columnAxes(p,'x',key),cy=columnAxes(p,'y',key);for(const [ix,x]of cx.entries())for(const [iy,y]of cy.entries()){if(noColumn(t,x.v,y.v))continue;if(added.some(c=>near(c.x,x.v)&&near(c.y,y.v)))continue;const custom=t.columnSizes?.find(q=>q.ax===x.id&&q.ay===y.id),b=(!custom||custom.bMode201==='default'?df.cb:custom.b)/1000,d=(!custom||custom.dMode201==='default'?df.cd:custom.d)/1000;let found=false;for(const dx of [0,b/2,-b/2]){for(const dy of [0,d/2,-d/2]){let id='AC'+(input.length+1);while(added.some(c=>c.id===id))id+='A';const c={id,anchorX:x.id,anchorY:y.id,x:x.v+dx,y:y.v+dy,b,d,bMode201:custom?custom.bMode201??'manual':'default',dMode201:custom?custom.dMode201??'manual':'default',status:'上下贯通',on:true};const r={...c,w:b};if(!rectAllowed(ts,c.x,c.y,b,d,true)||wr.some(w=>overlap(r,w))||input.some(o=>overlap(r,{...o,w:o.b})))continue;input.push(c);found=true;break;}if(found)break;}}input.push(...added);}
+  if(t.mode==='auto'&&t.columnFrozen311){const added=input.filter(c=>c.autoAdded);input=clone(t.columnFrozen311.columns);for(const c of input){const custom=t.columnSizes?.find(q=>q.ax===c.anchorX&&q.ay===c.anchorY);c.b=(!custom||custom.bMode201==='default'?df.cb:custom.b)/1000;c.d=(!custom||custom.dMode201==='default'?df.cd:custom.d)/1000;c.bMode201=custom?custom.bMode201??'manual':'default';c.dMode201=custom?custom.dMode201??'manual':'default';}input.push(...added);}
+  else if(t.mode==='auto'){const added=input.filter(c=>c.autoAdded);input=[];const cx=columnAxes(p,'x',key),cy=columnAxes(p,'y',key);for(const [ix,x]of cx.entries())for(const [iy,y]of cy.entries()){if(noColumn(t,x.v,y.v))continue;if(added.some(c=>near(c.x,x.v)&&near(c.y,y.v)))continue;const custom=t.columnSizes?.find(q=>q.ax===x.id&&q.ay===y.id),b=(!custom||custom.bMode201==='default'?df.cb:custom.b)/1000,d=(!custom||custom.dMode201==='default'?df.cd:custom.d)/1000;let found=false;for(const dx of [0,b/2,-b/2]){for(const dy of [0,d/2,-d/2]){let id='AC'+(input.length+1);while(added.some(c=>c.id===id))id+='A';const c={id,anchorX:x.id,anchorY:y.id,x:x.v+dx,y:y.v+dy,b,d,bMode201:custom?custom.bMode201??'manual':'default',dMode201:custom?custom.dMode201??'manual':'default',status:'上下贯通',on:true};const r={...c,w:b};if(!rectAllowed(ts,c.x,c.y,b,d,true)||wr.some(w=>overlap(r,w))||input.some(o=>overlap(r,{...o,w:o.b})))continue;input.push(c);found=true;break;}if(found)break;}}input.push(...added);}
   for(const c of input){const placement=(t.columnPlacements||[]).find(v=>v.key===(c.anchorX!==undefined?'axis:'+c.anchorX+'|'+c.anchorY:'id:'+c.id));if(placement){c.alignmentReference=[c.x,c.y];c.x=c.cx=placement.resize174?placement.resize174.x+placement.resize174.dx*c.b/2:placement.x;c.y=c.cy=placement.resize174?placement.resize174.y+placement.resize174.dy*c.d/2:placement.y;c.alignmentNote='已应用柱对齐 · 可撤销';}}
   // Apply only explicit manual section positions after the unchanged auto-column search.
   for(const c of input){const record=columnPositionRecord(t,c);if(record&&!t.columnPlacements?.some(v=>v.key===columnPositionKey(c))){const ref=columnReference(p,key,c),offset=columnDirections[record.position];c.cx=ref[0]+offset[0]*c.b/2;c.cy=ref[1]+offset[1]*c.d/2;c.axisPosition=record.position;}}
@@ -904,6 +906,7 @@ const Engine=(()=>{
  }
  // Align physical sections on shared vertical column lines; input references stay unchanged.
  function columnReference(p,key,c){
+  if(p.types[key].columnFrozen311&&c.reference311)return c.reference311;
   if(p.types[key].mode==='auto'&&c.anchorX!==undefined)return [columnAxes(p,'x',key).find(a=>a.id===c.anchorX).v,columnAxes(p,'y',key).find(a=>a.id===c.anchorY).v];
   return c.alignmentReference||[c.x,c.y];
  }

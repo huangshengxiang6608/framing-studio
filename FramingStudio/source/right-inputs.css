@@ -17,3 +17,22 @@
 #side .preview-colour-pair span:first-child{color:#2474a3}
 #side .preview-colour-pair span:last-child{color:#c27322}
 header .preview-label{background:#fff1bf;color:#244558;border-radius:5px;padding:4px 8px;font-size:12px}
+
+/* E2.312: a full-width column toggle, separate from the dimension inputs. */
+#side .column-settings312{display:grid;gap:14px;min-width:0}
+#side .column-follow312{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0;padding:12px 14px;border:1px solid #d8e7ec;border-radius:9px;background:#f3f8fa;cursor:pointer;min-width:0}
+#side .column-follow-copy312{display:grid;gap:4px;min-width:0;line-height:1.45}
+#side .column-follow-copy312 strong{font-size:14px;font-weight:600;color:#244558}
+#side .column-follow-copy312 small{font-size:12px;color:#607b8b}
+#side .column-switch312{position:relative;display:block;flex:0 0 42px;width:42px;height:24px}
+#side .column-switch312 input#column-follow311{position:absolute;inset:0;z-index:1;width:100%;height:100%;min-width:0;min-height:0;margin:0;padding:0;opacity:0;cursor:pointer}
+#side .column-switch-track312{display:block;box-sizing:border-box;width:42px;height:24px;border:1px solid #9aadb7;border-radius:14px;background:#b8c7cf;transition:background .15s,border-color .15s}
+#side .column-switch-track312:before{content:"";display:block;width:18px;height:18px;margin:2px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #163d4c33;transition:transform .15s}
+#side #column-follow311:checked+.column-switch-track312{background:#176f80;border-color:#176f80}
+#side #column-follow311:checked+.column-switch-track312:before{transform:translateX(18px)}
+#side #column-follow311:focus-visible+.column-switch-track312{outline:3px solid #70b8c8;outline-offset:3px}
+#side .column-follow312:hover{border-color:#83b6c2}
+#side .column-dimensions312{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#side .column-dimensions312 .field{min-width:0;margin:0;gap:6px}
+#side .column-dimensions312 input{box-sizing:border-box;width:100%;min-width:0}
+@media(prefers-reduced-motion:reduce){#side .column-switch-track312,#side .column-switch-track312:before{transition:none}}

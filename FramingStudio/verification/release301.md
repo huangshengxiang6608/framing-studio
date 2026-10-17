@@ -1,16 +1,25 @@
 # E2.301 — Wall/beam drawing junctions
 
-Automatic main-beam generation could skip a wall-to-offset-column span because the wall-coverage check treated a diagonal legacy reference as vertical. Reject non-orthogonal coverage candidates. Existing deleted-member suppression remains effective during ordinary regeneration; explicit Auto MB rebuild restores the default span.
+Automatic main-beam generation could skip a wall-to-offset-column span because the wall-coverage check treated a diagonal legacy reference as vertical. Reject non-orthogonal coverage candidates. Ordinary regeneration retains deleted-member suppression; explicit Auto MB rebuild restores default spans.
 
-Manual beam snapping now resolves actual column centres and the wall face toward the beam before the existing orthogonality, Opening, footprint and overlap checks run. The same physical wall contact is recognized by the existing Loading support check; no gap tolerance or support rule is widened. Both click directions work for centred and offset walls.
+Manual beam snapping resolves actual column centres and the wall face toward the beam before the existing orthogonality, Opening, footprint and overlap checks. The resulting contact is recognized by the existing support check. No gap tolerance or support rule is widened.
 
-Built on official main f9ac54addd0fc8cd89ab919c18f725ecff37a8c4, including the merged axis-insertion and wall-copy changes. No loading/RC equations, reinforcement rules, native Excel/VBA, templates, or Section A/B report rendering were edited. Geometry changes can naturally change subsequent calculated values.
+Built on official main f9ac54addd0fc8cd89ab919c18f725ecff37a8c4, including axis insertion and wall copying. Loading/RC equations, reinforcement rules, native Excel/VBA, templates and Section A/B report rendering are unchanged. Geometry changes can naturally change subsequent calculated values.
 
-Validation:
-- `wall-beam-junction301.cjs`: synthetic and current private 2019 model, wall centre/left/right, six junction targets per position, automatic missing MB restored, ordinary update respects deletion, physical wall support agrees.
-- `wall-beam-snap301.cjs`: executes the actual app snapping functions in Node VM, both click directions for all three positions; generated manual beam remains connected after JSON save/reopen. Passed with synthetic and current private model.
-- True OP crossings, genuine beam overlaps, wall gaps, out-of-length and ambiguous wall contacts remain guarded; transposed horizontal-wall cases passed.
-- Existing `beam-type294`, `drawing-support197`, `beam-network165`, `secondary-bay-follow300`, `axis-insert291`, and `wall-copy292` regression tests passed.
-- Windows desktop build and ZIP integrity/contents checked. All pre-existing files outside the explicitly changed UI/geometry/version/build files are byte-identical to the baseline, including all Excel assets and calculation/report modules.
+## Validation
 
-Limitations: browser automation timed out after refreshing the preview, so interactive pointer/screenshot verification was not completed. Two legacy browser suites (`beam-footprint`, `main-beam-centres`) also could not start because their Playwright dependency is unavailable. The tests above exercise the actual snapping and generation code offline; they are not claimed as live UI tests. Native Excel/A/B generation was not rerun for this geometry-only change. The private model is not included in the repository or release.
+- Automated junction and app-snapping tests passed with synthetic fixtures and a local model: centred/left/right walls, both click orders, automatic MB restoration, deletion preservation, physical support agreement and save/reopen persistence.
+- Existing beam type, drawing support, beam network, secondary bay following, axis insertion and wall copying regression tests passed.
+- Windows build and ZIP integrity verified. All 567 pre-existing files outside the explicitly changed UI/geometry/version/build files match the baseline byte for byte, including Excel and calculation/report assets.
+
+## Live browser verification completed 2026-10-17
+
+- Tested the existing preview using the current locally supplied model, after saving a backup and confirming no pending invalid text inputs.
+- Centred wall: manually draw from wall to column, inspect both supports, then delete and restore through Auto MB and Apply Layout. Passed.
+- Left-offset wall: manually draw in the reverse direction from column to wall, inspect both supports, then delete and restore through Auto MB. Passed.
+- Right-offset wall: manually draw from wall to column, inspect both supports, save and reopen the model, recheck the endpoints/supports, then delete and restore through Auto MB. Passed.
+- Actual attempted drawing across an Opening was rejected. Actual attempted drawing overlapping an existing beam was rejected with the overlap message. Neither invalid attempt added a beam.
+- Restored the pre-test saved model and exported it again. The entire parsed JSON is exactly equal, preserving geometry, loads, reinforcement, selections and settings.
+- The existing right-side preview remains on E2.301 at the original address. Screenshots, model files, coordinates and member details are retained locally and are not uploaded.
+
+No application-code or binary changes were needed for this follow-up. The initial draft's pending live UI verification is now complete. Native Excel/A/B generation was not rerun for this geometry-only change; the byte-preservation check remains valid. Two legacy Playwright runner suites were unavailable; direct browser operation and the named offline regression suites above provide the recorded coverage.

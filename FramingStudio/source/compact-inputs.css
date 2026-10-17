@@ -8,3 +8,10 @@ input[readonly],input[disabled],select[disabled],textarea[readonly],output{backg
 .floor-group-compact th:first-child,.floor-group-compact td:first-child{width:34px}
 .floor-group-compact input,.floor-group-compact select{width:100%!important;min-width:0!important;padding:6px 3px!important;font-size:13px;box-sizing:border-box}
 .floor-group-compact button{padding:5px 8px;min-width:0}.floor-group-compact small{font-size:11px}
+
+/* E2.309: type floor/clear/E&M heights directly; retain numeric validation. */
+@media screen{
+ .layout[data-tab="floors"] #side :is(input[data-action="group"][data-f="h"],input[data-action="group"][data-f="headroom"],input[data-action="group"][data-f="em"],input[data-lh-field="height"],input[data-lh-field="headroom"],input[data-lh-field="em"]){-moz-appearance:textfield;appearance:textfield}
+ .layout[data-tab="floors"] #side :is(input[data-action="group"][data-f="h"],input[data-action="group"][data-f="headroom"],input[data-action="group"][data-f="em"],input[data-lh-field="height"],input[data-lh-field="headroom"],input[data-lh-field="em"])::-webkit-inner-spin-button,
+ .layout[data-tab="floors"] #side :is(input[data-action="group"][data-f="h"],input[data-action="group"][data-f="headroom"],input[data-action="group"][data-f="em"],input[data-lh-field="height"],input[data-lh-field="headroom"],input[data-lh-field="em"])::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+}

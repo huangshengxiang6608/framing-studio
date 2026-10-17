@@ -155,6 +155,41 @@ const FloorColumns101=(()=>{
   }
   p.types[key]=trial.types[key];if(trial.explorer)p.explorer=trial.explorer;return {columns:plan.length};
  }
+ // E2.308: translate/copy actual column centres within one shared Framing.
+ // Work on a clone so any invalid destination leaves the entire batch unchanged.
+ function transform308(p,result,key,f,hits,dx,dy,copy=false){
+  if(![dx,dy].every(Number.isFinite)||Math.abs(dx)>10000||Math.abs(dy)>10000||Math.hypot(dx,dy)<1e-8)throw Error('請輸入有效且非零的 ΔX／ΔY（m）');
+  if(!hits?.length)throw Error('請先選取當層柱');
+  const model=Engine.floorModel(result,f,key),seen=new Set(),plan=[];
+  for(const hit of hits){assertEditable(hit,f);const c=model.columns.find(c=>c.id===hit.id&&c.status!=='上层柱');if(hit.kind!=='COL'||!c)throw Error('只能操作當層柱，請重新選取');const pk=Engine.columnPositionKey(c);if(seen.has(pk))continue;seen.add(pk);const r=Engine.columnRect(c);plan.push({c,pk,r:{...r,x:r.x+dx,y:r.y+dy}});}
+  const others=copy?model.columns:model.columns.filter(c=>!seen.has(Engine.columnPositionKey(c))),targets=plan.map(x=>x.r);
+  for(let i=0;i<plan.length;i++){const {c,r}=plan[i];let reason='';if(!Engine.rectAllowed(model.ts,r.x,r.y,r.w,r.d,true))reason='柱截面超出建築範圍';else if(Engine.noColumn(p.types[key],r.x,r.y))reason='進入禁柱區';else if(model.walls.some(w=>Engine.overlap(r,Engine.rect(w))))reason='與牆重疊';else if(others.some(o=>Engine.overlap(r,Engine.columnRect(o)))||targets.some((o,j)=>j!==i&&Engine.overlap(r,o)))reason='與其他柱重疊';if(reason)throw Error(c.id+'：'+reason+'；整批未'+(copy?'複製':'移動'));}
+  const trial=Engine.clone(p),before=Engine.model(p,key),ids=[];
+  mutate(trial,key,f,q=>{const t=q.types[key];Engine.freezeAutoBeams(q,key,before);const used=new Set([...t.columns,...before.columns].map(c=>c.id));
+   for(const x of plan){let pk=x.pk;if(copy){let n=1,id;do{id='C'+n++;}while(used.has(id));used.add(id);pk='id:'+id;
+     t.columns.push({id,x:x.r.x,y:x.r.y,b:x.c.b*1000,d:x.c.d*1000,bMode201:x.c.bMode201??'manual',dMode201:x.c.dMode201??'manual',status:x.c.status,on:true,transferColumn:!!x.c.transferManual,...(t.mode==='auto'?{autoAdded:true}:{})});
+    }t.columnPlacements=(t.columnPlacements||[]).filter(v=>v.key!==pk);t.columnPlacements.push({key:pk,x:x.r.x,y:x.r.y,explicit174:true});ids.push(pk);
+   }
+   const next=Engine.model(q,key),present=new Map(next.columns.map(c=>[Engine.columnPositionKey(c),c]));
+   for(const c of before.columns)if(!present.has(Engine.columnPositionKey(c)))throw Error(c.id+'：操作後柱無法生成；整批未修改');
+   plan.forEach((x,i)=>{const c=present.get(ids[i]);if(!c||['x','y','w','d'].some(k=>Math.abs(Engine.columnRect(c)[k]-x.r[k])>1e-6))throw Error(x.c.id+'：未能保留目標中心或尺寸；整批未修改');});
+   if(!copy){
+    // A fixed/orthogonal beam must never be silently detached by a column move.
+    for(const b of before.beams.filter(b=>['MB','CB','TB'].includes(b.kind))){const nb=next.beams.find(v=>v.id===b.id&&(v.baseKind||v.kind)===(b.baseKind||b.kind));
+     for(const end of ['a','z']){const owner=plan.filter(x=>Math.abs(b[end][0]-Engine.columnRect(x.c).x)<1e-6&&Math.abs(b[end][1]-Engine.columnRect(x.c).y)<1e-6);if(owner.length!==1)continue;
+      if(!nb||Math.abs(nb[end][0]-owner[0].r.x)>1e-6||Math.abs(nb[end][1]-owner[0].r.y)>1e-6)throw Error((b.displayId||b.id)+' 無法跟隨柱中心；請一併選取同列接柱或先調整固定梁，整批未移動');
+     }
+    }
+   }
+  });
+  if(!copy&&trial.explorer){const next=Engine.generate(trial),moves=[];
+   for(const floor of result.floors.filter(v=>v.type===key)){const old=Engine.floorModel(result,floor.n,key),now=new Map(Engine.floorModel(next,floor.n,key).columns.map(c=>[Engine.columnPositionKey(c),c]));for(const c of old.columns){const to=now.get(Engine.columnPositionKey(c));if(!to)continue;const a=floor.n+'|'+Loading.token('COL',c),b=floor.n+'|'+Loading.token('COL',to);if(a!==b)moves.push([a,b]);}}
+   for(const name of ['members','selected','reportA','reportB']){const map=trial.explorer[name];if(!map)continue;const source=Engine.clone(map);for(const [a]of moves)delete map[a];for(const [a,b]of moves){if(!Object.hasOwn(source,a))continue;if(Object.hasOwn(map,b)&&JSON.stringify(map[b])!==JSON.stringify(source[a]))throw Error('目標柱已有獨立 Loading／Check 輸入；整批未移動');map[b]=source[a];}}
+   if(trial.foundation?.column){const mapped=moves.find(([a])=>a===trial.foundation.column);if(mapped)trial.foundation.column=mapped[1];}
+  }
+  p.types[key]=trial.types[key];if(trial.explorer)p.explorer=trial.explorer;if(trial.foundation)p.foundation=trial.foundation;
+  return {columns:plan.length,keys:ids};
+ }
  function snap(c){const r=Engine.columnRect(c);return [[r.x,r.y]];}
  function viewport(p){const xs=Object.keys(p.types).flatMap(k=>Engine.axes(p,'x',k).map(a=>a.v)),ys=Object.keys(p.types).flatMap(k=>Engine.axes(p,'y',k).map(a=>a.v));return {x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)};}
  document.addEventListener('change',e=>{const a=e.target,k=a.dataset.c101;if(!k)return;const box=a.closest('[data-column-floor]'),f=+box.dataset.columnFloor,id=box.dataset.columnId;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=box.dataset.columnFraming,c=Engine.floorModel(result,f,key).columns.find(c=>c.id===id);if(!c)throw Error('柱已不存在');const v=k==='position'?a.value:+a.value;if(k==='position')mutate(p,key,f,q=>Engine.setColumnPosition(q,key,Engine.columnPositionKey(c),v));else if(['b','d'].includes(k)){const reset=a.value.trim()==='',df={...p.defaults,...p.types[key].columnDefaults101},value=reset?df[k==='b'?'cb':'cd']:v;resizeMany(p,result,key,f,[{hit:{kind:'COL',id,f},b:k==='b'?value:c.b*1000,d:k==='d'?value:c.d*1000,bMode201:k==='b'?(reset?'default':'manual'):c.bMode201??'manual',dMode201:k==='d'?(reset?'default':'manual'):c.dMode201??'manual'}]);}else{if(a.value.trim()===''||!Number.isFinite(v))throw Error('請填寫有效的柱中心座標');mutate(p,key,f,q=>{const r=Engine.columnRect(c),t=q.types[key],pk=Engine.columnPositionKey(c);t.columnPlacements=(t.columnPlacements||[]).filter(x=>x.key!==pk);t.columnPlacements.push({key:pk,x:k==='x'?v:r.x,y:k==='y'?v:r.y,explicit174:true});});}});});
@@ -162,7 +197,7 @@ const FloorColumns101=(()=>{
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-copy]');if(!a||a.disabled)return;const box=a.closest('[data-column-floor]'),f=Number(box.dataset.columnFloor),step=Number(a.dataset.c101Copy),h=StudioHost.get();if(f!==h.floor||box.dataset.columnFraming!==h.key){h&&StudioHost.toast('請先選擇當層柱');return;}const hit={kind:'COL',id:box.dataset.columnId,f};let outcome;if(StudioHost.transact(()=>{const now=StudioHost.get();outcome=copyAdjacent(now.p,now.result,now.key,now.floor,hit,step);}))StudioHost.toast(outcome.message);});
  document.addEventListener('click',e=>{const a=e.target.closest('[data-c101-delete]');if(!a)return;const b=a.closest('[data-column-floor]'),f=+b.dataset.columnFloor;StudioHost.transact(()=>{assertEditable({kind:'COL',f},StudioHost.get().floor);const {p,result}=StudioHost.get(),key=b.dataset.columnFraming;mutate(p,key,f,q=>Engine.removeMember(q,key,{kind:'COL',id:b.dataset.columnId}));});});
  for(const name of ['editSize','removeMember','setTransferColumn']){const original=Engine[name];Engine[name]=function(p,key,hit,...args){if(name==='editSize'&&hit.kind==='COL'){const f=hit.f||Engine.floors(p).find(v=>v.type===key)?.n,k=key||Engine.floors(p)[f-1]?.type;if(!k||!f)throw Error('柱楼层不存在');const size=args[0],df={...p.defaults,...p.types[k].columnDefaults101},result=Engine.generate(p),c=Engine.floorModel(result,f,k).columns.find(c=>c.id===hit.id);return resizeMany(p,result,k,f,[{hit:{...hit,f},b:size.b??df.cb,d:size.d??df.cd,bMode201:size.preserveColumnB201?c?.bMode201??'manual':size.b==null?'default':'manual',dMode201:size.preserveColumnD201?c?.dMode201??'manual':size.d==null?'default':'manual'}]);}if(hit.kind==='COL'&&hit.f){const f=hit.f,k=key||Engine.floors(p)[f-1]?.type;if(!k)throw Error('柱楼层不存在');return mutate(p,k,f,q=>original(q,k,{...hit,f:undefined},...args));}return original(p,key,hit,...args);};}
- return {positionMany257,resizeMany,recommendationPlan,applyRecommendations,record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
+ return {transform308,positionMany257,resizeMany,recommendationPlan,applyRecommendations,record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
 })();
 
 // E2.292: copy physical wall geometry to the floor above without inheriting axis names.

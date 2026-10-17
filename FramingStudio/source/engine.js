@@ -193,7 +193,7 @@ const Engine=(()=>{
   m={walls:[],columns:[],...m};
   const t=p.types[key],prior=t.autoBeamSnapshot?.secondary||[],deleted=prior.filter(b=>b.kind==='SB'&&(b.deleted304||!b.retained304&&t.suppressed.includes(sig(b.rawA,b.rawZ)))).map(b=>({...clone(b),secondaryLinks304:b.secondaryLinks304||secondaryLinks304(b,m.beams,m.walls),deleted304:true,retained304:false}));
   const snapshot={main:[],primary:[],secondary:[]},boundaries300=bayEdges171([...m.walls,...m.beams.filter(v=>v.kind!=='SB'&&v.supportStatus==='connected')],m.columns);
-  for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,...(source.autoCantilever173?source.cantileverOrigin173:{}),kind:source.baseKind||source.kind};if(source.autoCantilever173)delete b.fixedEnd101;if(b.kind==='SB'&&m.panels){const bay=beamBay171(b,m.panels);if(bay){b.bay171=bay;const signature=bayBoundary300(bay,boundaries300);if(signature)b.bayBoundary300=signature;else delete b.bayBoundary300;}}if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':b.kind==='SB'?'secondary':'primary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164','bay171','bayBoundary300','positionMode175','fixedA175','fixedZ175','loadKind194','depthOverride184','extendToBoundary173','manualKind294','wallSupports302','secondaryLinks304'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
+  for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,...(source.autoCantilever173?source.cantileverOrigin173:{}),kind:source.baseKind||source.kind};if(source.autoCantilever173)delete b.fixedEnd101;if(b.kind==='SB'&&m.panels){const bay=beamBay171(b,m.panels);if(bay){b.bay171=bay;const signature=bayBoundary300(bay,boundaries300);if(signature)b.bayBoundary300=signature;else delete b.bayBoundary300;}}if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':b.kind==='SB'?'secondary':'primary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164','bay171','bayBoundary300','positionMode175','fixedA175','fixedZ175','loadKind194','depthOverride184','extendToBoundary173','manualKind294','wallSupports302','secondaryLinks304','irregularBay305'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
   for(const b of snapshot.secondary){b.secondaryLinks304=b.secondaryLinks304||secondaryLinks304(b,m.beams,m.walls);b.retained304=true;}
   const active=new Set(snapshot.secondary.map(secondaryKey304));snapshot.secondary.push(...deleted.filter(b=>!active.has(secondaryKey304(b))).map(b=>({...b,id:'deleted304:'+sig(b.rawA,b.rawZ)})));
   for(const row of t.beams.filter(b=>b.kind==='SB')){const live=m.beams.find(b=>b.kind==='SB'&&b.source==='manual'&&b.id===row.id);if(live)row.secondaryLinks304=live.secondaryLinks304||secondaryLinks304(live,m.beams,m.walls);}
@@ -436,10 +436,53 @@ const Engine=(()=>{
   const axis=near(b.a[1],b.z[1])?0:1,ends=['a','z'].map(end=>{
    const point=[...b[end]],hits=columns.filter(c=>c.status!=='上层柱').map(columnRect).filter(r=>Math.abs(point[0]-r.x)<=r.w/2+eps&&Math.abs(point[1]-r.y)<=r.d/2+eps);
    const joins=unique(edges.filter(v=>v!==b&&v.kind!=='WALL'&&near(v.a[axis],v.z[axis])).map(rect).filter(r=>Math.abs(point[0]-r.x)<=r.w/2+eps&&Math.abs(point[1]-r.y)<=r.d/2+eps).map(r=>axis?r.y:r.x));
-   if(joins.length===1)point[axis]=joins[0];else if(!joins.length&&hits.length===1)point[axis]=axis?hits[0].y:hits[0].x;
+   // A physical wall-face contact closes on that wall's reference station.
+   // Prefer that verified contact over an overlapping primary's centreline.
+   const wallJoins=unique(edges.filter(v=>v.kind==='WALL'&&near(v.a[axis],v.z[axis])).filter(v=>{const r=rect(v);return Math.abs(point[0]-r.x)<=r.w/2+eps&&Math.abs(point[1]-r.y)<=r.d/2+eps;}).map(v=>v.rawA[axis]));
+   if(wallJoins.length===1)point[axis]=wallJoins[0];else if(!wallJoins.length&&joins.length===1)point[axis]=joins[0];else if(!wallJoins.length&&!joins.length&&hits.length===1)point[axis]=axis?hits[0].y:hits[0].x;
    return point;
   });return {...b,rawA:ends[0],rawZ:ends[1]};
  });}
+ // Find closed non-rectangular faces using ONLY actual primary/wall segments.
+ // Grid cells describe their area; their internal edges are not supports.
+ function irregularBays305(edges,ts,rectangles){
+  const xs=unique([...edges.flatMap(e=>[e.rawA[0],e.rawZ[0]]),...ts.flatMap(t=>[t.x0,t.x1])]),ys=unique([...edges.flatMap(e=>[e.rawA[1],e.rawZ[1]]),...ts.flatMap(t=>[t.y0,t.y1])]);
+  const nx=xs.length-1,ny=ys.length-1;if(nx<1||ny<1||nx*ny>250000)return [];
+  const cells=new Int32Array(nx*ny).fill(-1),vertical=new Uint8Array((nx+1)*ny),horizontal=new Uint8Array(nx*(ny+1));
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++)if(rectAllowed(ts,(xs[i]+xs[i+1])/2,(ys[j]+ys[j+1])/2,xs[i+1]-xs[i],ys[j+1]-ys[j]))cells[j*nx+i]=-2;
+  for(let j=0;j<ny;j++)for(let i=0;i<=nx;i++)vertical[j*(nx+1)+i]=covered(edges,[xs[i],ys[j]],[xs[i],ys[j+1]])?1:0;
+  for(let j=0;j<=ny;j++)for(let i=0;i<nx;i++)horizontal[j*nx+i]=covered(edges,[xs[i],ys[j]],[xs[i+1],ys[j]])?1:0;
+  const out=[];let label=0;
+  for(let seed=0;seed<cells.length;seed++)if(cells[seed]===-2){
+   const queue=[seed],rects=[],boundary=[];cells[seed]=label++;let closed=true,x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity,area=0;
+   for(let at=0;at<queue.length;at++){
+    const n=queue[at],i=n%nx,j=Math.floor(n/nx),r={x0:xs[i],x1:xs[i+1],y0:ys[j],y1:ys[j+1]};rects.push(r);area+=(r.x1-r.x0)*(r.y1-r.y0);x0=Math.min(x0,r.x0);x1=Math.max(x1,r.x1);y0=Math.min(y0,r.y0);y1=Math.max(y1,r.y1);
+    const visit=(to,blocked,a,z)=>{if(blocked){boundary.push([a,z]);return;}if(to<0||cells[to]===-1){closed=false;return;}if(cells[to]===-2){cells[to]=cells[seed];queue.push(to);}};
+    visit(i? n-1:-1,vertical[j*(nx+1)+i],[r.x0,r.y0],[r.x0,r.y1]);
+    visit(i<nx-1?n+1:-1,vertical[j*(nx+1)+i+1],[r.x1,r.y0],[r.x1,r.y1]);
+    visit(j?n-nx:-1,horizontal[j*nx+i],[r.x0,r.y0],[r.x1,r.y0]);
+    visit(j<ny-1?n+nx:-1,horizontal[(j+1)*nx+i],[r.x0,r.y1],[r.x1,r.y1]);
+   }
+   if(!closed||Math.abs(area-(x1-x0)*(y1-y0))<eps||rects.some(r=>rectangles.some(b=>intersectArea(r,panelRect(b))>eps)))continue;
+   const members=edges.filter(e=>boundary.some(([a,z])=>{const axis=near(a[1],z[1])?0:1,cross=1-axis;return near(e.rawA[cross],a[cross])&&near(e.rawZ[cross],a[cross])&&Math.min(Math.max(e.rawA[axis],e.rawZ[axis]),z[axis])-Math.max(Math.min(e.rawA[axis],e.rawZ[axis]),a[axis])>eps;}));
+   out.push({rects,x0,x1,y0,y1,area,key:JSON.stringify([...new Set(members.map(b=>b.kind+'|'+b.id))].sort())});
+  }return out;
+ }
+ function irregularSpans305(region,edges,direction,gap){
+  const axis=direction==='自动'?(region.x1-region.x0<=region.y1-region.y0?0:1):direction==='X'?0:1,cross=1-axis,lo=axis?region.x0:region.y0,hi=axis?region.x1:region.y1,n=Math.ceil((hi-lo)/gap),out=[];
+  if(n>500)throw Error('次梁间距过小');
+  const stations=unique(region.rects.flatMap(r=>axis?[r.y0,r.y1]:[r.x0,r.x1]));
+  const contains=(v,c)=>region.rects.some(r=>v>r[axis?'y0':'x0']-eps&&v<r[axis?'y1':'x1']+eps&&c>r[axis?'x0':'y0']+eps/4&&c<r[axis?'x1':'y1']-eps/4);
+  for(let q=1;q<n;q++){
+   const c=lo+(hi-lo)*q/n,delta=Math.min(1e-5,gap/100),runs=[];
+   for(let i=1;i<stations.length;i++){const a=stations[i-1],z=stations[i],mid=(a+z)/2;if(!contains(mid,c-delta)||!contains(mid,c+delta))continue;const last=runs.at(-1);if(last&&near(last[1],a))last[1]=z;else runs.push([a,z]);}
+   for(const [lo,hi]of runs){
+    const receivers=edges.filter(e=>near(e.rawA[axis],e.rawZ[axis])&&c>=Math.min(e.rawA[cross],e.rawZ[cross])-eps&&c<=Math.max(e.rawA[cross],e.rawZ[cross])+eps),cuts=unique([lo,hi,...receivers.map(e=>e.rawA[axis]).filter(v=>v>lo+eps&&v<hi-eps)]);
+    for(let i=1;i<cuts.length;i++){const a=cuts[i-1],z=cuts[i],A=axis?[c,a]:[a,c],Z=axis?[c,z]:[z,c];if([a,z].every(v=>receivers.some(e=>near(v,e.rawA[axis]))))out.push({a:A,z:Z});}
+   }
+  }return out;
+ }
+
  // Identify a bay by its ordered boundary members, not changing coordinates.
  // Full coverage and a unique match are required; split/merged bays stay guarded.
  function bayBoundary300(bay,edges){
@@ -720,7 +763,7 @@ const Engine=(()=>{
    let changed=true;while(changed){changed=false;for(const b of primary){if(supported.has(b))continue;const root=b.fixedEnd101,cb=b.kind==='CB',ok=cb?root==='a'?held(b.rawA):root==='z'?held(b.rawZ):support(b.rawA)!==support(b.rawZ):held(b.rawA)&&held(b.rawZ);if(ok){supported.add(b);changed=true;}}}
   }
   splitSecondarySpans200(p,key,beams,[...walls,...supported],issue);
-  const edges=[...walls,...supported],currentBays171=beamBays171(bayEdges171(edges,columns),ts,key),savedSB171=(t.autoBeamSnapshot?.secondary||[]).filter(b=>b.kind==='SB'&&!b.deleted304),oldBays171=savedSB171.some(b=>!b.bay171)?beamBays171(edges,ts,key):[],changedBays171=new Set();
+  const edges=[...walls,...supported],boundaryEdges305=bayEdges171(edges,columns),currentBays171=beamBays171(boundaryEdges305,ts,key),irregularRegions305=irregularBays305(boundaryEdges305,ts,currentBays171),savedSB171=(t.autoBeamSnapshot?.secondary||[]).filter(b=>b.kind==='SB'&&!b.deleted304),oldBays171=savedSB171.some(b=>!b.bay171)?beamBays171(edges,ts,key):[],changedBays171=new Set();
   // Missing legacy bay tags can be recovered only when the entire saved SB layout
   // exactly matches the current bay's independent spacing and support boundaries.
   // Explicit historical tags and layouts that no longer fit retain the change guard.
@@ -756,9 +799,23 @@ const Engine=(()=>{
    const direction=rule?.direction??layout?.secondaryDirection??df.direction,gap=rule?.gap??layout?.gap??df.gap,h=direction==='自动'?b-a<=d-c:direction==='X',n=Math.ceil((h?d-c:b-a)/(gap/1000));if(n>500)throw Error('次梁间距过小');
    for(let q=1;q<n;q++){const pos=h?c+(d-c)*q/n:a+(b-a)*q/n;add(h?[a,pos]:[pos,c],h?[b,pos]:[pos,d],'SB');}
   }
+  // Rectangular decomposition is only for finding interior intervals, never support.
+  for(const region of irregularRegions305){
+   if(!autoSecondary)continue;
+   const selected=(t.secondaryAreas||[]).filter(a=>a.rects.some(r=>region.rects.some(q=>intersectArea(r,q)>eps)));
+   if(layout?.scope==='selected'&&!selected.length)continue;
+   const rules=selected.filter(a=>Math.abs(region.area-region.rects.reduce((sum,r)=>sum+a.rects.reduce((n,q)=>n+intersectArea(r,q),0),0))<eps);
+   if(selected.length&&(rules.length!==1||selected.length!==1)){issue('SB','凹形梁格與次梁分區不一致，請核對整個梁格的方向及間距');continue;}
+   const rule=rules[0],direction=rule?.direction??layout?.secondaryDirection??df.direction,gap=(rule?.gap??layout?.gap??df.gap)/1000;
+   // A frozen layout (including deletions) owns its existing spacing.
+   if((t.autoBeamSnapshot?.secondary||[]).some(b=>b.irregularBay305===region.key))continue;
+   for(const span of irregularSpans305(region,boundaryEdges305,direction,gap)){
+    add(span.a,span.z,'SB');const b=beams.find(b=>b.kind==='SB'&&b.source==='auto'&&sig(b.rawA,b.rawZ)===sig(span.a,span.z));if(b)b.irregularBay305=region.key;
+   }
+  }
   for(const area of t.secondaryAreas||[])if(autoSecondary&&area.cbSupported106){const r=area.rects[0],horizontal=area.direction==='X',cb=[...supported].filter(b=>b.kind==='CB'),sides=horizontal?[[[r.x0,r.y0],[r.x0,r.y1]],[[r.x1,r.y0],[r.x1,r.y1]]]:[[[r.x0,r.y0],[r.x1,r.y0]],[[r.x0,r.y1],[r.x1,r.y1]]];if(!sides.every(([a,z])=>covered(cb,a,z))){issue(area.name,'次梁分区的 CB 支承已失效，请核对根部或重画');continue;}if(!panels.some(p=>intersectArea(panelRect(p),r)>eps))panels.push([r.x0,r.x1,r.y0,r.y1]);const first=horizontal?r.y0:r.x0,last=horizontal?r.y1:r.x1,n=Math.ceil((last-first)/((area.gap??layout?.gap??df.gap)/1000));if(n>500)throw Error('次梁间距过小');for(let q=1;q<n;q++){const v=first+(last-first)*q/n;add(horizontal?[r.x0,v]:[v,r.y0],horizontal?[r.x1,v]:[v,r.y1],'SB');}}
   for(const area of t.secondaryAreas||[])if(autoSecondary&&area.cantilever101){const r=area.rects[0],horizontal=area.direction==='X',root=area.root101,first=horizontal?r.y0:r.x0,last=horizontal?r.y1:r.x1,n=Math.ceil((last-first)/((area.gap??layout?.gap??df.gap)/1000));if(n>500)throw Error('次梁间距过小');const rootA=root==='left'?[r.x0,r.y0]:root==='right'?[r.x1,r.y0]:root==='top'?[r.x0,r.y0]:[r.x0,r.y1],rootZ=root==='left'?[r.x0,r.y1]:root==='right'?[r.x1,r.y1]:root==='top'?[r.x1,r.y0]:[r.x1,r.y1];if(!covered(edges,rootA,rootZ)){issue(area.name,'悬挑分区固定边支承已失效，请重画');continue;}for(let q=0;q<=n;q++){const v=first+(last-first)*q/n,a=horizontal?[r.x0,v]:[v,r.y0],z=horizontal?[r.x1,v]:[v,r.y1];add(a,z,'CB');const b=beams.find(b=>sig(b.rawA,b.rawZ)===sig(a,z));if(b&&b.source==='auto'){b.fixedEnd101=['left','top'].includes(root)?'a':'z';b.secondaryCantilever101=area.id;}}}
-  for(const area of t.secondaryAreas||[])if(!area.cantilever101&&!area.cbSupported106&&!panels.some(p=>area.rects.some(r=>intersectArea(panelRect(p),r)>eps)))issue(area.name,'次梁区域已无对应的完整梁格，请删除或重画');
+  for(const area of t.secondaryAreas||[])if(!area.cantilever101&&!area.cbSupported106&&!panels.some(p=>area.rects.some(r=>intersectArea(panelRect(p),r)>eps))&&!irregularRegions305.some(p=>p.rects.some(q=>area.rects.some(r=>intersectArea(q,r)>eps))))issue(area.name,'次梁区域已无对应的完整梁格，请删除或重画');
   // Actual member kinds and display labels now agree after directed classification.
   for(const b of beams){
    const ok=b.kind==='SB'?held(b.rawA)&&held(b.rawZ):supported.has(b);
@@ -781,9 +838,9 @@ const Engine=(()=>{
   const columnsOnly=layout?.columnsOnly===true&&!beams.length;
   const slabs=columnsOnly?[]:slabPanels(ts,beams,walls,slabVoids,columns);if(slabs===null)issue('SLAB','板块分隔过于复杂，未显示板块信息；请减少自由坐标分段');
   for(const s of slabs||[]){const zone=(t.secondaryAreas||[]).find(a=>a.cantilever101&&a.rects.some(r=>s.x0>=r.x0-eps&&s.x1<=r.x1+eps&&s.y0>=r.y0-eps&&s.y1<=r.y1+eps));if(zone)s.direction101=zone.direction==='X'?'Y':'X';}for(const s of slabs||[]){s.thickness=t.slabSizes?.find(o=>o.signature===slabSignature(s))?.value??t.slabSizes?.find(o=>s.legacySignatures120.includes(o.signature))?.value??df.slab;if(t.slabDirections116&&typeof Loading!=='undefined')s.direction116=slabGeometry.record(t.slabDirections116,s);if(layout)s.shortSpan116=true;}
-  const uncovered=(slabs||[]).flatMap(s=>s.rects).reduce((sum,t)=>{let coveredArea=0;for(const [a,b,c,d]of panels)coveredArea+=Math.max(0,Math.min(b,t.x1)-Math.max(a,t.x0))*Math.max(0,Math.min(d,t.y1)-Math.max(c,t.y0));return sum+Math.max(0,(t.x1-t.x0)*(t.y1-t.y0)-coveredArea);},0);
+  const uncovered=(slabs||[]).flatMap(s=>s.rects).reduce((sum,t)=>{let coveredArea=0;for(const [a,b,c,d]of [...panels,...irregularRegions305.flatMap(r=>r.rects.map(q=>[q.x0,q.x1,q.y0,q.y1]))])coveredArea+=Math.max(0,Math.min(b,t.x1)-Math.max(a,t.x0))*Math.max(0,Math.min(d,t.y1)-Math.max(c,t.y0));return sum+Math.max(0,(t.x1-t.x0)*(t.y1-t.y0)-coveredArea);},0);
   if(uncovered>.001)issue('SLAB',uncovered.toFixed(1)+' m² 未识别封闭梁格，请核对支承；未按悬臂板处理');
-  return {key,ts,columns,walls,beams,issues,panels,duplicateCandidates163,slabs:slabs||[],slabVoids,sh,min,...(columnsOnly?{columnsOnly:true}:{})};
+  return {key,ts,columns,walls,beams,issues,panels,irregularRegions305,duplicateCandidates163,slabs:slabs||[],slabVoids,sh,min,...(columnsOnly?{columnsOnly:true}:{})};
  }
  function slabPanels(ts,beams,walls,voids=[],columns=[]){
   const concrete=slabGeometry.concrete(beams,walls,columns),cuts=[...voids,...concrete],xs=unique([...ts.flatMap(t=>[t.x0,t.x1]),...cuts.flatMap(r=>[r.x0,r.x1])]),ys=unique([...ts.flatMap(t=>[t.y0,t.y1]),...cuts.flatMap(r=>[r.y0,r.y1])]);
@@ -1057,7 +1114,7 @@ const Engine=(()=>{
    const preservedBay246=snap.secondary?.find(v=>v.id===b.id&&sig(v.rawA,v.rawZ)===signature)?.bay171;
    for(const group of ['main','secondary','primary'])snap[group]=(snap[group]||[]).filter(v=>!(v.id===b.id&&sig(v.rawA,v.rawZ)===signature));
    const saved={id:row.id,kind:row.kind,rawA:clone(original.rawA),rawZ:clone(original.rawZ),a:clone(original.a),z:clone(original.z),b:row.b/1000,d:row.d==null?b.d:row.d/1000};
-   for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','bayBoundary300','fixedEnd101','secondaryCantilever101','extendToBoundary173','manualKind294','secondaryLinks304','retained304'])if(row[k]!==undefined)saved[k]=clone(row[k]);
+   for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','bayBoundary300','fixedEnd101','secondaryCantilever101','extendToBoundary173','manualKind294','secondaryLinks304','retained304','irregularBay305'])if(row[k]!==undefined)saved[k]=clone(row[k]);
    if(row.kind==='SB'&&preservedBay246)saved.bay171=clone(preservedBay246);
    if(!size.depthOverride184&&!size.preserveDepth184&&row.kind==='SB'&&size.d!=null)saved.depthOverride184=size.d;
    if(b.autoCantilever173&&row.kind==='MB')delete saved.fixedEnd101;

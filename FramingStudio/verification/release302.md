@@ -1,0 +1,14 @@
+# E2.302 - Keep automatic exterior walls inside the building outline
+
+Restoring an Opening to building area previously removed the opening-side offset and centred an automatic exterior wall on the boundary. The outer half of its thickness could then lie outside the building. Automatic exterior walls now face inward according to the complete building outline, including Opening cells. Full wall thickness is checked. Contradictory directions or impossible thickness retain an explicit geometry issue instead of silently choosing a side.
+
+Explicit manual offsets remain unchanged and receive a clear outside-building diagnostic in both the wall and region panels. The automatic-position label explains the exterior/interior distinction. Known perpendicular beam contacts follow the physical wall face before the existing collision and support checks. Manual widths, fixed coordinates, member/load reference lines and real Opening/overlap rejection remain intact. Non-axis wall-face contacts are recorded when geometry changes, survive save/reopen, and are invalidated by a later deliberate endpoint edit.
+
+Validation:
+- `wall-boundary302.cjs`: four exterior edges, reversed endpoints, Opening restoration, manual offset diagnostics, impossible geometry, manual and snapshot secondary-beam face contacts, stale-link invalidation and save/reopen.
+- The user's current project was tested locally in automatic, centred and both side-offset variants, without modifying the source project. Wall and beam counts are retained after restoration. Private project data and screenshots are not included in this repository.
+- Actual browser operations on an isolated current-project copy: paint Opening, restore building area, select outward/centred/inward/automatic wall positions, observe diagnostics and save the result. The original preview tab was not reloaded and its inputs were not replaced.
+- Existing wall-copy, wall/beam snapping, beam-network, secondary-bay, geometry-consistency and beam-type regression suites pass. Two old expected coordinates were updated to the newly requested inward wall/physical-face behavior.
+- All unrelated pre-existing tracked files, including calculation and reinforcement modules, Excel templates, VBA, ExcelBridge and Section A/B report routines, remain byte-identical to E2.301. Bundled HTML outside the changed geometry/UI modules and version label is identical. The Windows host changes only version metadata and was rebuilt.
+
+This is a geometry correction. Recomputing an edited model can change resulting spans/loads; calculation formulas and selection rules are unchanged. Native Excel/A/B generation was not rerun for this change. This branch includes the still-unmerged E2.301 fixes from PR #21 and builds on that exact head; official main remains unchanged until merge.

@@ -1,7 +1,7 @@
 // Portable geometry regression: no private model or browser required.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=path.resolve(__dirname,'../engine.js'),context=vm.createContext({module:{exports:{}},require:n=>require(path.resolve(path.dirname(source),n))});
-vm.runInContext(fs.readFileSync(source,'utf8').replace('return {transferBeamAt,','return {followBeamNetwork165,transferBeamAt,'),context);
+vm.runInContext(fs.readFileSync(source,'utf8').replace('return {columnReferenceAxes289,','return {followBeamNetwork165,columnReferenceAxes289,'),context);
 const E=context.module.exports,copy=x=>JSON.parse(JSON.stringify(x)),near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
 function fixture(){
  const p={types:{F01:{mode:'manual'}}},columns=[{id:'C1',x:10,y:0,cx:9.75,cy:.75,b:1.5,d:1.5},{id:'C2',x:10,y:20,cx:9.75,cy:19.25,b:1.5,d:1.5}];

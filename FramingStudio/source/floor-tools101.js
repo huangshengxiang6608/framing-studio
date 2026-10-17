@@ -164,3 +164,37 @@ const FloorColumns101=(()=>{
  for(const name of ['editSize','removeMember','setTransferColumn']){const original=Engine[name];Engine[name]=function(p,key,hit,...args){if(name==='editSize'&&hit.kind==='COL'){const f=hit.f||Engine.floors(p).find(v=>v.type===key)?.n,k=key||Engine.floors(p)[f-1]?.type;if(!k||!f)throw Error('柱楼层不存在');const size=args[0],df={...p.defaults,...p.types[k].columnDefaults101},result=Engine.generate(p),c=Engine.floorModel(result,f,k).columns.find(c=>c.id===hit.id);return resizeMany(p,result,k,f,[{hit:{...hit,f},b:size.b??df.cb,d:size.d??df.cd,bMode201:size.preserveColumnB201?c?.bMode201??'manual':size.b==null?'default':'manual',dMode201:size.preserveColumnD201?c?.dMode201??'manual':size.d==null?'default':'manual'}]);}if(hit.kind==='COL'&&hit.f){const f=hit.f,k=key||Engine.floors(p)[f-1]?.type;if(!k)throw Error('柱楼层不存在');return mutate(p,k,f,q=>original(q,k,{...hit,f:undefined},...args));}return original(p,key,hit,...args);};}
  return {positionMany257,resizeMany,recommendationPlan,applyRecommendations,record,view,mutate,defaults,mode,models,panel,copyAdjacent,copyManyAdjacent,removeMany,snap,viewport,isReference,assertEditable};
 })();
+
+// E2.292: copy physical wall geometry to the floor above without inheriting axis names.
+const FloorWalls292=(()=>{
+ const eps=1e-7,near=(a,b)=>Math.abs(a-b)<eps;
+ const same=(a,b)=>['x','y','w','d'].every(k=>near(a[k],b[k]));
+ function copyUp(p,result,key,f,hits){
+  if(!Number.isInteger(f)||result.floors[f-1]?.type!==key||!Array.isArray(hits)||!hits.length)throw Error('請先選取當層牆');
+  const target=f+1,targetKey=result.floors[target-1]?.type;if(!targetKey)throw Error('已是頂層，沒有上層可複製');
+  const source=Engine.floorModel(result,f,key),unique=[...new Map(hits.map(h=>[h.id,h])).values()];
+  for(const h of hits)if(h.kind!=='WALL'||h.f!=null&&h.f!==f||!source.walls.some(w=>w.id===h.id))throw Error('只能複製當層已選取的牆');
+  const label=FloorLevels.name(p,target);if(targetKey===key)return {copied:0,skipped:unique.length,target,message:label+' 與當層共用 '+key+'，牆已共用，無須重複複製。'};
+  const trial=Engine.clone(p),t=trial.types[targetKey],used=new Set(t.walls.map(w=>w.id));let current=result,copied=0,skipped=0;const ids=[];
+  for(const hit of unique){
+   const wall=source.walls.find(w=>w.id===hit.id),r=Engine.rect(wall),m=Engine.floorModel(current,target,targetKey),horizontal=near(wall.rawA[1],wall.rawZ[1]);
+   if(m.walls.some(w=>same(Engine.rect(w),r))){skipped++;continue;}
+   if(m.columns.some(c=>Engine.overlap(r,Engine.columnRect(c))))throw Error(hit.id+'：目標層此位置與現有柱重疊；整批未複製');
+   if(m.walls.some(w=>horizontal===near(w.rawA[1],w.rawZ[1])&&Engine.overlap(r,Engine.rect(w))))throw Error(hit.id+'：目標層有重疊的平行牆；整批未複製');
+   const raw=Engine.clone(p.types[key].walls.find(w=>w.id===hit.id));if(!raw)throw Error('牆已不存在，請重新選取');
+   const a=[...wall.rawA],z=[...wall.rawZ],matches=pos=>pos&&pos.a.every((v,i)=>near(v,wall.a[i]))&&pos.z.every((v,i)=>near(v,wall.z[i]));
+   let position=raw.axisPosition??'auto';
+   if(!matches(Engine.wallPosition(m.ts,a,z,wall.b,position))){const cross=horizontal?1:0,offset=wall.a[cross]-a[cross];position=near(offset,0)?'center':horizontal?(offset>0?'down':'up'):(offset>0?'right':'left');}
+   if(!matches(Engine.wallPosition(m.ts,a,z,wall.b,position)))throw Error(hit.id+'：目標層此位置不在有效建築範圍，未能保留牆位置；整批未複製');
+   let id=wall.id,n=1;while(used.has(id))id='W'+n++;used.add(id);
+   if(!copied)Engine.freezeAutoBeams(trial,targetKey,Engine.model(trial,targetKey));
+   t.walls.push({...raw,id,a:{x:a[0],y:a[1]},z:{x:z[0],y:z[1]},b:wall.b*1000,on:true,axisPosition:position});
+   current=Engine.generate(trial);const built=Engine.floorModel(current,target,targetKey).walls.find(w=>w.id===id);
+   if(!built||!same(Engine.rect(built),r))throw Error(hit.id+'：未能保留牆座標及厚度；整批未複製');
+   copied++;ids.push(id);
+  }
+  if(copied)p.types[targetKey]=trial.types[targetKey];
+  return {copied,skipped,target,ids,message:label+'：已複製 '+copied+' 面牆（'+targetKey+' 共用）'+(skipped?'；'+skipped+' 面相同牆已存在，略過':'')+'；可撤銷。'};
+ }
+ return {copyUp};
+})();

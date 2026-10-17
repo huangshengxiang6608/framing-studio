@@ -1,0 +1,161 @@
+{
+  "version": "E2.291",
+  "baseline": "d5c7cc45c4dfb1ee0603fed7029e4a0a6aba9b0f",
+  "modules": 36,
+  "scripts": 40,
+  "protectedModules": [
+    "audit-runner132.js",
+    "beam-layout116.js",
+    "beam-load-ui.js",
+    "beam-loads.js",
+    "beam-rebar116.js",
+    "beam-sizing.js",
+    "checks.js",
+    "column-alignment-ui.js",
+    "column-alignment.js",
+    "column-areas103.js",
+    "column-loads101.js",
+    "column-panel123.js",
+    "deflection-ui.js",
+    "deflection.js",
+    "display-quality.js",
+    "drawing.js",
+    "excel-formulas.js",
+    "excel-sync.js",
+    "explorer-ui.js",
+    "floor-levels.js",
+    "floor-tools101.js",
+    "foundation.js",
+    "framing-fold91.js",
+    "framing-symbols98.js",
+    "horizontal-path133.js",
+    "input-feedback172.js",
+    "load-data.js",
+    "load-path84.js",
+    "load-regions.js",
+    "loading.js",
+    "measure189.js",
+    "mobile.js",
+    "overall-report.js",
+    "overall-runtime.js",
+    "overall-source.js",
+    "rc-plan.js",
+    "report-compose.js",
+    "report-content.js",
+    "report-extras.js",
+    "report-paper.js",
+    "reports.js",
+    "review-layout191.js",
+    "right-inputs.js",
+    "slab-geometry120.js",
+    "slab-marks.js",
+    "slab-panel121.js",
+    "slab-support-ui132.js",
+    "slab-support132.js",
+    "steel-catalog.js",
+    "steel.js",
+    "transfer-markers.js",
+    "transfer-truss.js",
+    "truss-analysis.js",
+    "truss-catalog.js",
+    "truss-model.js",
+    "truss-reports.js",
+    "truss-ui.js",
+    "truss-zone.js",
+    "ui-polish173.js",
+    "usage.js",
+    "view-helpers87.js",
+    "wind-average93.js",
+    "workspace-pages.js"
+  ],
+  "nativeFiles": [
+    "FramingStudio/Excel/ExcelBridge.exe",
+    "FramingStudio/Excel/Foundation_Design_Checking_v8.xlsm",
+    "FramingStudio/Excel/ReportImages/horizontal-load-path.png",
+    "FramingStudio/Excel/ReportImages/vertical-load-path.png",
+    "FramingStudio/Excel/Section A RC - Section B v106 Loading.xlsm",
+    "FramingStudio/Excel/Section A RC - Section B v107 Full Loads.xlsm",
+    "FramingStudio/Excel/Section A RC - Section B v108 Area Loads.xlsm",
+    "FramingStudio/Excel/Section A RC - Section B v109 Compact Copy.xlsm",
+    "FramingStudio/Excel/Steel Beam design V095.xlsm",
+    "FramingStudio/Excel/deflection_core_wall_BD_layered.xlsm",
+    "FramingStudio/Excel/overall_checking_BD_copy_ruled.xlsm",
+    "FramingStudio/Excel/templates.json"
+  ],
+  "differentialProjects": [
+    "slab",
+    "cb"
+  ],
+  "tests": [
+    {
+      "test": "axis-insert291",
+      "exit": 0,
+      "ms": 365
+    },
+    {
+      "test": "column-spacing258",
+      "exit": 0,
+      "ms": 448
+    },
+    {
+      "test": "axis-insert291-ui",
+      "exit": 0,
+      "ms": 4641
+    },
+    {
+      "test": "column-spacing258-ui",
+      "exit": 0,
+      "ms": 3914
+    },
+    {
+      "test": "grid-snap217",
+      "exit": 0,
+      "ms": 514
+    },
+    {
+      "test": "column-delete289-ui",
+      "exit": 0,
+      "ms": 3371
+    },
+    {
+      "test": "column-representatives271",
+      "exit": 0,
+      "ms": 473
+    },
+    {
+      "test": "slab-representatives275",
+      "exit": 0,
+      "ms": 297
+    },
+    {
+      "test": "member-list290-ui",
+      "exit": 0,
+      "ms": 4336
+    },
+    {
+      "test": "check-native279",
+      "exit": 0,
+      "ms": 747
+    },
+    {
+      "test": "report-slab-preflight276",
+      "exit": 0,
+      "ms": 1577
+    },
+    {
+      "test": "check-ui279",
+      "exit": 0,
+      "ms": 559
+    },
+    {
+      "test": "summary-app282",
+      "exit": 0,
+      "ms": 634
+    },
+    {
+      "test": "local-rebar285",
+      "exit": 0,
+      "ms": 1391
+    }
+  ]
+}

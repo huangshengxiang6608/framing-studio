@@ -22,6 +22,22 @@ Section A/B 报告内容生成、公式、ExcelBridge、工作簿和 VBA 模板�
 - Preserve Section A/B report rendering, formulas, native ExcelBridge and workbook/VBA templates. Desktop host changes only its release version.
 - Based on official E2.290; the unmerged PR #14 E2.292 axis/wall-copy changes are not included.
 
+# E2.292 — Copy selected walls to the upper floor
+
+- Add Copy to Upper Floor to the wall selection panel for single, multiple and select-all walls, matching the column workflow.
+- Retain physical wall endpoints, thickness and face alignment across different architectural grids and Opening layouts. Apply to the destination Framing's shared floors; leave the source and other Framings intact.
+- Skip identical walls and shared-Framing no-ops, remap conflicting wall IDs, reject column/parallel-wall conflicts atomically, and preserve existing automatic beam geometry.
+- Commit pending wall name/thickness edits before the first copy click; invalid edits block copying. Retain one-step Undo, local backup, project reopen and top-floor disabling.
+- Keep E2.291 axis insertion, calculation rules, Section A/B reports and native Excel/VBA unchanged.
+
+# E2.291 — Insert axes without moving the existing grid
+
+- Add Insert buttons between every adjacent pair of X/Y axis rows. Enter an axis name and absolute coordinate in metres, preview both resulting gaps, then commit in one undoable transaction.
+- Split the original gap and remap building/Opening cells so existing axis coordinates, references and physical region boundaries remain fixed. Support arbitrary insertion order, inherited/nonzero-origin grids, shared Framing floors and saved projects.
+- Split local-height Area cells with the new axis; validate their union across intermediate floors so a split does not invalidate an unchanged physical Area.
+- Reject duplicate/blank names, coordinates outside the selected interval, gaps under 0.001 m and more than 20 axes; keep drafts and existing project data on failure or cancellation.
+- Preserve calculation equations, Section A/B report content/layout and native Excel/VBA templates.
+
 # E2.290 — Remove members from the Check list
 
 - The member-list remove button now hides the row as well as clearing Check/A/B flags; the physical member remains in the model.

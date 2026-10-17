@@ -1,0 +1,21 @@
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert/strict');
+const source=fs.readFileSync(path.join(__dirname,'../explorer-ui.js'),'utf8');
+const rep=vm.runInNewContext(source.slice(0,source.indexOf('function ExplorerUI(host)'))+';BeamRepresentatives250');
+const rows=['MB','CB','TB','SB','COL','SLAB','CS'].map((kind,i)=>({floor:1,id:kind,framing:'F1',kind:kind==='CS'?'SLAB':kind,displayType:kind,token:(kind==='CS'?'SLAB':kind)+'|'+kind,member:{d:.6},actions:{M:i+1},result:{values:{D22:i+1},inputs:{C28:10}},columnA:{transfer271:{known:true,sources:[]}}}));
+const groups=rep.select(rows),originalRows=JSON.stringify(rows),e={members:{'1|TB|manual':{steel:{C44:18,D44:32}}}};
+rep.sync(e,groups);
+for(const g of groups)rep.remove290(e,rep.key(g.winner));
+rep.manual(e,'1|MB|extra','selected',true);rep.manual(e,'1|MB|extra','reportA',false);rep.manual(e,'1|MB|extra','reportB',true);
+rep.remove290(e,'1|SB|unrelated');
+const saved=JSON.parse(JSON.stringify(e)),flags=x=>JSON.stringify([x.selected,x.reportA,x.reportB,x.representatives250.overrides,x.representatives250.hidden290]),before=flags(saved);
+rep.sync(saved,groups);assert.equal(flags(saved),before,'Ordinary refresh must retain deletions/manual flags');
+assert(rep.restore295(saved,groups));
+for(const g of groups){const k=rep.key(g.winner);for(const n of ['selected','reportA','reportB'])assert.equal(saved[n][k],true);assert(!saved.representatives250.hidden290[k]);assert(!saved.representatives250.overrides[k]);}
+assert(saved.selected['1|MB|extra']);assert.equal(saved.reportA['1|MB|extra'],false);assert(saved.reportB['1|MB|extra']);assert(saved.representatives250.hidden290['1|SB|unrelated']);
+assert.equal(JSON.stringify(saved.members),JSON.stringify(e.members));assert.equal(JSON.stringify(rows),originalRows);
+assert.equal(rep.restore295(saved,groups),false,'Repeated restore is idempotent');
+const reopened=JSON.parse(JSON.stringify(saved));assert.equal(rep.sync(reopened,groups),false);
+const k=rep.key(groups[0].winner);rep.manual(reopened,k,'reportA',false);rep.sync(reopened,groups);assert.equal(reopened.reportA[k],false,'Manual changes after restore still survive refresh');
+const incomplete=JSON.parse(JSON.stringify(e));rep.restore295(incomplete,groups.map(g=>({...g,missing:1})));for(const g of groups)assert.equal(incomplete.selected[rep.key(g.winner)],false,'Unknown maxima must not be restored');
+const next=rep.select([...rows.filter(r=>r.kind!=='MB'),{...rows[0],id:'new',token:'MB|new',actions:{M:999}}]);rep.sync(saved,next);assert(!saved.selected['1|MB|MB']);assert(saved.selected['1|MB|new']);assert(saved.selected['1|MB|extra']);
+console.log('PASS restore beam/column/slab defaults, persisted deletions, manual extras, incomplete groups, idempotence, later refresh/winner changes, unchanged RC inputs/results');

@@ -89,14 +89,33 @@ const Engine=(()=>{
   if(b.columnSupports164)return b.columnSupports164;
   return ['a','z'].map(end=>{const point=b[end],hits=columns.filter(c=>{if(c.status==='上层柱')return false;const r=columnRect(c);return Math.abs(point[0]-r.x)<=r.w/2+eps&&Math.abs(point[1]-r.y)<=r.d/2+eps;});return hits.length===1?{key:columnPositionKey(hits[0]),reference:columnReference(p,key,hits[0])}:null;});
  }
- function followMainColumns164(p,key,b,columns){
+ function followMainColumns164(p,key,b,columns,walls=[]){
   const links=mainColumnSupports164(p,key,b,columns),find=link=>{if(!link)return null;const live=columns.filter(c=>c.status!=='上层柱'),exact=live.find(c=>columnPositionKey(c)===link.key);if(exact)return exact;const matches=live.filter(c=>columnReference(p,key,c).every((v,i)=>near(v,link.reference[i])));return matches.length===1?matches[0]:null;},ends=links.map(find);
+  if(ends.filter(Boolean).length===1){
+   // A column-to-wall span must follow the column before collision testing.
+   // Keep the wall's connection station; only slide along its physical face.
+   const index=ends[0]?0:1,other=1-index,c=columnRect(ends[index]),horizontal=near(b.rawA[1],b.rawZ[1]),axis=horizontal?0:1,cross=1-axis;
+   const old=[b.a,b.z],next=old.map(q=>[...q]);next[index]=[c.x,c.y];next[other][cross]=next[index][cross];
+   const contains=(w,q)=>{const r=rect(w);return Math.abs(q[0]-r.x)<=r.w/2+eps&&Math.abs(q[1]-r.y)<=r.d/2+eps;};
+   const targets=walls.filter(w=>horizontal!==near(w.a[1],w.z[1])&&contains(w,old[other])&&contains(w,next[other]));
+   // A one-column CB keeps its free-end station, but its root must follow
+   // the column before overlap checks, just like the adjacent column-to-wall beam.
+   if((targets.length!==1&&(b.kind!=='CB'||links[other]||targets.length>1))||(next[1][axis]-next[0][axis])*(b.rawZ[axis]-b.rawA[axis])<=eps)return null;
+   return {a:next[0],z:next[1],columnSupports164:links};
+  }
   if(ends.some(c=>!c)||ends[0]===ends[1])return null;
   const rects=ends.map(columnRect),a=[rects[0].x,rects[0].y],z=[rects[1].x,rects[1].y],horizontal=near(b.rawA[1],b.rawZ[1]);
   // Unequal column offsets must not create a diagonal in the orthogonal model.
   if(horizontal?!near(a[1],z[1]):!near(a[0],z[0]))return null;
   const axis=horizontal?0:1;if((z[axis]-a[axis])*(b.rawZ[axis]-b.rawA[axis])<=eps)return null;
   return {a,z,columnSupports164:links};
+ }
+ // Resolve stored support identity before reading automatic width: an old
+ // endpoint can lie outside a column after shrinking its anchored section.
+ function linkedMainWidth299(p,key,b,columns,fallback){
+  const links=mainColumnSupports164(p,key,b,columns),live=columns.filter(c=>c.status!=='上层柱');
+  const ends=links.map(link=>{if(!link)return null;const exact=live.find(c=>columnPositionKey(c)===link.key);if(exact)return exact;const matches=live.filter(c=>columnReference(p,key,c).every((v,i)=>near(v,link.reference[i])));return matches.length===1?matches[0]:null;}).filter(Boolean);
+  return ends.length?Math.min(...ends.map(c=>near(b.rawA[1],b.rawZ[1])?c.d:c.b)):mainBeamWidth(columns,b.rawA,b.rawZ,fallback);
  }
  function bindMainColumns164(p,key,m){
   for(const b of [...p.types[key].autoBeamSnapshot?.main||[],...p.types[key].autoBeamSnapshot?.primary||[],...p.types[key].beams.filter(v=>['MB','CB','TB'].includes(v.kind))])if(!b.columnSupports164){const live=m.beams.find(v=>v.id===b.id&&(v.baseKind||v.kind)===b.kind);if(live)b.columnSupports164=mainColumnSupports164(p,key,live,m.columns);}
@@ -109,19 +128,20 @@ const Engine=(()=>{
   const mains=beams.filter(automatic),groups=[],groupOf=new Map(),findColumn=link=>{if(!link)return null;const cs=columns.filter(c=>c.status!=='上层柱'),exact=cs.find(c=>columnPositionKey(c)===link.key);if(exact)return exact;const match=cs.filter(c=>columnReference(p,key,c).every((v,i)=>near(v,link.reference[i])));return match.length===1?match[0]:null;};
   const links=new Map(mains.map(b=>[b,mainColumnSupports164(p,key,b,columns).map(findColumn)]));
   for(const first of mains){if(groupOf.has(first))continue;const group=[first];groupOf.set(first,group);for(let i=0;i<group.length;i++)for(const b of mains){if(groupOf.has(b)||horizontal(b)!==horizontal(first))continue;const a=axis(b),cross=1-a;if(!near(b.rawA[cross],first.rawA[cross]))continue;if(![group[i].rawA,group[i].rawZ].some(q=>[b.rawA,b.rawZ].some(v=>near(q[a],v[a]))))continue;group.push(b);groupOf.set(b,group);}groups.push(group);}
-  const proposals=new Map(),targetCross=new Map();
+  const proposals=new Map(),targetCross=new Map(),blocked=new Set();
   for(const group of groups){const a=axis(group[0]),cross=1-a,centres=unique(group.flatMap(b=>links.get(b).filter(Boolean).map(c=>{const r=columnRect(c);return cross?r.y:r.x;})));if(centres.length!==1)continue;for(const b of group)targetCross.set(b,centres[0]);}
   const position=b=>proposals.get(b)||b;
   // Walls retain their existing face connection; snapping to a wall centre can
   // extend an otherwise valid beam into the adjacent opening.
   function receiver(point,b){const a=axis(b),cross=1-a,hits=beams.filter(v=>v!==b&&horizontal(v)!==horizontal(b)&&near(v.rawA[a],point[a])&&point[cross]>=Math.min(v.rawA[cross],v.rawZ[cross])-eps&&point[cross]<=Math.max(v.rawA[cross],v.rawZ[cross])+eps),values=unique(hits.map(v=>targetCross.get(v)??position(v).a[a]));return values.length===1?values[0]:null;}
-  function valid(b,q){const a=axis(b),r=rect(q),others=beams.filter(v=>v!==b).map(position),supports=[...others.filter(v=>horizontal(v)!==horizontal(b)),...walls].map(rect).concat(columns.filter(c=>c.status!=='上层柱').map(columnRect)),connected=['a','z'].every(end=>q[end].every((v,i)=>near(v,b[end][i]))||supports.some(s=>Math.abs(q[end][0]-s.x)<=s.w/2+eps&&Math.abs(q[end][1]-s.y)<=s.d/2+eps));return connected&&(q.z[a]-q.a[a])*(b.rawZ[a]-b.rawA[a])>eps&&rectAllowed(ts,r.x,r.y,r.w,r.d)&&!beamSpaceConflict(q,others,columns);}
-  // Validate adjoining main spans together. If one chain cannot move, recalculate
-  // dependent connections using its original position instead of a rejected target.
+  function valid(b,q,checkBoundary=true){const a=axis(b),r=rect(q),others=beams.filter(v=>v!==b).map(position),supports=[...others.filter(v=>horizontal(v)!==horizontal(b)),...walls].map(rect).concat(columns.filter(c=>c.status!=='上层柱').map(columnRect)),connected=['a','z'].every(end=>q[end].every((v,i)=>near(v,b[end][i]))||supports.some(s=>Math.abs(q[end][0]-s.x)<=s.w/2+eps&&Math.abs(q[end][1]-s.y)<=s.d/2+eps));return connected&&(q.z[a]-q.a[a])*(b.rawZ[a]-b.rawA[a])>eps&&(!checkBoundary||rectAllowed(ts,r.x,r.y,r.w,r.d))&&!beamSpaceConflict(q,others,columns);}
+  // Resolve connected ends together before geometry checks. A boundary conflict
+  // retains the synchronized main geometry and its width for explicit review.
+  // Invalid/reversed or overlapping connections still reject the affected chain.
   let rejected=true;while(rejected){
    rejected=false;proposals.clear();
-   for(const b of mains){const a=axis(b),cross=1-a,value=targetCross.get(b);if(value===undefined)continue;const ends=['a','z'].map((end,i)=>{const q=[...b[end]],c=links.get(b)[i];q[cross]=value;if(c){const r=columnRect(c);q[a]=a?r.y:r.x;}else{const v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;}return q;});proposals.set(b,{...b,a:ends[0],z:ends[1]});}
-   for(const [b,q]of proposals){if(valid(b,q))continue;for(const member of groupOf.get(b))targetCross.delete(member);rejected=true;}
+   for(const b of mains){if(blocked.has(b))continue;const a=axis(b),cross=1-a,value=targetCross.get(b)??b.a[cross];const ends=['a','z'].map((end,i)=>{const q=[...b[end]],c=links.get(b)[i];q[cross]=value;if(c){const r=columnRect(c);q[a]=a?r.y:r.x;}else{const v=receiver(i?b.rawZ:b.rawA,b);if(v!==null)q[a]=v;}return q;});proposals.set(b,{...b,a:ends[0],z:ends[1]});}
+   for(const [b,q]of proposals){if(valid(b,q,false))continue;for(const member of groupOf.get(b)){targetCross.delete(member);blocked.add(member);}rejected=true;}
   }
   for(const [b,q]of proposals){b.a=q.a;b.z=q.z;}proposals.clear();targetCross.clear();
   // SB spacing stays fixed; endpoints follow only the accepted receiving beams.
@@ -129,8 +149,8 @@ const Engine=(()=>{
 
  }
  function freezeAutoBeams(p,key,m){
-  const snapshot={main:[],primary:[],secondary:[]};
-  for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,...(source.autoCantilever173?source.cantileverOrigin173:{}),kind:source.baseKind||source.kind};if(source.autoCantilever173)delete b.fixedEnd101;if(b.kind==='SB'&&m.panels){const bay=beamBay171(b,m.panels);if(bay)b.bay171=bay;}if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':b.kind==='SB'?'secondary':'primary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164','bay171','positionMode175','fixedA175','fixedZ175','loadKind194','depthOverride184','extendToBoundary173'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
+  const snapshot={main:[],primary:[],secondary:[]},boundaries300=bayEdges171([...m.walls,...m.beams.filter(v=>v.kind!=='SB'&&v.supportStatus==='connected')],m.columns);
+  for(const source of m.beams.filter(b=>b.source==='auto')){const b={...source,...(source.autoCantilever173?source.cantileverOrigin173:{}),kind:source.baseKind||source.kind};if(source.autoCantilever173)delete b.fixedEnd101;if(b.kind==='SB'&&m.panels){const bay=beamBay171(b,m.panels);if(bay){b.bay171=bay;const signature=bayBoundary300(bay,boundaries300);if(signature)b.bayBoundary300=signature;else delete b.bayBoundary300;}}if(b.kind==='MB')b.columnSupports164=mainColumnSupports164(p,key,b,m.columns);snapshot[b.kind==='MB'?'main':b.kind==='SB'?'secondary':'primary'].push(Object.fromEntries(['id','kind','a','z','rawA','rawZ','b','d','widthMode','fixedEnd101','secondaryCantilever101','columnSupports164','bay171','bayBoundary300','positionMode175','fixedA175','fixedZ175','loadKind194','depthOverride184','extendToBoundary173','manualKind294'].filter(k=>b[k]!==undefined).map(k=>[k,clone(b[k])])));}
   p.types[key].autoBeamSnapshot=snapshot;
  }
  // Adding a real column can turn an existing secondary span into a primary span.
@@ -316,10 +336,10 @@ const Engine=(()=>{
   const status=()=>new Map(Loading.supportModel(p,model(),f).beams.map(b=>[b.id,b.supportStatus]));
   const held=(b,end,states)=>{const choices=Loading.supportOptions(model(),b,end),manual=Loading.manualSupport(p,model(),f,b,end);if(manual)return !manual.invalid&&(manual.type!=='BEAM'||states.get(manual.member.id)==='connected');
    const direct=choices.filter(v=>v.type!=='BEAM');if(direct.length)return direct.some(v=>v.type==='WALL')||direct.length===1;
-   const q=end==='a'?b.rawA:b.rawZ,hits=choices.filter(v=>{if(v.type!=='BEAM'||states.get(v.member.id)!=='connected')return false;const c=Loading.contact(q,v.member),len=Math.hypot(v.member.rawZ[0]-v.member.rawA[0],v.member.rawZ[1]-v.member.rawA[1]);return c&&c.x>eps&&c.x<len-eps;});return hits.length===1;
+   const q=end==='a'?b.rawA:b.rawZ,hits=choices.filter(v=>{if(v.type!=='BEAM'||states.get(v.member.id)!=='connected')return false;const c=v.contact,len=Math.hypot(v.member.rawZ[0]-v.member.rawA[0],v.member.rawZ[1]-v.member.rawA[1]);return c&&(c.x>eps&&c.x<len-eps||Loading.cbTipSupport(p,result(),f,v.member,q,c));});return hits.length===1;
   };
   for(const b of beams.filter(b=>b.kind==='CB'&&b.extendToBoundary173)){const root=Loading.cbRoot(p,result(),f,b);if(root.fixedEnd)extendCantilever173(b,root.fixedEnd,ts,beams,columns,issue);}
-  let states=status();const candidates=beams.filter(b=>b.kind==='MB'&&states.get(b.id)!=='connected'&&held(b,'a',states)!==held(b,'z',states)),labels=new Map(candidates.map((b,i)=>[b.id,'CB-'+String(i+1).padStart(2,'0')])),used=new Set(beams.map(b=>b.id));
+  let states=status();const candidates=beams.filter(b=>b.kind==='MB'&&b.manualKind294!==b.kind&&states.get(b.id)!=='connected'&&held(b,'a',states)!==held(b,'z',states)),labels=new Map(candidates.map((b,i)=>[b.id,'CB-'+String(i+1).padStart(2,'0')])),used=new Set(beams.map(b=>b.id));
   candidates.sort((a,b)=>Math.hypot(a.z[0]-a.a[0],a.z[1]-a.a[1])-Math.hypot(b.z[0]-b.a[0],b.z[1]-b.a[1])||a.id.localeCompare(b.id));
   for(const b of candidates){states=status();if(states.get(b.id)==='connected')continue;const ha=held(b,'a',states),hz=held(b,'z',states);if(ha===hz)continue;
    const root=ha?'a':'z';b.cantileverOrigin173={a:[...b.a],z:[...b.z],rawA:[...b.rawA],rawZ:[...b.rawZ]};b.baseKind='MB';b.kind=b.displayKind='CB';b.autoCantilever173=true;b.fixedEnd101=root;b.displayId=labels.get(b.id);while(used.has(b.displayId))b.displayId+='A';used.add(b.displayId);
@@ -347,6 +367,29 @@ const Engine=(()=>{
    return point;
   });return {...b,rawA:ends[0],rawZ:ends[1]};
  });}
+ // Identify a bay by its ordered boundary members, not changing coordinates.
+ // Full coverage and a unique match are required; split/merged bays stay guarded.
+ function bayBoundary300(bay,edges){
+  const [x0,x1,y0,y1]=bay,sides=[[[x0,y0],[x1,y0]],[[x1,y0],[x1,y1]],[[x0,y1],[x1,y1]],[[x0,y0],[x0,y1]]],keys=[];
+  for(const [a,z]of sides){const axis=near(a[1],z[1])?0:1,cross=1-axis,hits=edges.filter(b=>near(b.rawA[cross],a[cross])&&near(b.rawZ[cross],a[cross])&&Math.min(Math.max(b.rawA[axis],b.rawZ[axis]),z[axis])-Math.max(Math.min(b.rawA[axis],b.rawZ[axis]),a[axis])>eps);
+   if(!hits.length||!covered(hits,a,z))return null;
+   keys.push([...new Set(hits.map(b=>(b.kind==='WALL'?'W:':'B:')+b.id))].sort());
+  }return JSON.stringify(keys);
+ }
+ function followedBays300(saved,edges,currentEdges,bays,beams){
+  const groups=new Map(),current=new Map(),out=new Map(),referenceEdges=bayEdges171(edges.map(e=>({...e,a:e.rawA,z:e.rawZ})),[]);
+  for(const bay of bays){const signature=bayBoundary300(bay,currentEdges);if(signature){const matches=current.get(signature)||[];matches.push(bay);current.set(signature,matches);}}
+  for(const s of saved){if(!s.bay171)continue;const key=bayKey171(s.bay171),group=groups.get(key)||[];group.push(s);groups.set(key,group);}
+  const signatures=new Map();
+  for(const [key,group]of groups){const values=[...new Set(group.map(s=>s.bayBoundary300||bayBoundary300(s.bay171,edges)||bayBoundary300(s.bay171,referenceEdges)))];if(values.length!==1||!values[0])continue;const sig=values[0],matches=signatures.get(sig)||[];matches.push(key);signatures.set(sig,matches);}
+  for(const [signature,keys]of signatures){const matches=current.get(signature);if(keys.length!==1||matches?.length!==1)continue;const bay=matches[0],group=groups.get(keys[0]);
+   const fits=group.every(s=>{const live=beams.find(b=>b.kind==='SB'&&b.source==='auto'&&b.id===s.id&&sig(b.rawA,b.rawZ)===sig(s.rawA,s.rawZ));if(!live||!beamBay171(live,[bay]))return false;
+    const axis=near(live.a[1],live.z[1])?0:near(live.a[0],live.z[0])?1:-1;if(axis<0)return false;
+    return [live.a,live.z].every(q=>currentEdges.some(e=>{const r=rect(e);return near(e.rawA[axis],e.rawZ[axis])&&(near(e.rawA[axis],bay[axis?2:0])||near(e.rawA[axis],bay[axis?3:1]))&&Math.abs(q[0]-r.x)<=r.w/2+eps&&Math.abs(q[1]-r.y)<=r.d/2+eps;}));
+   });
+   if(fits)for(const s of group)out.set(s,{bay,signature});
+  }return out;
+ }
  const bayKey171=r=>r.map(v=>Number(v.toFixed(6))).join('|');
  function beamBay171(b,panels){const a=b.a||b.rawA,z=b.z||b.rawZ,x=(a[0]+z[0])/2,y=(a[1]+z[1])/2;return panels.find(r=>x>r[0]+eps&&x<r[1]-eps&&y>r[2]+eps&&y<r[3]-eps);}
  // Split existing main beams at current, load-bearing columns, including saved layouts.
@@ -515,8 +558,8 @@ const Engine=(()=>{
   // Keep already valid records first: an older, auto-width record must not
   // displace a correctly positioned replacement when its section grows.
   const duplicateCandidates163=[],manualCandidates=t.beams.filter(c=>c.on).map(c=>{
-   const a=resolve(p,c.a),z=resolve(p,c.z),automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?mainBeamWidth(columns,a,z,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??(c.widthMode==='default'?df[c.kind==='SB'?'sb':'mb']:c.b):c.widthMode==='default'?df[c.kind==='TB'?'tb':'mb']:c.b)/1000;
-   const linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns):null,linkedRect=linked&&rect({...linked,b}),fixed=c.positionMode175==='fixed'&&c.fixedA175&&c.fixedZ175?{a:clone(c.fixedA175),z:clone(c.fixedZ175)}:null;
+   const a=resolve(p,c.a),z=resolve(p,c.z),linked=c.positionMode175!=='fixed'&&['MB','CB','TB'].includes(c.kind)?followMainColumns164(p,key,{...c,a,z,rawA:a,rawZ:z},columns,walls):null,automatic=(c.kind==='MB'&&c.widthMode==='column'||c.kind==='CB'&&(t.cbColumnWidth171!==true||c.widthMode!=='manual')),b=automatic?linkedMainWidth299(p,key,{...c,a,z,rawA:a,rawZ:z},columns,(t.beamWidths83?.[sig(a,z)]??df.mb)/1000):(['MB','SB'].includes(c.kind)?t.beamWidths83?.[sig(a,z)]??(c.widthMode==='default'?df[c.kind==='SB'?'sb':'mb']:c.b):c.widthMode==='default'?df[c.kind==='TB'?'tb':'mb']:c.b)/1000;
+   const linkedRect=linked&&rect({...linked,b}),fixed=c.positionMode175==='fixed'&&c.fixedA175&&c.fixedZ175?{a:clone(c.fixedA175),z:clone(c.fixedZ175)}:null;
    const original=fixed||lineAllowed(ts,a,z,b,c.edgeInset===true),pos=linkedRect&&rectAllowed(ts,linkedRect.x,linkedRect.y,linkedRect.w,linkedRect.d)?linked:original||(automatic?lineAllowed(ts,a,z,b,true):null);
    return {c,a,z,b,pos,adjusted:!original&&!!pos};
   }).sort((a,b)=>Number(a.adjusted)-Number(b.adjusted));
@@ -537,8 +580,8 @@ const Engine=(()=>{
    // Snapshots preserve topology; automatic MB and CB widths follow columns.
    // Missing widthMode is a legacy automatic snapshot; explicit widths stay fixed.
    const fixed=t.beamWidths83?.[sig(saved.rawA,saved.rawZ)],automatic=['MB','CB'].includes(saved.kind)&&saved.widthMode!=='manual'&&fixed==null;
-   const followed=saved.positionMode175!=='fixed'&&['MB','CB','TB'].includes(saved.kind)?followMainColumns164(p,key,saved,columns):null;
-   const width=automatic?mainBeamWidth(columns,followed?.a||saved.rawA,followed?.z||saved.rawZ,df.mb/1000):fixed!=null?fixed/1000:saved.widthMode!=='manual'?df[saved.kind==='SB'?'sb':saved.kind==='TB'?'tb':'mb']/1000:saved.b;
+   const followed=saved.positionMode175!=='fixed'&&['MB','CB','TB'].includes(saved.kind)?followMainColumns164(p,key,saved,columns,walls):null;
+   const width=automatic?linkedMainWidth299(p,key,saved,columns,df.mb/1000):fixed!=null?fixed/1000:saved.widthMode!=='manual'?df[saved.kind==='SB'?'sb':saved.kind==='TB'?'tb':'mb']/1000:saved.b;
    const candidate=followed&&{...followed,b:width},box=candidate&&rect(candidate),canFollow=box&&rectAllowed(ts,box.x,box.y,box.w,box.d)&&!beamSpaceConflict(candidate,beams,columns);
    const prior=rect({...saved,b:width}),pos=saved.positionMode175==='fixed'?{a:saved.a,z:saved.z}:canFollow?followed:automatic||!rectAllowed(ts,prior.x,prior.y,prior.w,prior.d)?lineAllowed(ts,saved.rawA,saved.rawZ,width,true):{a:saved.a,z:saved.z},beam={...clone(saved),...pos,b:width,widthMode:fixed!=null?'manual':automatic?'column':saved.widthMode??'default'};
    // Saved automatic candidates outside the current model are dormant records, not current members.
@@ -581,8 +624,10 @@ const Engine=(()=>{
    if(fits)for(const s of inside)if(!s.bay171)recoveredBays246.set(s,bay);
   }
   for(const s of savedSB171){const bay=recoveredBays246.get(s);if(!bay)continue;const live=beams.find(b=>b.source==='auto'&&b.kind==='SB'&&b.id===s.id&&sig(b.rawA,b.rawZ)===sig(s.rawA,s.rawZ));if(live)live.bay171=clone(bay);}
+  const followed300=followedBays300(savedSB171,edges,bayEdges171(edges,columns),currentBays171,beams);
+  for(const [s,{bay,signature}]of followed300){const live=beams.find(b=>b.source==='auto'&&b.kind==='SB'&&b.id===s.id&&sig(b.rawA,b.rawZ)===sig(s.rawA,s.rawZ));live.bay171=clone(bay);live.bayBoundary300=signature;}
   // Repair only bays whose primary boundaries changed, retaining other saved spacing.
-  for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=b.bay171||recoveredBays246.get(b)||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
+  for(const bay of currentBays171){const key171=bayKey171(bay),affected=savedSB171.filter(b=>{const old=followed300.get(b)?.bay||b.bay171||recoveredBays246.get(b)||beamBay171(b,oldBays171);return old&&intersectArea(panelRect(old),panelRect(bay))>eps&&bayKey171(old)!==key171;});if(!affected.length)continue;
    const customized=affected.some(b=>{const token=typeof Loading!=='undefined'?Loading.token(b.kind,b):null;return token&&Object.entries(p.explorer?.members||{}).some(([k,v])=>k.endsWith('|'+token)&&v&&Object.keys(v).length)||t.beamWidths83?.[sig(b.rawA,b.rawZ)]!=null||t.beamDepths201?.[sig(b.rawA,b.rawZ)]!=null||b.depthOverride184!=null;});
    if(customized){issue('SB','主梁 bay 已改變，但原次梁有構件輸入；請核對後重新布置該 bay');continue;}changedBays171.add(key171);
   }
@@ -610,6 +655,11 @@ const Engine=(()=>{
   }
   for(const b of beams)if(b.kind==='SB'&&b.displayKind==='CB')b.d=sh;
   followBeamNetwork165(p,key,beams,columns,walls,ts);
+  // Report after both follow passes, so each affected member appears once.
+  // Do not disguise a retained manual-width conflict as a successful fit.
+  for(const b of beams.filter(b=>['MB','CB','TB'].includes(b.kind)&&b.positionMode175!=='fixed')){
+   const r=rect(b);if(!rectAllowed(ts,r.x,r.y,r.w,r.d))issue(b.displayId||b.id,'梁端已跟隨柱及相連梁同步；梁截面越出建築邊界或穿越 Opening（梁寬 '+Math.round(b.b*1000)+' mm'+(b.widthMode==='manual'?'，保留手動梁寬':'')+'），請核對梁寬、柱位或邊界；未取消整列移動');
+  }
   const slabVoids=(t.slabVoids||[]).flatMap(r=>ts.filter(t=>t.state===1).map(t=>({x0:Math.max(t.x0,r.x0),x1:Math.min(t.x1,r.x1),y0:Math.max(t.y0,r.y0),y1:Math.min(t.y1,r.y1)})).filter(r=>r.x1>r.x0&&r.y1>r.y0));
   const columnsOnly=layout?.columnsOnly===true&&!beams.length;
   const slabs=columnsOnly?[]:slabPanels(ts,beams,walls,slabVoids,columns);if(slabs===null)issue('SLAB','板块分隔过于复杂，未显示板块信息；请减少自由坐标分段');
@@ -759,7 +809,7 @@ const Engine=(()=>{
     const target=transferBeamAt(p,resolved,lower.n,point);
     if(!target||!['MB','SB','TB'].includes(target.kind)||target.displayKind==='CB'||target.supportStatus!=='connected')continue;
     const beam=own(lower.n).beams.find(b=>b.id===target.id),column=own(upper.n).columns.find(v=>v.id===c.id);
-    if(beam.kind!=='TB'){beam.baseKind=beam.kind;beam.kind=beam.displayKind='TB';beam.autoTransfer=true;beam.displayId='TB-'+beam.id;}
+    if(beam.kind!=='TB'&&beam.manualKind294!==beam.kind){beam.baseKind=beam.kind;beam.kind=beam.displayKind='TB';beam.autoTransfer=true;beam.displayId='TB-'+beam.id;}
     (beam.transferLandings??=[]).push({floor:upper.n,id:c.id,point:[...point]});
     column.isTransferColumn=true;if(!column.transferManual)column.transferReason='自動識別：'+lower.n+'/F '+(beam.displayId||beam.id)+' 承托，無直接下層柱或牆';
    }
@@ -873,13 +923,14 @@ const Engine=(()=>{
   if(hit.kind==='SLAB'){assertSlab241(size.b??p.defaults.slab);const s=m.slabs.find(s=>s.id===hit.slabId);if(!s)throw Error('板块已不存在');const signature=slabSignature(s);t.slabSizes=(t.slabSizes||[]).filter(s=>s.signature!==signature);if(size.b!==null)t.slabSizes.push({signature,value:size.b});return;}
   if(hit.kind==='COL'){const c=m.columns.find(c=>c.id===hit.id);if(!c)throw Error('柱已不存在');if(t.mode==='auto'&&c.anchorX!==undefined){t.columnSizes=(t.columnSizes||[]).filter(o=>o.ax!==c.anchorX||o.ay!==c.anchorY);if(size.b!==null||size.d!==null)t.columnSizes.push({ax:c.anchorX,ay:c.anchorY,b:size.b??t.columnDefaults101?.cb??p.defaults.cb,d:size.d??t.columnDefaults101?.cd??p.defaults.cd,bMode201:size.b==null?'default':'manual',dMode201:size.d==null?'default':'manual'});}else{const row=t.columns.find(c=>c.id===hit.id);row.b=size.b??t.columnDefaults101?.cb??p.defaults.cb;row.d=size.d??t.columnDefaults101?.cd??p.defaults.cd;row.bMode201=size.b==null?'default':'manual';row.dMode201=size.d==null?'default':'manual';}return;}
   if(hit.kind==='WALL'){const row=t.walls.find(w=>w.id===hit.id);if(!row)throw Error('墙已不存在');row.b=size.b??p.defaults.wall;return;}
-  const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)throw Error('梁已不存在');if(size.depthOverride184&&size.d!==null){for(const f of floors(p).filter(f=>f.type===key)){const limit=LocalHeights96.beamAllowance(p,f.n,b);if(size.d>limit+1e-6)throw Error(b.id+' 梁深 '+size.d+' mm 超過 '+FloorLevels.name(p,f.n)+' Structural Zone 上限 '+limit+' mm；未套用');}}const requestedKind=size.kind??b.kind,nextKind=(b.autoTransfer||b.autoCantilever173)&&requestedKind===b.kind?b.baseKind:requestedKind;if(!['MB','SB','TB','CB'].includes(nextKind))throw Error('梁类型须为 MB、SB、TB 或 CB');if(nextKind!==b.kind&&m.beams.some(other=>other!==b&&other.kind===nextKind&&sig(other.rawA,other.rawZ)===sig(b.rawA,b.rawZ)))throw Error('同位置已存在该类型的梁，请先检查重复构件');if(b.splitMainParent||b.splitSecondaryParent200){materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}let row=t.beams.find(c=>c.id===b.id&&c.kind===(b.baseKind||b.kind)&&b.source==='manual');
+  const b=m.beams.find(b=>b.id===hit.id&&b.kind===hit.kind);if(!b)throw Error('梁已不存在');if(size.depthOverride184&&size.d!==null){for(const f of floors(p).filter(f=>f.type===key)){const limit=LocalHeights96.beamAllowance(p,f.n,b);if(size.d>limit+1e-6)throw Error(b.id+' 梁深 '+size.d+' mm 超過 '+FloorLevels.name(p,f.n)+' Structural Zone 上限 '+limit+' mm；未套用');}}const requestedKind=size.kind??b.kind,nextKind=(b.autoTransfer||b.autoCantilever173)&&requestedKind===b.kind&&!size.manualKind294?b.baseKind:requestedKind;if(!['MB','SB','TB','CB'].includes(nextKind))throw Error('梁类型须为 MB、SB、TB 或 CB');if(nextKind!==b.kind&&m.beams.some(other=>other!==b&&other.kind===nextKind&&sig(other.rawA,other.rawZ)===sig(b.rawA,b.rawZ)))throw Error('同位置已存在该类型的梁，请先检查重复构件');if(b.splitMainParent||b.splitSecondaryParent200){materializeColumnSpans170(p,key,m);freezeAutoBeams(p,key,m);}let row=t.beams.find(c=>c.id===b.id&&c.kind===(b.baseKind||b.kind)&&b.source==='manual');
   if(size.b!==null)assertBeamWidth241(p,key,requestedKind,size.b);
   const autoEdit201=b.source==='auto';
   if(autoEdit201){if(!batch244)freezeAutoBeams(p,key,m);const original=beamIdentity173(b);row={...clone(b),id:b.id,kind:nextKind,a:{x:original.rawA[0],y:original.rawA[1]},z:{x:original.rawZ[0],y:original.rawZ[1]},b:b.b*1000,d:null,on:true};}
   if(!row){let n=1;while(t.beams.some(b=>b.id==='EDIT_'+n))n++;const original=beamIdentity173(b),signature=sig(original.rawA,original.rawZ);if(!t.suppressed.includes(signature))t.suppressed.push(signature);row={id:'EDIT_'+n,kind:nextKind,a:{x:original.rawA[0],y:original.rawA[1]},z:{x:original.rawZ[0],y:original.rawZ[1]},on:true,original:signature};t.beams.push(row);}
   if(b.loadKind194)row.loadKind194=b.loadKind194;
   row.columnSupports164=clone(b.columnSupports164||mainColumnSupports164(p,key,b,m.columns));
+  if(size.manualKind294||requestedKind!==b.kind)row.manualKind294=nextKind;
   row.positionMode175=size.positionMode175??b.positionMode175??'follow';delete row.typeMode175;
   if(row.positionMode175==='fixed'){row.fixedA175=clone(b.a);row.fixedZ175=clone(b.z);}else{delete row.fixedA175;delete row.fixedZ175;}
   if(t.beamWidths83)delete t.beamWidths83[sig(b.rawA,b.rawZ)];row.edgeInset=true;if(nextKind==='CB'&&(b.kind!=='CB'||b.autoCantilever173))row.extendToBoundary173=true;row.widthMode=size.preserveWidth199?(b.widthMode??(b.source==='auto'?(b.kind==='SB'?'default':['MB','CB'].includes(b.kind)?'column':'manual'):'manual')):size.b===null?(["MB","CB"].includes(nextKind)?"column":"default"):"manual";row.kind=nextKind;row.b=size.b??(nextKind==='SB'?secondaryWidth(p,key):p.defaults[nextKind==='TB'?'tb':'mb']);if(size.depthOverride184){if(size.d===null)delete row.depthOverride184;else row.depthOverride184=size.d;}row.d??=null;if(requestedKind!==b.kind&&!size.depthOverride184){delete row.depthOverride184;row.d=null;}else if(!size.preserveDepth184)row.d=['MB','TB','CB'].includes(nextKind)?null:size.d;if(autoEdit201){
@@ -887,7 +938,7 @@ const Engine=(()=>{
    const preservedBay246=snap.secondary?.find(v=>v.id===b.id&&sig(v.rawA,v.rawZ)===signature)?.bay171;
    for(const group of ['main','secondary','primary'])snap[group]=(snap[group]||[]).filter(v=>!(v.id===b.id&&sig(v.rawA,v.rawZ)===signature));
    const saved={id:row.id,kind:row.kind,rawA:clone(original.rawA),rawZ:clone(original.rawZ),a:clone(original.a),z:clone(original.z),b:row.b/1000,d:row.d==null?b.d:row.d/1000};
-   for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','fixedEnd101','secondaryCantilever101','extendToBoundary173'])if(row[k]!==undefined)saved[k]=clone(row[k]);
+   for(const k of ['widthMode','depthOverride184','positionMode175','fixedA175','fixedZ175','columnSupports164','loadKind194','bay171','bayBoundary300','fixedEnd101','secondaryCantilever101','extendToBoundary173','manualKind294'])if(row[k]!==undefined)saved[k]=clone(row[k]);
    if(row.kind==='SB'&&preservedBay246)saved.bay171=clone(preservedBay246);
    if(!size.depthOverride184&&!size.preserveDepth184&&row.kind==='SB'&&size.d!=null)saved.depthOverride184=size.d;
    if(b.autoCantilever173&&row.kind==='MB')delete saved.fixedEnd101;
@@ -942,6 +993,6 @@ const Engine=(()=>{
   return {lo:floor,hi:floor};
  }
  function floorModel(result,f,key){const n=typeof f==="object"?f.n:f,k=key??result?.floors[n-1]?.type;return result?.floorModels?.[n]?.key===k?result.floorModels[n]:result?.models[k];}
- return {insertAxis291,columnReferenceAxes289,removeColumns289,editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
+ return {columnReferenceAxes289,insertAxis291,removeColumns289,editBeamSizes245,editBeamWidths244,beamFire241,beamMinimum241,assertBeamWidth241,assertSlab241,validateDimensionChanges241,secondaryWidth,promoteColumnBeams194,columnLoadPoint,transferBeamAt,beamSpaceConflict,bindMainColumns164,freezeAutoBeams,baseModel,floorModel,columnDirections,columnPositionKey,columnPositionRecord,setColumnPosition,mainBeamWidth,wallPosition,columnReference,addSecondaryArea,secondaryAreaRule,columnAxes,columnGridDraft,noColumn,addColumn,setColumnMode,structuralHeight,applyClearances,clone,columnRect,setRegion,setTransferColumn,axisData,ownAxes,axes,resolve,validate,floors,tiles,rectAllowed,align,rect,overlap,on,sig,model,generate,removeAxis,removeType,openingGroups,removeOpening,viewRange,removeBeam,removeMember,removeMembers,editSize};
 })();
 if(typeof module!=='undefined')module.exports=Engine;

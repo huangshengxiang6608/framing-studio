@@ -60,6 +60,8 @@ class ReportService251:
         return target
 
 class PreviewHandler251(SimpleHTTPRequestHandler):
+    # Windows MIME registry entries can map .mjs to text/plain; module loading requires JavaScript.
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js':'text/javascript', '.mjs':'text/javascript'}
     def __init__(self,*args,service,**kwargs): self.service=service;super().__init__(*args,**kwargs)
     def allowed(self):
         port=self.server.server_port;hosts={f'127.0.0.1:{port}',f'localhost:{port}'}

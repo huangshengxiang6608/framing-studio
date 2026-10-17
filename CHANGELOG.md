@@ -1,3 +1,27 @@
+# E2.297 — Preserve explicit beam types and resolve physical end supports
+
+E2.297 修复手动梁类型被自动识别覆盖，以及贴边梁端支承漏判。
+
+- 手动选择并应用 MB / SB / TB / CB 后保留类型；尺寸恢复、重新计算、共用楼层、保存重开均保留。没有手动指定的梁保留原自动识别逻辑。
+- 梁端与垂直承托梁实际截面相接时，支承提示、连接检查和反力传递采用同一连接位置。普通点荷载／柱荷载的 contact 定位不扩大。
+- 真实间隙、平行梁、超出承托梁长度、多重支承及循环支承仍待确认；手动改类型不使缺失支承的 Check 通过。保留上层柱的荷载及落点。
+- 保留 PR #16（E2.294／E2.295／E2.296）的柱结果显示修正、重新抽选预设代表构件及定位时保留当前页面功能。PR #14（轴线插入／向上复制墙）仍独立。
+
+验证：新增四组计算回归及真实界面测试通过，包含水平／竖向、端点反向、反力守恒、手动支承、撤销、非法尺寸输入、尺寸恢复和保存重开。现有自动转换梁 34 项断言、悬臂支承、板传荷、绘图支承及几何回归通过。
+
+Section A/B 报告内容生成、公式、ExcelBridge、工作簿和 VBA 模板保持不变；本轮未重新运行原生 Excel 出抄；预览测试使用合成 PDF，也没有运行整套历史测试。旧 member-depth204-ui 测试的弹窗不可见超时在原版 E2.293 同样复现；本次对应界面流程由新增测试通过验证。
+
+已修复报告预览在后台进度更新时跳回顶部：保留同一 PDF 和画布，只更新状态区域，并保留当前阅读位置及展开状态。16 页真实 PDF 的连续滚轮、后台进度、A/B 切换及新 PDF 替换测试通过。用户原项目和旧版本文件保持不变。
+
+# E2.293 — Column tributary areas and geometry consistency
+
+- Match adjacent columns using their physical section projection at wall ends, retaining actual centre/reference-line tributary boundaries. Detect missing, overlapping, outside and unresolved allocations and propagate unresolved results to Check/report inputs.
+- List and clean enabled columns wholly outside the current Framing's building outline. Subsequent outline edits synchronize cleanup in the same undoable transaction. Retain openings, edge/partially crossing columns and other Framings.
+- Follow resized column centres for horizontal/vertical column-to-wall beams before overlap checks; preserve explicit fixed coordinates and independently assigned loads/design. Existing protected duplicate handling retains replacement beams.
+- Group geometry warnings by Framing and reason, separate them from member checks, and locate excluded records with temporary dashed outlines.
+- Preserve Section A/B report rendering, formulas, native ExcelBridge and workbook/VBA templates. Desktop host changes only its release version.
+- Based on official E2.290; the unmerged PR #14 E2.292 axis/wall-copy changes are not included.
+
 # E2.292 — Copy selected walls to the upper floor
 
 - Add Copy to Upper Floor to the wall selection panel for single, multiple and select-all walls, matching the column workflow.
